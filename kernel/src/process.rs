@@ -10,6 +10,8 @@ use core::{
     mem, ptr,
 };
 
+use common::elf::{*};
+
 extern "C" {
     static __kernel_base: u8;
 }
