@@ -30,7 +30,7 @@ impl Elf64Hdr {
             None
         } else {
             unsafe {
-                let base_addr = elf_header_addr.add(self.e_shoff) as *const Elf64Shdr;
+                let base_addr = elf_header_addr.add(self.e_shoff).cast::<Elf64Shdr>();
                 Some(base_addr.add((idx - 1) as usize))
             }
         }
@@ -175,6 +175,19 @@ pub enum ProgramFlags {
     X = 0x01,
     W = 0x02,
     R = 0x04
+}
+
+impl ProgramFlags {
+    #[inline]
+    pub fn is_executable(flags: u32) -> bool {
+        (Self::X as u32 & flags) == Self::X as u32
+    }
+    pub fn is_writable(flags: u32) -> bool {
+        (Self::W as u32 & flags) == Self::W as u32
+    }
+    pub fn is_readable(flags: u32) -> bool {
+        (Self::R as u32 & flags) == Self::R as u32
+    }
 }
 
 // Section header

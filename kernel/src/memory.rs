@@ -23,6 +23,10 @@ impl<T> Address<T> {
     pub const fn new(addr: usize) -> Self {
         Self { addr, _phantom: PhantomData }
     }
+
+    pub fn add(&self, count: usize) -> Self {
+        Self { addr: self.addr + count, _phantom: self._phantom }
+    }
 }
 
 impl<T> From<usize> for Address<T> {

@@ -1,16 +1,18 @@
+use crate::common::align_up;
 use crate::memory::{PhysAddr, VirtAddr};
 use crate::{
     memory::{__free_ram_end, alloc_pages, PAGE_SIZE},
     page::{map_page, PAGE_R, PAGE_U, PAGE_V, PAGE_W, PAGE_X, SATP_SV48},
     write_csr,
 };
+use core::cmp::min;
 use core::{
     any::type_name,
     arch::{asm, naked_asm},
     mem, ptr,
 };
 
-use common::elf::{*};
+use common::elf::*;
 
 extern "C" {
     static __kernel_base: u8;
@@ -66,7 +68,7 @@ impl Process {
             page_table: PhysAddr::new(0),
         }
     }
-    pub fn create(image: *const usize, image_size: usize) {
+    pub fn create(elf_image: *const usize) {
         let (i, proc) = unsafe {
             PROCS
                 .iter_mut()
@@ -78,6 +80,7 @@ impl Process {
         proc.pid = i + 1;
         proc.status = ProcessStatus::Runnable;
 
+        // kernel stack
         unsafe {
             let sp = (&mut proc.stack as *mut [u8] as *mut u8).add(mem::size_of_val(&proc.stack))
                 as *mut usize;
@@ -99,27 +102,16 @@ impl Process {
             proc.sp = VirtAddr::new(sp.sub(13) as usize);
         }
 
+        // kernel memory
         let page_table = alloc_pages(1);
         let mut paddr = PhysAddr::new(ptr::addr_of!(__kernel_base) as *const u8 as usize);
         while paddr < PhysAddr::new(ptr::addr_of!(__free_ram_end) as *const u8 as usize) {
             unsafe { map_page(page_table, paddr.into(), paddr, PAGE_R | PAGE_W | PAGE_X) };
             paddr += PhysAddr::new(PAGE_SIZE);
         }
-        let mut off = VirtAddr::new(0);
-        let pimage = image;
-            while off < image_size.into() {
-            let page = alloc_pages(1);
-            unsafe {
-                ptr::copy(pimage.add(off.into()), page.addr as *mut usize , PAGE_SIZE as usize);
-            }
-            map_page(
-                page_table,
-                off + USER_BASE.into(),
-                page,
-                PAGE_U | PAGE_R | PAGE_W | PAGE_X,
-            );
-            off += PAGE_SIZE.into();
-        }
+
+        let elf_header = elf_image.cast::<Elf64Hdr>();
+        load_elf(page_table, elf_header);
         proc.page_table = page_table
     }
 
@@ -129,6 +121,42 @@ impl Process {
     fn is_runnable(&self) -> bool {
         self.status == ProcessStatus::Runnable
     }
+}
+
+fn load_elf(page_table: PhysAddr, elf_header: *const Elf64Hdr) {
+    let mut idx = 0;
+    unsafe {
+        while idx < (*elf_header).e_phnum {
+            let p_header = (*elf_header).get_pheader(elf_header.cast::<usize>(), idx).unwrap(); 
+            let flags = get_flags((*p_header).p_flags);
+            // this is start address of mapping segment
+            let p_vaddr = VirtAddr::new((*p_header).p_vaddr);
+            let p_start_addr = elf_header.cast::<usize>().add((*p_header).p_offset);
+            // Sometime memsz > filesz, for example bss
+            // so have to call copy with caring of this situation.
+            let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
+            let mut file_sz_rem = (*p_header).p_filesz;
+
+            for page_idx in 0..page_num {
+                let page = alloc_pages(1);
+                ptr::copy(p_start_addr.add(PAGE_SIZE * page_idx), page.addr as *mut usize, min(PAGE_SIZE, file_sz_rem));
+                map_page(
+                    page_table,
+                    p_vaddr.add(PAGE_SIZE * page_idx),
+                    page,
+                    flags
+                );
+                file_sz_rem = file_sz_rem.wrapping_sub(PAGE_SIZE);
+            }
+            idx += 1;
+        }
+    }
+}
+
+#[inline]
+fn get_flags(flags: u32) -> usize {
+    let ret = if ProgramFlags::is_executable(flags) { PAGE_X } else {0} | if ProgramFlags::is_writable(flags) { PAGE_W } else {0} | if ProgramFlags::is_readable(flags) {PAGE_R} else {0};
+    ret
 }
 
 pub unsafe fn yield_proc() {
