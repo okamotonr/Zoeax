@@ -1,3 +1,2 @@
 [build]
 target = "riscv64gc-unknown-none-elf"
-rustflags = ['-C', 'link-args=-Tsrc/user.ld -Map=user.map']

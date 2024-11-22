@@ -3,28 +3,26 @@
 #![feature(naked_functions)]
 
 use core::{
-    arch::{asm, naked_asm},
+    arch::naked_asm,
     panic::PanicInfo,
     ptr,
-    mem::size_of,
 };
 
 use mios::{handler::trap_entry, memory::PhysAddr};
 use mios::memory;
 use mios::process::{yield_proc, Process, init_proc};
 use mios::riscv::{w_stvec, wfi};
-use mios::{print, println};
-
-// Dirty Dirty Hacking. Related medium? medany? medlow?
-const _binary_shell_bin_size : usize = 65840;
+use mios::println;
 
 extern "C" {
     static mut __bss: u8;
     static __bss_end: u8;
     static __stack_top: u8;
     pub static __kernel_base: u8;
-    static _binary_shell_bin_start: usize;
 }
+
+#[no_mangle]
+static SHELL: &'static [u8] = include_bytes!("shell");
 
 #[no_mangle]
 fn kernel_main() {
@@ -37,17 +35,24 @@ fn kernel_main() {
     w_stvec(trap_entry as usize);
 
     memory::init_memory();
+    println!("{:?}, {:?}, {:?}, {:?}", SHELL[0], SHELL[1], SHELL[2], SHELL[3]);
+    println!("{:p}", &SHELL);
+    println!("{:p}", SHELL);
+    let start = ptr::addr_of!(SHELL);
+    unsafe {
+        println!("{:?}", (*start)[0]);
+        println!("{:?}", *(start as *const u8));
+    }
 
     let paddr0 = memory::alloc_pages(2);
     let paddr1 = memory::alloc_pages(1);
     println!("alloc_pages test: paddr0={:?}", paddr0);
     println!("alloc_pages test: paddr1={:?}", paddr1);
 
-    let start = ptr::addr_of!(_binary_shell_bin_start);
-    let size = _binary_shell_bin_size;
     init_proc();
     println!("Here");
-    Process::create(start, size);
+    Process::create(SHELL);
+    println!("Come");
     unsafe {
         yield_proc();
     }

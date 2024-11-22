@@ -30,7 +30,7 @@ pub const PAGE_X: usize = 1 << 3;
 pub const PAGE_U: usize = 1 << 4;
 
 pub fn map_page(table3: PhysAddr, vaddr: VirtAddr, paddr: PhysAddr, flags: usize){
-    assert!(is_aligned(vaddr.addr, PAGE_SIZE));
+    assert!(is_aligned(vaddr.addr, PAGE_SIZE), "{:?}", vaddr);
     assert!(is_aligned(paddr.addr, PAGE_SIZE));
 
     let table3 = table3.addr as *mut usize;

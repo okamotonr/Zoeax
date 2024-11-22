@@ -35,6 +35,13 @@ pub fn w_stvec(addr: usize) {
 }
 
 #[inline]
+pub fn w_sepc(addr: usize) {
+    unsafe {
+        asm!("csrw sepc, {0}", in(reg) addr);
+    }
+}
+
+#[inline]
 pub fn wfi() {
     unsafe {
         asm!("wfi", options(nomem, nostack));

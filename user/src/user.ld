@@ -3,23 +3,30 @@ ENTRY(start)
 SECTIONS {
     . = 0x1000000;
 
-    .text :{
+    .text : ALIGN(4096){
         KEEP(*(.text.start));
         *(.text .text.*);
     }
 
-    .rodata : ALIGN(4) {
+    .rodata : ALIGN(4096) {
         *(.rodata .rodata.*);
+        . = ALIGN(16);
+        *(.srodata .srodata.*);
+        KEEP(*(.symbols));
     }
 
-    .data : ALIGN(4) {
+    .data : ALIGN(4096) {
         *(.data .data.*);
+        *(.sdata .sdata.*);
     }
 
-    .bss : ALIGN(4) {
-        *(.bss .bss.* .sbss .sbss.*);
+    .bss : ALIGN(4096) {
+        *(.bss .bss.);
+        . = ALIGN(16);
+        *(.sbss .sbss.*);
 
         . = ALIGN(16); /* https://github.com/nuta/operating-system-in-1000-lines/pull/23 */
+
         . += 64 * 1024; /* 64KB */
         __stack_top = .;
 

@@ -31,7 +31,7 @@ impl Elf64Hdr {
         } else {
             unsafe {
                 let base_addr = elf_header_addr.add(self.e_shoff).cast::<Elf64Shdr>();
-                Some(base_addr.add((idx - 1) as usize))
+                Some(base_addr.add(idx as usize))
             }
         }
     }
@@ -41,14 +41,15 @@ impl Elf64Hdr {
             None
         } else {
             unsafe {
-                let base_addr = elf_header_addr.add(self.e_phoff) as *const Elf64Phdr;
-                Some(base_addr.add((idx - 1) as usize))
+                let base_addr = elf_header_addr.byte_add(self.e_phoff) as *const Elf64Phdr;
+                Some(base_addr.add(idx as usize))
             }
         }
     }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[repr(C)]
 pub struct ElfIdent(pub [u8; EI_DENT]);
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -147,6 +148,7 @@ pub enum ElfVersion {
 
 // Program header
 #[repr(C)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Elf64Phdr {
     pub p_type: ProgramType,
     pub p_flags: u32,
@@ -159,6 +161,7 @@ pub struct Elf64Phdr {
 }
 
 #[repr(u32)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ProgramType {
     Null,
     Load,
@@ -171,6 +174,7 @@ pub enum ProgramType {
 } 
 
 #[repr(u32)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ProgramFlags {
     X = 0x01,
     W = 0x02,
@@ -191,6 +195,7 @@ impl ProgramFlags {
 }
 
 // Section header
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Elf64Shdr {
     pub sh_name: u32,
     pub sh_type: SectionType,
@@ -205,6 +210,7 @@ pub struct Elf64Shdr {
 }
 
 #[repr(u32)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SectionType {
     Null,
     Progbits,
@@ -225,6 +231,7 @@ pub enum SectionType {
 }
 
 // String and symbol table
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Elf64Sym {
     pub st_name: u32,
     pub st_info: StInfo,
@@ -235,6 +242,7 @@ pub struct Elf64Sym {
 }
 
 #[repr(u8)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum StInfo {
     Notype,
     Object,
@@ -251,6 +259,7 @@ pub enum StInfo {
 }
 
 #[repr(u8)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum StOther {
     Default,
     Internal,

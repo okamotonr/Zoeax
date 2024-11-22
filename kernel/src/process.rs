@@ -4,6 +4,8 @@ use crate::{
     memory::{__free_ram_end, alloc_pages, PAGE_SIZE},
     page::{map_page, PAGE_R, PAGE_U, PAGE_V, PAGE_W, PAGE_X, SATP_SV48},
     write_csr,
+    riscv::w_sepc,
+    println,
 };
 use core::cmp::min;
 use core::{
@@ -23,7 +25,6 @@ static mut PROCS: [Process; PROCS_MAX] = [Process::init(); PROCS_MAX];
 
 pub static mut CURRENT_PROC: *mut Process = ptr::null_mut();
 pub static mut IDLE_PROC: *mut Process = ptr::null_mut();
-const USER_BASE: usize = 0x1000000;
 const SSTATUS_SPIE: u64 = 1 << 5;
 
 #[repr(C)]
@@ -43,18 +44,29 @@ pub struct Process {
     page_table: PhysAddr,
 }
 
-#[naked]
-extern "C" fn user_entry() {
+#[no_mangle]
+fn user_entry(ip: usize) -> ! {
+    // a0 is ip,
     unsafe {
-        naked_asm!(
-            "la a0, {sepc}",
-            "csrw sepc, a0",
+        w_sepc(ip);
+        asm!(
             "la a0, {sstatus}",
             "csrw sstatus, a0",
             "sret",
-            sepc = const USER_BASE,
             sstatus = const SSTATUS_SPIE,
+            options(noreturn)
         );
+    }
+}
+
+#[no_mangle]
+#[naked]
+extern "C" fn user_entry_trampoline() {
+    unsafe {
+      naked_asm!(
+      "ld a0, 0 * 8(sp)", // ip
+      "j user_entry"
+      )
     }
 }
 
@@ -68,7 +80,7 @@ impl Process {
             page_table: PhysAddr::new(0),
         }
     }
-    pub fn create(elf_image: *const usize) {
+    pub fn create(elf_image: *const [u8]) {
         let (i, proc) = unsafe {
             PROCS
                 .iter_mut()
@@ -80,26 +92,30 @@ impl Process {
         proc.pid = i + 1;
         proc.status = ProcessStatus::Runnable;
 
+        let elf_header = elf_image as *const Elf64Hdr;
+        println!("{:?}", elf_header);
+
         // kernel stack
         unsafe {
             let sp = (&mut proc.stack as *mut [u8] as *mut u8).add(mem::size_of_val(&proc.stack))
                 as *mut usize;
             let stack = ptr::addr_of_mut!((*proc).stack) as *mut u8;
             let _sp = stack.add(proc.stack.len());
-            *sp.sub(1) = 1; // s11
-            *sp.sub(2) = 2; // s10
-            *sp.sub(3) = 3; // s9
-            *sp.sub(4) = 4; // s8
-            *sp.sub(5) = 5; // s7
-            *sp.sub(6) = 6; // s6
-            *sp.sub(7) = 7; // s5
-            *sp.sub(8) = 8; // s4
-            *sp.sub(9) = 9; // s3
-            *sp.sub(10) = 10; // s2
-            *sp.sub(11) = 11; // s1
-            *sp.sub(12) = 12; // s0
-            *sp.sub(13) = user_entry as usize; // ra
-            proc.sp = VirtAddr::new(sp.sub(13) as usize);
+            *sp.sub(1) = (*elf_header).e_entry; // s0
+            *sp.sub(2) = 0; // s11
+            *sp.sub(3) = 0; // s10
+            *sp.sub(4) = 0; // s9
+            *sp.sub(5) = 0; // s8
+            *sp.sub(6) = 0; // s7
+            *sp.sub(7) = 0; // s6
+            *sp.sub(8) = 0; // s5
+            *sp.sub(9) = 0; // s4
+            *sp.sub(10) = 0; // s3
+            *sp.sub(11) = 0; // s2
+            *sp.sub(12) = 0; // s1
+            *sp.sub(13) = 0; // s0
+            *sp.sub(14) = user_entry_trampoline as usize; // ra
+            proc.sp = VirtAddr::new(sp.sub(14) as usize);
         }
 
         // kernel memory
@@ -110,8 +126,9 @@ impl Process {
             paddr += PhysAddr::new(PAGE_SIZE);
         }
 
-        let elf_header = elf_image.cast::<Elf64Hdr>();
+
         load_elf(page_table, elf_header);
+        
         proc.page_table = page_table
     }
 
@@ -125,10 +142,24 @@ impl Process {
 
 fn load_elf(page_table: PhysAddr, elf_header: *const Elf64Hdr) {
     let mut idx = 0;
+
     unsafe {
+        println!("elf addr is {:?}", elf_header);
+        println!("elf ident addr is {:?}", ptr::addr_of!((*elf_header).e_ident));
+        println!("elf ident head is {:?}", *(ptr::addr_of!((*elf_header).e_ident) as *const u8));
+        println!("elf magic is {:?}", (*elf_header).e_ident);
+        println!("elf header, {:?}, {:0x}, {:?}", (*elf_header).e_phnum,
+        (*elf_header).e_entry, (*elf_header).e_phoff
+            );
         while idx < (*elf_header).e_phnum {
+            println!("before Get");
             let p_header = (*elf_header).get_pheader(elf_header.cast::<usize>(), idx).unwrap(); 
-            let flags = get_flags((*p_header).p_flags);
+            if !((*p_header).p_type == ProgramType::Load) {
+                idx += 1;
+                continue
+            }
+            println!("after Get, {:?}", p_header);
+            let flags = get_flags((*p_header).p_flags) | PAGE_U;
             // this is start address of mapping segment
             let p_vaddr = VirtAddr::new((*p_header).p_vaddr);
             let p_start_addr = elf_header.cast::<usize>().add((*p_header).p_offset);
@@ -137,9 +168,16 @@ fn load_elf(page_table: PhysAddr, elf_header: *const Elf64Hdr) {
             let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
             let mut file_sz_rem = (*p_header).p_filesz;
 
+            println!("Before map, {:?}, {:?}, {:?}, {:?}, {:?}", file_sz_rem, p_start_addr, page_num, page_num, p_vaddr);
             for page_idx in 0..page_num {
                 let page = alloc_pages(1);
-                ptr::copy(p_start_addr.add(PAGE_SIZE * page_idx), page.addr as *mut usize, min(PAGE_SIZE, file_sz_rem));
+                println!("Before copy");
+                let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
+                let copy_dst = page.addr as *mut usize;
+                let copy_size = min(PAGE_SIZE, file_sz_rem);
+                println!("Copy args {:?}, {:?}, {:?}", copy_src, copy_dst, copy_size);
+                ptr::copy(copy_src, copy_dst, copy_size);
+                println!("After copy");
                 map_page(
                     page_table,
                     p_vaddr.add(PAGE_SIZE * page_idx),
@@ -148,6 +186,7 @@ fn load_elf(page_table: PhysAddr, elf_header: *const Elf64Hdr) {
                 );
                 file_sz_rem = file_sz_rem.wrapping_sub(PAGE_SIZE);
             }
+            println!("After map, {:?}", idx);
             idx += 1;
         }
     }

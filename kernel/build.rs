@@ -5,8 +5,8 @@ fn main() {
     println!("cargo:rerun-if-changed={:}/src/kernel.ld", build_root);
     println!("cargo::rustc-link-arg=-T{:}/src/kernel.ld", build_root);
     println!("cargo::rustc-link-arg=-Map={:}/kernel.map", build_root);
-    println!("cargo:rerun-if-changed={:}/shell.bin.o", build_root);
-    println!("cargo::rustc-link-arg={:}/shell.bin.o", build_root);
+    //println!("cargo:rerun-if-changed={:}/shell", build_root);
+    //println!("cargo::rustc-link-arg={:}/shell", build_root);
     //println!("cargo::rustc-link-arg=-mcmodel=medium");
     //println!("cargo::rustc-flags=-mcmodel=medany");
     //println!("cargo::rustc-link-arg=-fuse-ld=mold");
