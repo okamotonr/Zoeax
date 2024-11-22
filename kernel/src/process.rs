@@ -46,7 +46,6 @@ pub struct Process {
 
 #[no_mangle]
 fn user_entry(ip: usize) -> ! {
-    // a0 is ip,
     unsafe {
         w_sepc(ip);
         asm!(
@@ -93,7 +92,6 @@ impl Process {
         proc.status = ProcessStatus::Runnable;
 
         let elf_header = elf_image as *const Elf64Hdr;
-        println!("{:?}", elf_header);
 
         // kernel stack
         unsafe {
@@ -141,28 +139,23 @@ impl Process {
 }
 
 fn load_elf(page_table: PhysAddr, elf_header: *const Elf64Hdr) {
+    println!("sstatus {}", SSTATUS_SPIE);
     let mut idx = 0;
-
     unsafe {
         println!("elf addr is {:?}", elf_header);
-        println!("elf ident addr is {:?}", ptr::addr_of!((*elf_header).e_ident));
-        println!("elf ident head is {:?}", *(ptr::addr_of!((*elf_header).e_ident) as *const u8));
-        println!("elf magic is {:?}", (*elf_header).e_ident);
         println!("elf header, {:?}, {:0x}, {:?}", (*elf_header).e_phnum,
         (*elf_header).e_entry, (*elf_header).e_phoff
             );
         while idx < (*elf_header).e_phnum {
-            println!("before Get");
             let p_header = (*elf_header).get_pheader(elf_header.cast::<usize>(), idx).unwrap(); 
             if !((*p_header).p_type == ProgramType::Load) {
                 idx += 1;
                 continue
             }
-            println!("after Get, {:?}", p_header);
             let flags = get_flags((*p_header).p_flags) | PAGE_U;
             // this is start address of mapping segment
             let p_vaddr = VirtAddr::new((*p_header).p_vaddr);
-            let p_start_addr = elf_header.cast::<usize>().add((*p_header).p_offset);
+            let p_start_addr = elf_header.cast::<usize>().byte_add((*p_header).p_offset);
             // Sometime memsz > filesz, for example bss
             // so have to call copy with caring of this situation.
             let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
@@ -171,20 +164,22 @@ fn load_elf(page_table: PhysAddr, elf_header: *const Elf64Hdr) {
             println!("Before map, {:?}, {:?}, {:?}, {:?}, {:?}", file_sz_rem, p_start_addr, page_num, page_num, p_vaddr);
             for page_idx in 0..page_num {
                 let page = alloc_pages(1);
-                println!("Before copy");
-                let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
-                let copy_dst = page.addr as *mut usize;
-                let copy_size = min(PAGE_SIZE, file_sz_rem);
-                println!("Copy args {:?}, {:?}, {:?}", copy_src, copy_dst, copy_size);
-                ptr::copy(copy_src, copy_dst, copy_size);
-                println!("After copy");
+                if !(file_sz_rem == 0) {
+                    let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
+                    let copy_dst = page.addr as *mut usize;
+                    let copy_size = min(PAGE_SIZE, file_sz_rem);
+                    file_sz_rem = file_sz_rem.wrapping_sub(PAGE_SIZE);
+                    println!("Copy args {:?}, {:?}, {:?}", copy_src, copy_dst, copy_size);
+                    ptr::copy(copy_src, copy_dst, copy_size);
+                } else {
+                    println!("no file size, so we'll zero padding");
+                }
                 map_page(
                     page_table,
                     p_vaddr.add(PAGE_SIZE * page_idx),
                     page,
                     flags
                 );
-                file_sz_rem = file_sz_rem.wrapping_sub(PAGE_SIZE);
             }
             println!("After map, {:?}", idx);
             idx += 1;
