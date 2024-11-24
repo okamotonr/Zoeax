@@ -275,20 +275,20 @@ impl StOther {
 
 // Relocation entries (Rel & Rela)
 pub struct Elf64Rel {
-    r_offset: Elf64Addr,
-    r_info: usize,
+    pub r_offset: Elf64Addr,
+    pub r_info: usize,
 }
 
 pub struct Elf64Rela {
-    r_offset: Elf64Addr,
-    r_info: usize,
-    r_addend: isize,
+    pub r_offset: Elf64Addr,
+    pub r_info: usize,
+    pub r_addend: isize,
 }
 
 // Dynamic tags (Dyn)
 pub struct Elf64Dyn {
-    d_tag: Dtag,
-    d_un: DUnion,
+    pub d_tag: Dtag,
+    pub d_un: DUnion,
 }
 
 #[repr(i64)]
@@ -323,14 +323,14 @@ pub enum Dtag {
     Hiproc
 }
 
-union DUnion {
-    d_val: Elf64Xword,
-    d_ptr: Elf64Addr,
+pub union DUnion {
+    pub d_val: Elf64Xword,
+    pub d_ptr: Elf64Addr,
 }
 
 // Notes (Nhdr)
 pub struct Elf64Nhdr {
-    n_namesz: Elf64Word,
-    n_descz: Elf64Word,
-    n_type: Elf64Word,
+    pub n_namesz: Elf64Word,
+    pub n_descz: Elf64Word,
+    pub n_type: Elf64Word,
 }

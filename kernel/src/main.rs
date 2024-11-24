@@ -8,11 +8,11 @@ use core::{
     ptr,
 };
 
-use mios::{handler::trap_entry, memory::PhysAddr};
-use mios::memory;
-use mios::process::{yield_proc, Process, init_proc};
-use mios::riscv::{w_stvec, wfi};
-use mios::println;
+use kernel::{handler::trap_entry};
+use kernel::memory;
+use kernel::process::{yield_proc, Process, init_proc};
+use kernel::riscv::{w_stvec, wfi};
+use kernel::println;
 
 extern "C" {
     static mut __bss: u8;
@@ -22,7 +22,7 @@ extern "C" {
 }
 
 #[no_mangle]
-static SHELL: &'static [u8] = include_bytes!("shell");
+static SHELL: &'static [u8] = include_bytes!("../shell");
 
 #[no_mangle]
 fn kernel_main() {
@@ -80,4 +80,3 @@ fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
     loop {}
 }
-
