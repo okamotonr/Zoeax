@@ -1,4 +1,4 @@
-use crate::common::align_up;
+use crate::common::{Err, KernelResult};
 use crate::memory::{PhysAddr, VirtAddr};
 use crate::{
     memory::{__free_ram_end, alloc_pages, PAGE_SIZE},
@@ -7,9 +7,7 @@ use crate::{
     riscv::w_sepc,
     println,
 };
-use core::cmp::min;
 use core::{
-    any::type_name,
     arch::{asm, naked_asm},
     mem, ptr,
 };
@@ -79,27 +77,40 @@ impl Process {
             page_table: PhysAddr::new(0),
         }
     }
-    pub fn create(elf_image: *const [u8]) {
+
+    pub fn map_page(&mut self, v_addr: VirtAddr, p_addr: PhysAddr, flags: usize) {
+            map_page(
+                self.page_table,
+                v_addr,
+                p_addr,
+                flags
+            );
+    }
+    pub fn allocate(ip: usize) -> KernelResult<&'static mut Process> {
         let (i, proc) = unsafe {
             PROCS
                 .iter_mut()
                 .enumerate()
                 .find(|(_, &mut x)| x.is_usable())
-                .expect("no free process slot")
+                .ok_or(Err::TooManyTasks)?
         };
 
         proc.pid = i + 1;
         proc.status = ProcessStatus::Runnable;
 
-        let elf_header = elf_image as *const Elf64Hdr;
 
         // kernel stack
         unsafe {
             let sp = (&mut proc.stack as *mut [u8] as *mut u8).add(mem::size_of_val(&proc.stack))
                 as *mut usize;
+            println!("stack pointer {:?}", sp);
+            println!("address is {:p}", &proc.stack[0]);
+            println!("address is {:p}", &proc.stack[8191]);
             let stack = ptr::addr_of_mut!((*proc).stack) as *mut u8;
             let _sp = stack.add(proc.stack.len());
-            *sp.sub(1) = (*elf_header).e_entry; // s0
+            println!("stack pointer {:?}", _sp);
+            println!("stack pointer {:?}", _sp.sub(1));
+            *sp.sub(1) = ip;
             *sp.sub(2) = 0; // s11
             *sp.sub(3) = 0; // s10
             *sp.sub(4) = 0; // s9
@@ -124,10 +135,10 @@ impl Process {
             paddr += PhysAddr::new(PAGE_SIZE);
         }
 
+        proc.page_table = page_table;
+        Ok(proc)
 
-        load_elf(page_table, elf_header);
         
-        proc.page_table = page_table
     }
 
     fn is_usable(&self) -> bool {
@@ -138,60 +149,6 @@ impl Process {
     }
 }
 
-fn load_elf(page_table: PhysAddr, elf_header: *const Elf64Hdr) {
-    println!("sstatus {}", SSTATUS_SPIE);
-    let mut idx = 0;
-    unsafe {
-        println!("elf addr is {:?}", elf_header);
-        println!("elf header, {:?}, {:0x}, {:?}", (*elf_header).e_phnum,
-        (*elf_header).e_entry, (*elf_header).e_phoff
-            );
-        while idx < (*elf_header).e_phnum {
-            let p_header = (*elf_header).get_pheader(elf_header.cast::<usize>(), idx).unwrap(); 
-            if !((*p_header).p_type == ProgramType::Load) {
-                idx += 1;
-                continue
-            }
-            let flags = get_flags((*p_header).p_flags) | PAGE_U;
-            // this is start address of mapping segment
-            let p_vaddr = VirtAddr::new((*p_header).p_vaddr);
-            let p_start_addr = elf_header.cast::<usize>().byte_add((*p_header).p_offset);
-            // Sometime memsz > filesz, for example bss
-            // so have to call copy with caring of this situation.
-            let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
-            let mut file_sz_rem = (*p_header).p_filesz;
-
-            println!("Before map, {:?}, {:?}, {:?}, {:?}, {:?}", file_sz_rem, p_start_addr, page_num, page_num, p_vaddr);
-            for page_idx in 0..page_num {
-                let page = alloc_pages(1);
-                if !(file_sz_rem == 0) {
-                    let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
-                    let copy_dst = page.addr as *mut usize;
-                    let copy_size = min(PAGE_SIZE, file_sz_rem);
-                    file_sz_rem = file_sz_rem.wrapping_sub(PAGE_SIZE);
-                    println!("Copy args {:?}, {:?}, {:?}", copy_src, copy_dst, copy_size);
-                    ptr::copy(copy_src, copy_dst, copy_size);
-                } else {
-                    println!("no file size, so we'll zero padding");
-                }
-                map_page(
-                    page_table,
-                    p_vaddr.add(PAGE_SIZE * page_idx),
-                    page,
-                    flags
-                );
-            }
-            println!("After map, {:?}", idx);
-            idx += 1;
-        }
-    }
-}
-
-#[inline]
-fn get_flags(flags: u32) -> usize {
-    let ret = if ProgramFlags::is_executable(flags) { PAGE_X } else {0} | if ProgramFlags::is_writable(flags) { PAGE_W } else {0} | if ProgramFlags::is_readable(flags) {PAGE_R} else {0};
-    ret
-}
 
 pub unsafe fn yield_proc() {
     let mut next = IDLE_PROC;

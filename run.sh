@@ -3,7 +3,7 @@ set -xue
 
 # QEMUのファイルパス
 QEMU=qemu-system-riscv64
-KERNEL=target/riscv64gc-unknown-none-elf/debug/mios
+KERNEL=target/riscv64gc-unknown-none-elf/debug/kernel
 USER=target/riscv64gc-unknown-none-elf/debug/user
 OBJCOPY=llvm-objcopy
 

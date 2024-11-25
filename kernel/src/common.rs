@@ -7,4 +7,13 @@ pub fn align_up(value: usize, align: usize) -> usize {
     (value + align - 1) & !(align - 1)
 }
 
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Err {
+    NoMemory,
+    TooManyTasks
+}
+
+pub type KernelResult<T> = Result<T, Err>;
+
 
