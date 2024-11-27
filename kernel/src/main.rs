@@ -13,9 +13,10 @@ use kernel::handler::trap_entry;
 use kernel::memory::{init_memory, PAGE_SIZE, alloc_pages, VirtAddr};
 use kernel::process::{yield_proc, Process, init_proc};
 use kernel::riscv::{w_stvec, wfi};
-use kernel::println;
+use kernel::{println, print};
 use kernel::common::align_up;
 use kernel::page::{PAGE_R, PAGE_U, PAGE_W, PAGE_X};
+use kernel::virtio;
 
 use common::elf::*;
 
@@ -50,6 +51,22 @@ fn kernel_main() {
     w_stvec(trap_entry as usize);
 
     init_memory();
+
+    unsafe {
+        virtio::init();
+        println!("init virtio");
+
+        let mut buf: [u8; virtio::SECTOR_SIZE as usize] = [0; virtio::SECTOR_SIZE as usize];
+        virtio::read_write_disk(&mut buf as *mut [u8] as *mut u8, 0, false).unwrap();
+        let text = buf.iter().take_while(|c| **c != 0);
+        for c in text {
+            print!("{}", *c as char);
+        }
+        println!();
+
+        let buf = b"hello from kernel!!!\n";
+        virtio::read_write_disk(buf as *const [u8] as *mut u8, 0, true).unwrap();
+    }
 
     let paddr0 = alloc_pages(2);
     let paddr1 = alloc_pages(1);

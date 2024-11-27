@@ -1,18 +1,16 @@
-use crate::common::{Err, KernelResult};
-use crate::memory::{PhysAddr, VirtAddr};
 use crate::{
-    memory::{__free_ram_end, alloc_pages, PAGE_SIZE},
-    page::{map_page, PAGE_R, PAGE_U, PAGE_V, PAGE_W, PAGE_X, SATP_SV48},
+    memory::{__free_ram_end, alloc_pages, PAGE_SIZE, PhysAddr, VirtAddr},
+    page::{map_page, PAGE_R, PAGE_W, PAGE_X, SATP_SV48},
     write_csr,
     riscv::w_sepc,
     println,
+    common::{Err, KernelResult},
+    virtio::VIRTIO_BLK_PADDR
 };
 use core::{
     arch::{asm, naked_asm},
     mem, ptr,
 };
-
-use common::elf::*;
 
 extern "C" {
     static __kernel_base: u8;
@@ -79,12 +77,14 @@ impl Process {
     }
 
     pub fn map_page(&mut self, v_addr: VirtAddr, p_addr: PhysAddr, flags: usize) {
+        unsafe {
             map_page(
                 self.page_table,
                 v_addr,
                 p_addr,
                 flags
             );
+        }
     }
     pub fn allocate(ip: usize) -> KernelResult<&'static mut Process> {
         let (i, proc) = unsafe {
@@ -135,10 +135,13 @@ impl Process {
             paddr += PhysAddr::new(PAGE_SIZE);
         }
 
+        unsafe {
+            map_page(page_table, VIRTIO_BLK_PADDR.into(), VIRTIO_BLK_PADDR.into(),  PAGE_R | PAGE_W);
+        }
+
+
         proc.page_table = page_table;
         Ok(proc)
-
-        
     }
 
     fn is_usable(&self) -> bool {

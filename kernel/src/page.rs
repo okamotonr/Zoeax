@@ -22,14 +22,14 @@
 use crate::{memory::{PhysAddr, VirtAddr, PAGE_SIZE, alloc_pages}, common::is_aligned};
 
 /* 64bit arch*/
-pub const SATP_SV48: usize = (9 << 60);
+pub const SATP_SV48: usize = 9 << 60;
 pub const PAGE_V: usize = 1 << 0;
 pub const PAGE_R: usize = 1 << 1;
 pub const PAGE_W: usize = 1 << 2;
 pub const PAGE_X: usize = 1 << 3;
 pub const PAGE_U: usize = 1 << 4;
 
-pub fn map_page(table3: PhysAddr, vaddr: VirtAddr, paddr: PhysAddr, flags: usize){
+pub unsafe fn map_page(table3: PhysAddr, vaddr: VirtAddr, paddr: PhysAddr, flags: usize){
     assert!(is_aligned(vaddr.addr, PAGE_SIZE), "{:?}", vaddr);
     assert!(is_aligned(paddr.addr, PAGE_SIZE));
 
