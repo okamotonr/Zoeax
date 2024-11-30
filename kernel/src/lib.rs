@@ -8,8 +8,9 @@ pub mod handler;
 pub mod riscv;
 pub mod memory;
 pub mod process;
-pub mod page;
 pub mod virtio;
+mod memlayout;
+pub mod vm;
 
 #[macro_export]
 macro_rules! write_csr {

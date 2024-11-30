@@ -11,7 +11,9 @@ pub fn align_up(value: usize, align: usize) -> usize {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Err {
     NoMemory,
-    TooManyTasks
+    TooManyTasks,
+    PteNotFound,
+    OutOfMemory
 }
 
 pub type KernelResult<T> = Result<T, Err>;

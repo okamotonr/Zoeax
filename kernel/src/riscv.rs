@@ -47,3 +47,12 @@ pub fn wfi() {
         asm!("wfi", options(nomem, nostack));
     }
 }
+
+#[inline]
+pub fn r_mhartid() -> usize {
+    let mut ret;
+    unsafe {
+        asm!("csrr {}, mhartid", out(reg) ret);
+    };
+    ret
+}

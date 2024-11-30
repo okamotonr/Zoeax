@@ -15,8 +15,7 @@ use kernel::process::{yield_proc, Process, init_proc};
 use kernel::riscv::{w_stvec, wfi};
 use kernel::{println, print};
 use kernel::common::align_up;
-use kernel::page::{PAGE_R, PAGE_U, PAGE_W, PAGE_X};
-use kernel::virtio;
+use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 
 use common::elf::*;
 
@@ -41,39 +40,46 @@ static ALIGNED: &'static AlignedTo<u8, [u8]> = &AlignedTo {
 static SHELL: &'static [u8] = &ALIGNED.bytes;
 
 #[no_mangle]
-fn kernel_main() {
+fn kernel_main(hartid: usize) {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
         ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
     };
+    println!("booting kernel");
 
     w_stvec(trap_entry as usize);
 
     init_memory();
+    unsafe { kernel_vm_init().unwrap() };
 
-    unsafe {
-        virtio::init();
-        println!("init virtio");
+    println!("read hartid");
+    println!("cpu id is {}", hartid);
 
-        let mut buf: [u8; virtio::SECTOR_SIZE as usize] = [0; virtio::SECTOR_SIZE as usize];
-        virtio::read_write_disk(&mut buf as *mut [u8] as *mut u8, 0, false).unwrap();
-        let text = buf.iter().take_while(|c| **c != 0);
-        for c in text {
-            print!("{}", *c as char);
-        }
-        println!();
-
-        let buf = b"hello from kernel!!!\n";
-        virtio::read_write_disk(buf as *const [u8] as *mut u8, 0, true).unwrap();
-    }
+    // unsafe {
+    //     virtio::init();
+    //     println!("init virtio");
+    //
+    //     let mut buf: [u8; virtio::SECTOR_SIZE as usize] = [0; virtio::SECTOR_SIZE as usize];
+    //     virtio::read_write_disk(&mut buf as *mut [u8] as *mut u8, 0, false).unwrap();
+    //     let text = buf.iter().take_while(|c| **c != 0);
+    //     for c in text {
+    //         print!("{}", *c as char);
+    //     }
+    //     println!();
+    //
+    //     let buf = b"hello from kernel!!!\n";
+    //     virtio::read_write_disk(buf as *const [u8] as *mut u8, 0, true).unwrap();
+    // }
 
     let paddr0 = alloc_pages(2);
     let paddr1 = alloc_pages(1);
     println!("alloc_pages test: paddr0={:?}", paddr0);
     println!("alloc_pages test: paddr1={:?}", paddr1);
 
+
     init_proc();
+    println!("init memory");
 
     let elf_header: *const Elf64Hdr = (SHELL as *const [u8]).cast();
 
@@ -131,7 +137,7 @@ fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
 
             println!("Before map, {:?}, {:?}, {:?}, {:?}, {:?}", file_sz_rem, p_start_addr, page_num, page_num, p_vaddr);
             for page_idx in 0..page_num {
-                let page = alloc_pages(1);
+                let page = alloc_pages(1).unwrap();
                 if !(file_sz_rem == 0) {
                     let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
                     let copy_dst = page.addr as *mut usize;
@@ -139,8 +145,6 @@ fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
                     file_sz_rem = file_sz_rem.wrapping_sub(PAGE_SIZE);
                     println!("Copy args {:?}, {:?}, {:?}", copy_src, copy_dst, copy_size);
                     ptr::copy(copy_src, copy_dst, copy_size);
-                } else {
-                    println!("no file size, so we'll zero padding");
                 }
                 process.map_page(
                     p_vaddr.add(PAGE_SIZE * page_idx),

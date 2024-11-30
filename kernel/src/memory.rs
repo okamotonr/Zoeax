@@ -1,7 +1,8 @@
 use core::{ptr, marker::PhantomData, ops, fmt};
+use crate::common::{KernelResult, Err};
 
 extern "C" {
-    static __free_ram: u8;
+    pub static __free_ram: u8;
     pub static __free_ram_end: u8;
 }
 
@@ -81,15 +82,16 @@ pub fn init_memory() {
     }
 }
 
-pub fn alloc_pages(n: usize) -> PhysAddr {
+pub fn alloc_pages(n: usize) -> KernelResult<PhysAddr> {
     unsafe {
         let paddr = NEXT_PADDR;
         NEXT_PADDR += PhysAddr::new(n * PAGE_SIZE);
 
         if NEXT_PADDR.addr > RAM_END.addr {
-            panic!("out of memory")
-        };
-        ptr::write_bytes(paddr.addr as *mut u8, 0, n * PAGE_SIZE);
-        paddr
+            Err(Err::OutOfMemory)
+        } else {
+            ptr::write_bytes(paddr.addr as *mut u8, 0, n * PAGE_SIZE);
+            Ok(paddr)
+        }
     }
 }

@@ -5,29 +5,55 @@ SECTIONS {
     PROVIDE(__kernel_base = .);
 
     .text :{
+        __text = .;
         KEEP(*(.text.boot));
+
+        
+        . = ALIGN(16);
         *(.text .text.*);
+
+        . = ALIGN(4096);
+        __text_end = .;
     }
 
-    .rodata : ALIGN(8) {
+    
+    .rodata :{
+        __rodata = .;
         *(.rodata .rodata.*);
+        . = ALIGN(16);
+        *(.srodata .srodata.*);
+
+        KEEP(*(.symbols))
+
+        . = ALIGN(4096);
+        __rodata_end = .;
     }
 
-    .data : ALIGN(8) {
+    __data = .;
+    .data :{
+        . = ALIGN(16);
         *(.data .data.*);
+        . = ALIGN(16);
+        *(.sdata .sdata.*);
     }
 
-    .bss : ALIGN(8) {
+    .bss : {
         __bss = .;
-        *(.bss .bss.* .sbss .sbss.*);
+        . = ALIGN(16);
+        *(.bss .bss.*);
+        . = ALIGN(16);
+        *(.sbss .sbss.*);
         __bss_end = .;
+        . = ALIGN(4096);
     }
+
 
     . = ALIGN(8);
     . += 128 * 1024; /* 128KB */
     __stack_top = .;
 
     . = ALIGN(4096);
+    __data_end = .;
     __free_ram = .;
     . += 64 * 1024 * 1024; /* 64MB */
     __free_ram_end = .;

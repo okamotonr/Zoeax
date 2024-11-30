@@ -85,7 +85,7 @@ impl Virtq {
     unsafe fn init(index: u32) -> *mut Self {
         let virtq_paddr =
             alloc_pages(align_up(mem::size_of::<Virtq>() as usize, PAGE_SIZE) / PAGE_SIZE);
-        let vq = virtq_paddr.addr as *mut Virtq;
+        let vq = virtq_paddr.unwrap().addr as *mut Virtq;
         let virtq = vq.as_mut().unwrap();
         (*vq).queue_idx = index;
         let used_idx = (&mut (virtq.used) as *const VirtqUsed as *const u8)
@@ -99,7 +99,7 @@ impl Virtq {
         // 6. Notify the device about the used alignment by writing its value in bytes to QueueAlign.
         virtio_reg_write32(VIRTIO_REG_QUEUE_ALIGN, 0);
         // 7. Write the physical number of the first page of the queue to the QueuePFN register.
-        virtio_reg_write32(VIRTIO_REG_QUEUE_PFN, virtq_paddr.addr as u32);
+        virtio_reg_write32(VIRTIO_REG_QUEUE_PFN, virtq_paddr.unwrap().addr as u32);
 
         vq
     }
@@ -180,7 +180,7 @@ pub unsafe fn init() {
 
     // デバイスへの処理要求を格納する領域を確保
     BLK_REQ_PADDR =
-        alloc_pages(align_up(mem::size_of::<VirtioBlkReq>() as usize, PAGE_SIZE) / PAGE_SIZE).addr;
+        alloc_pages(align_up(mem::size_of::<VirtioBlkReq>() as usize, PAGE_SIZE) / PAGE_SIZE).unwrap().addr;
     BLK_REQ = BLK_REQ_PADDR as *mut VirtioBlkReq;
 }
 

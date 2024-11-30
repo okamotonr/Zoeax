@@ -1,11 +1,10 @@
 use crate::{
-    memory::{__free_ram_end, alloc_pages, PAGE_SIZE, PhysAddr, VirtAddr},
-    page::{map_page, PAGE_R, PAGE_W, PAGE_X, SATP_SV48},
+    memory::{PAGE_SIZE, PhysAddr, VirtAddr},
+    vm::{map_page, SATP_SV48, PageTableAddress, allocate_page_table},
     write_csr,
     riscv::w_sepc,
     println,
     common::{Err, KernelResult},
-    virtio::VIRTIO_BLK_PADDR
 };
 use core::{
     arch::{asm, naked_asm},
@@ -37,7 +36,7 @@ pub struct Process {
     pub status: ProcessStatus,
     sp: VirtAddr,
     pub stack: [u8; 8192],
-    page_table: PhysAddr,
+    page_table: PageTableAddress,
 }
 
 #[no_mangle]
@@ -72,7 +71,7 @@ impl Process {
             status: ProcessStatus::Unused,
             sp: VirtAddr::new(0),
             stack: [0; 8192],
-            page_table: PhysAddr::new(0),
+            page_table: PageTableAddress::init()
         }
     }
 
@@ -83,7 +82,7 @@ impl Process {
                 v_addr,
                 p_addr,
                 flags
-            );
+            ).unwrap();
         }
     }
     pub fn allocate(ip: usize) -> KernelResult<&'static mut Process> {
@@ -127,18 +126,7 @@ impl Process {
             proc.sp = VirtAddr::new(sp.sub(14) as usize);
         }
 
-        // kernel memory
-        let page_table = alloc_pages(1);
-        let mut paddr = PhysAddr::new(ptr::addr_of!(__kernel_base) as *const u8 as usize);
-        while paddr < PhysAddr::new(ptr::addr_of!(__free_ram_end) as *const u8 as usize) {
-            unsafe { map_page(page_table, paddr.into(), paddr, PAGE_R | PAGE_W | PAGE_X) };
-            paddr += PhysAddr::new(PAGE_SIZE);
-        }
-
-        unsafe {
-            map_page(page_table, VIRTIO_BLK_PADDR.into(), VIRTIO_BLK_PADDR.into(),  PAGE_R | PAGE_W);
-        }
-
+        let page_table = unsafe { allocate_page_table().unwrap() };
 
         proc.page_table = page_table;
         Ok(proc)
@@ -151,7 +139,6 @@ impl Process {
         self.status == ProcessStatus::Runnable
     }
 }
-
 
 pub unsafe fn yield_proc() {
     let mut next = IDLE_PROC;
@@ -175,7 +162,7 @@ pub unsafe fn yield_proc() {
             "sfence.vma",
             "csrw satp, {satp}",
             "sfence.vma",
-            satp = in(reg) (((*next).page_table.addr / PAGE_SIZE) | SATP_SV48)
+            satp = in(reg) (((*next).page_table.get_address() / PAGE_SIZE) | SATP_SV48)
         );
         write_csr!(
             "sscratch",
@@ -210,14 +197,7 @@ pub fn init_proc() {
         proc.sp = VirtAddr::new(sp.offset(-13) as usize);
     };
 
-    let page_table = alloc_pages(1);
-    let mut paddr = PhysAddr::new(ptr::addr_of!(__kernel_base) as *const u8 as usize);
-    while paddr < PhysAddr::new(ptr::addr_of!(__free_ram_end) as *const u8 as usize) {
-        unsafe {
-            map_page(page_table, paddr.into(), paddr, PAGE_R | PAGE_W | PAGE_X);
-        }
-        paddr += PhysAddr::new(PAGE_SIZE);
-    }
+    let page_table = unsafe { allocate_page_table().unwrap() };
     proc.page_table = page_table;
 
     unsafe {

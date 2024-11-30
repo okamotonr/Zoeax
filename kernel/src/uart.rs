@@ -8,7 +8,6 @@ pub fn putchar(ch: u8) {
 
 pub struct Uart;
 
-
 impl fmt::Write for Uart {
     fn write_str(&mut self, s: &str) -> fmt::Result {
        for ch in s.as_bytes() {
@@ -18,7 +17,6 @@ impl fmt::Write for Uart {
        Ok(())
     }
 }
-
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
