@@ -1,44 +1,91 @@
 use core::arch::asm;
 
+/// supervisor-level software interrupts
+pub const SIE_SSIE: usize = 1 << 1;  
+/// supervisor-level timer interrupts
+pub const SIE_STIE: usize = 1 << 5;
+/// supervisor-level external interrupts
+pub const SIE_SEIE: usize = 1 << 9;
+
+/// interrupt-enable bit
+pub const SSTATUS_SIE: usize = 1 << 1;
+/// interrupt-enable bit active prior to the trap
+pub const SSTATUS_SPIE: usize = 1 << 5;
+/// previous privilege mode
+pub const SSTATUS_SPP: usize = 1 << 8;
+/// permit supervisor user memory access
+pub const SSTATUS_SUM: usize = 1 << 18;
+
+macro_rules! read_csr {
+    ($csr:expr) => {
+        {
+            let mut ret;
+            unsafe {
+                asm!(concat!("csrr ",  "{r}, ", $csr), r = out(reg) ret);
+            };
+            ret
+        }
+    }
+}
+
+macro_rules! write_csr {
+    ($csr:expr, $value:expr) => {
+        unsafe {
+            asm!(concat!("csrw ", $csr, ", {r}"), r = in(reg) $value);
+        }
+    };
+}
+
+
 #[inline]
 pub fn r_scause() -> usize {
-    let mut ret;
-    unsafe {
-        asm!("csrr {}, scause", out(reg) ret);
-    };
-    ret
+    read_csr!("scause")
 }
 
 #[inline]
 pub fn r_stval() -> usize {
-    let mut ret;
-    unsafe {
-        asm!("csrr {}, stval", out(reg) ret);
-    };
-    ret
+    read_csr!("stval")
 }
+
 
 #[inline]
 pub fn r_sepc() -> usize {
-    let mut ret;
-    unsafe {
-        asm!("csrr {}, sepc", out(reg) ret);
-    };
-    ret
+    read_csr!("sepc")
 }
 
 #[inline]
-pub fn w_stvec(addr: usize) {
-    unsafe {
-        asm!("csrw stvec, {0}", in(reg) addr);
-    }
+pub fn r_sie() -> usize {
+    read_csr!("sie")
+}
+
+#[inline]
+pub fn r_sstatus() -> usize {
+    read_csr!("sstatus")
+}
+
+#[inline]
+pub fn w_sie(val: usize) {
+    write_csr!("sie", val)
 }
 
 #[inline]
 pub fn w_sepc(addr: usize) {
-    unsafe {
-        asm!("csrw sepc, {0}", in(reg) addr);
-    }
+    write_csr!("sepc", addr)
+}
+
+#[inline]
+pub fn w_sstatus(val: usize) {
+    write_csr!("sstaus", val)
+}
+
+#[inline]
+pub fn w_stvec(addr: usize) {
+    write_csr!("stvec", addr)
+}
+
+#[inline]
+pub fn w_sscratch(val: usize) {
+    write_csr!("sscratch", val)
 }
 
 #[inline]
@@ -49,10 +96,13 @@ pub fn wfi() {
 }
 
 #[inline]
-pub fn r_mhartid() -> usize {
+pub fn r_time() -> usize {
     let mut ret;
     unsafe {
-        asm!("csrr {}, mhartid", out(reg) ret);
+        asm!("rdtime {}", out(reg) ret);
     };
     ret
 }
+
+
+

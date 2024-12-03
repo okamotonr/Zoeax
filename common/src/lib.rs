@@ -1,14 +1,18 @@
 #![no_std]
 
 pub mod elf;
-use core::arch::asm;
+pub mod list;
+pub mod syscall;
 
+use core::{arch::asm, usize};
 #[repr(usize)] 
 pub enum SysNo {
     PutChar = PUTCHAR,
+    Sleep = SLEEP,
 }
 
 pub const PUTCHAR: usize = 0;
+pub const SLEEP: usize = 1;
 
 
 #[no_mangle]
@@ -32,4 +36,11 @@ pub fn put_char(char: char) {
     unsafe {
         syscall(SysNo::PutChar, char as usize, 0, 0);
     }
+}
+
+pub fn sleep(ms_time: usize) {
+    unsafe {
+        syscall(SysNo::Sleep, ms_time, 0, 0);
+    }
+
 }

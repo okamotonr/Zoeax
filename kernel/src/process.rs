@@ -1,10 +1,9 @@
 use crate::{
-    memory::{PAGE_SIZE, PhysAddr, VirtAddr},
-    vm::{map_page, SATP_SV48, PageTableAddress, allocate_page_table},
-    write_csr,
-    riscv::w_sepc,
-    println,
     common::{Err, KernelResult},
+    memory::{PhysAddr, VirtAddr, PAGE_SIZE},
+    println,
+    riscv::{w_sepc, w_sscratch, SSTATUS_SPIE},
+    vm::{allocate_page_table, map_page, PageTableAddress, SATP_SV48},
 };
 use core::{
     arch::{asm, naked_asm},
@@ -16,11 +15,10 @@ extern "C" {
 }
 
 const PROCS_MAX: usize = 8;
-static mut PROCS: [Process; PROCS_MAX] = [Process::init(); PROCS_MAX];
+static mut PROCS: [Process; PROCS_MAX] = [Process::new(); PROCS_MAX];
 
 pub static mut CURRENT_PROC: *mut Process = ptr::null_mut();
-pub static mut IDLE_PROC: *mut Process = ptr::null_mut();
-const SSTATUS_SPIE: u64 = 1 << 5;
+pub static mut IDLE_PROC: Process = Process::new();
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,6 +35,7 @@ pub struct Process {
     sp: VirtAddr,
     pub stack: [u8; 8192],
     page_table: PageTableAddress,
+    timeout_ms: usize,
 }
 
 #[no_mangle]
@@ -57,56 +56,45 @@ fn user_entry(ip: usize) -> ! {
 #[naked]
 extern "C" fn user_entry_trampoline() {
     unsafe {
-      naked_asm!(
-      "ld a0, 0 * 8(sp)", // ip
-      "j user_entry"
-      )
+        naked_asm!(
+            ".balign 8",
+            "ld a0, 0 * 8(sp)", // ip
+            "j user_entry"
+        )
     }
 }
 
 impl Process {
-    pub const fn init() -> Self {
+    pub const fn new() -> Self {
         Self {
             pid: 0,
             status: ProcessStatus::Unused,
             sp: VirtAddr::new(0),
             stack: [0; 8192],
-            page_table: PageTableAddress::init()
+            page_table: PageTableAddress::init(),
+            timeout_ms: 0
         }
     }
 
     pub fn map_page(&mut self, v_addr: VirtAddr, p_addr: PhysAddr, flags: usize) {
         unsafe {
-            map_page(
-                self.page_table,
-                v_addr,
-                p_addr,
-                flags
-            ).unwrap();
+            map_page(self.page_table, v_addr, p_addr, flags).unwrap();
         }
     }
-    pub fn allocate(ip: usize) -> KernelResult<&'static mut Process> {
-        let (i, proc) = unsafe {
-            PROCS
-                .iter_mut()
-                .enumerate()
-                .find(|(_, &mut x)| x.is_usable())
-                .ok_or(Err::TooManyTasks)?
-        };
 
-        proc.pid = i + 1;
-        proc.status = ProcessStatus::Runnable;
-
+    pub fn init(&mut self, ip: usize, pid: usize) -> KernelResult<()> {
+        self.pid = pid;
+        self.status = ProcessStatus::Runnable;
 
         // kernel stack
         unsafe {
-            let sp = (&mut proc.stack as *mut [u8] as *mut u8).add(mem::size_of_val(&proc.stack))
+            let sp = (&mut self.stack as *mut [u8] as *mut u8).add(mem::size_of_val(&self.stack))
                 as *mut usize;
             println!("stack pointer {:?}", sp);
-            println!("address is {:p}", &proc.stack[0]);
-            println!("address is {:p}", &proc.stack[8191]);
-            let stack = ptr::addr_of_mut!((*proc).stack) as *mut u8;
-            let _sp = stack.add(proc.stack.len());
+            println!("address is {:p}", &self.stack[0]);
+            println!("address is {:p}", &self.stack[8191]);
+            let stack = ptr::addr_of_mut!((*self).stack) as *mut u8;
+            let _sp = stack.add(self.stack.len());
             println!("stack pointer {:?}", _sp);
             println!("stack pointer {:?}", _sp.sub(1));
             *sp.sub(1) = ip;
@@ -123,12 +111,25 @@ impl Process {
             *sp.sub(12) = 0; // s1
             *sp.sub(13) = 0; // s0
             *sp.sub(14) = user_entry_trampoline as usize; // ra
-            proc.sp = VirtAddr::new(sp.sub(14) as usize);
+            self.sp = VirtAddr::new(sp.sub(14) as usize);
         }
 
         let page_table = unsafe { allocate_page_table().unwrap() };
 
-        proc.page_table = page_table;
+        self.page_table = page_table;
+        Ok(())
+
+    }
+    pub fn allocate(ip: usize) -> KernelResult<&'static mut Self> {
+        let (i, proc) = unsafe {
+            PROCS
+                .iter_mut()
+                .enumerate()
+                .find(|(_, &mut x)| x.is_usable())
+                .ok_or(Err::TooManyTasks)?
+        };
+
+        proc.init(ip, i + 1)?;
         Ok(proc)
     }
 
@@ -141,7 +142,7 @@ impl Process {
 }
 
 pub unsafe fn yield_proc() {
-    let mut next = IDLE_PROC;
+    let mut next = &raw mut IDLE_PROC;
     let current_pid = (*CURRENT_PROC).pid;
     for i in 0..PROCS_MAX {
         let proc = &mut PROCS[current_pid.wrapping_add(i) % PROCS_MAX] as *mut Process;
@@ -164,10 +165,9 @@ pub unsafe fn yield_proc() {
             "sfence.vma",
             satp = in(reg) (((*next).page_table.get_address() / PAGE_SIZE) | SATP_SV48)
         );
-        write_csr!(
-            "sscratch",
+        w_sscratch(
             (&mut (*next).stack as *mut [u8] as *mut u8)
-                .offset(mem::size_of_val(&(*next).stack) as isize) as *mut u64
+                .offset(mem::size_of_val(&(*next).stack) as isize) as *mut usize as usize
         );
     }
 
@@ -175,35 +175,24 @@ pub unsafe fn yield_proc() {
 }
 
 pub fn init_proc() {
-    let proc = unsafe { &mut PROCS[0] };
-    proc.status = ProcessStatus::Runnable;
-    proc.pid = 0;
     unsafe {
-        let stack = ptr::addr_of_mut!(proc.stack) as *mut usize;
-        let sp = stack.add(proc.stack.len());
-        *sp.offset(-1) = 0; // s11
-        *sp.offset(-2) = 0; // s10
-        *sp.offset(-3) = 0; // s9
-        *sp.offset(-4) = 0; // s8
-        *sp.offset(-5) = 0; // s7
-        *sp.offset(-6) = 0; // s6
-        *sp.offset(-7) = 0; // s5
-        *sp.offset(-8) = 0; // s4
-        *sp.offset(-9) = 0; // s3
-        *sp.offset(-10) = 0; // s2
-        *sp.offset(-11) = 0; // s1
-        *sp.offset(-12) = 0; // s0
-        *sp.offset(-13) = 0; // ra
-        proc.sp = VirtAddr::new(sp.offset(-13) as usize);
+        IDLE_PROC.init(0, 0).unwrap();
+        CURRENT_PROC = &raw mut IDLE_PROC;
     };
+}
 
-    let page_table = unsafe { allocate_page_table().unwrap() };
-    proc.page_table = page_table;
+pub fn sleep(ms_time: usize) {
+    if ms_time == 0 {
+        return
+    }
 
     unsafe {
-        CURRENT_PROC = proc;
-        IDLE_PROC = proc;
-    };
+        (*CURRENT_PROC).timeout_ms = ms_time;
+        (*CURRENT_PROC).status = ProcessStatus::Waiting;
+    }
+    unsafe {
+        yield_proc();
+    }
 }
 
 #[naked]

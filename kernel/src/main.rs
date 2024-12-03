@@ -12,13 +12,13 @@ use core::{
 use kernel::handler::trap_entry;
 use kernel::memory::{init_memory, PAGE_SIZE, alloc_pages, VirtAddr};
 use kernel::process::{yield_proc, Process, init_proc};
-use kernel::riscv::{w_stvec, wfi};
+use kernel::riscv::{r_sie, w_sie, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE, SSTATUS_SIE};
 use kernel::{println, print};
 use kernel::common::align_up;
 use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
+use kernel::timer::set_timer;
 
 use common::elf::*;
-
 extern "C" {
     static mut __bss: u8;
     static __bss_end: u8;
@@ -53,7 +53,6 @@ fn kernel_main(hartid: usize) {
     init_memory();
     unsafe { kernel_vm_init().unwrap() };
 
-    println!("read hartid");
     println!("cpu id is {}", hartid);
 
     // unsafe {
@@ -79,7 +78,6 @@ fn kernel_main(hartid: usize) {
 
 
     init_proc();
-    println!("init memory");
 
     let elf_header: *const Elf64Hdr = (SHELL as *const [u8]).cast();
 
@@ -87,11 +85,23 @@ fn kernel_main(hartid: usize) {
         let init_proc = Process::allocate((*elf_header).e_entry).unwrap();
         load_elf(init_proc, elf_header);
     }
-    unsafe {
-        yield_proc();
-    }
+
+    let ret = set_timer(1000000);
+    println!("{:?}", ret);
+
+    w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+
+    idle()
+}
+
+#[no_mangle]
+fn idle() -> !{
     loop {
-        wfi();
+        println!("Idle Process");
+        unsafe {
+            yield_proc()
+        }
+        wfi()
     }
 }
 

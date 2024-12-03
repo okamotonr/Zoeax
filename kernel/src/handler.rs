@@ -1,9 +1,24 @@
-use core::{arch::naked_asm, ptr::read_unaligned};
+use core::{arch::naked_asm, usize};
 
-use crate::{riscv::{r_scause, r_stval, r_sepc}, write_csr, uart::putchar, println};
-use common::PUTCHAR;
+use crate::{
+    println,
+    riscv::{r_scause, r_sepc, r_sie, r_stval, w_sepc, w_sie, SIE_STIE},
+    uart::putchar,
+    process::sleep,
+};
 
-const SCAUSE_ECALL: usize = 8;
+use common::{PUTCHAR, SLEEP};
+
+// I wanna use enum;
+const USERSOFTWARE: usize = 1;
+const SUPERVISOR: usize = 2;
+const MACHINESOFTWARE: usize = 3;
+const USERTIMER: usize = 4;
+const SUPREVISORTIMER: usize = 5;
+
+const INSTMISALIGNED: usize = 0;
+const INSTRUCTIONA: usize = 1;
+const ECALLUSER: usize = 8;
 
 #[repr(C, packed)]
 #[derive(Debug)]
@@ -40,7 +55,6 @@ pub struct TrapFrame {
     pub s11: usize,
     pub sp: usize,
 }
-
 
 /// 8 and (sd, ld) is valid because of riscv64
 #[naked]
@@ -130,29 +144,46 @@ pub extern "C" fn trap_entry() {
 
 fn handle_syscall(trap_frame: &TrapFrame) {
     match trap_frame.a3 {
-        PUTCHAR => {
-            putchar(trap_frame.a0 as u8)
-        }
-        _ => {
-            unsafe {
+        PUTCHAR => putchar(trap_frame.a0 as u8),
+        SLEEP =>  { sleep(trap_frame.a0) },
+        _ => unsafe {
             panic!("Unknown syscall, {:?}", trap_frame);
-            }
-        }
+        },
     }
 }
 
 #[no_mangle]
 extern "C" fn handle_trap(trap_frame: &TrapFrame) {
     let scause = r_scause();
+    let code = scause & !(1 << usize::BITS - 1);
     let stval = r_stval();
     let mut user_pc = r_sepc();
-    if scause == SCAUSE_ECALL {
-        handle_syscall(trap_frame);
-        user_pc += 4;
+
+    if (scause >> usize::BITS - 1) == 1 {
+        match code {
+            SUPREVISORTIMER => {
+                // TODO: impl timer intterupt handler
+            }
+            _ => {
+                panic!(
+                    "unexpected interrupt scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc
+                );
+            }
+        }
     } else {
-        panic!("unexpected trap scause={:x}, stval={:x}, sepc={:x}", scause, stval, user_pc);
+        match code {
+            ECALLUSER => {
+                handle_syscall(trap_frame);
+                user_pc += 4;
+            }
+            _ => {
+                panic!(
+                    "unexpected exception scause={:x}, stval={:x}, sepc={:x}, code={:x}",
+                    scause, stval, user_pc, code
+                );
+            }
+        }
     }
-
-    write_csr!("sepc", user_pc);
+    w_sepc(user_pc);
 }
-

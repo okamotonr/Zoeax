@@ -1,5 +1,6 @@
 use core::arch::asm;
 
+#[derive(Debug)]
 pub struct SBIRet {
     pub error: u64,
     pub value: u64
