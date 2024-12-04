@@ -2,22 +2,19 @@
 #![no_main]
 #![feature(naked_functions)]
 
-use core::{
-    arch::naked_asm,
-    panic::PanicInfo,
-    ptr,
-    cmp::min
-};
+use core::{arch::naked_asm, cmp::min, panic::PanicInfo, ptr};
 
-use kernel::memory::{init_memory, PAGE_SIZE, alloc_pages, VirtAddr};
-use kernel::process::{yield_proc, Process, init_proc, CPU_VAR};
-use kernel::riscv::{r_sie, r_sip, r_sstatus, w_sie, w_sscratch, w_sstatus, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE, SSTATUS_SIE};
-use kernel::{println, print};
 use kernel::common::align_up;
-use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
+use kernel::handler::trap_entry;
+use kernel::memory::{alloc_pages, init_memory, VirtAddr, PAGE_SIZE};
+use kernel::println;
+use kernel::process::{init_proc, yield_proc, Process, CPU_VAR};
+use kernel::riscv::{
+    r_sie, r_sstatus, w_sie, w_sscratch, w_sstatus, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE,
+    SSTATUS_SIE,
+};
 use kernel::timer::set_timer;
-
-use kernel::handler::initial_timer;
+use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 
 use common::elf::*;
 extern "C" {
@@ -25,14 +22,14 @@ extern "C" {
     static __bss_end: u8;
     static __stack_top: u8;
     pub static __kernel_base: u8;
-    fn trap_entry();
 }
 
 #[repr(C)] // guarantee 'bytes' comes after '_align'
-struct AlignedTo<Align, Bytes: ?Sized> {
+pub struct AlignedTo<Align, Bytes: ?Sized> {
     _align: [Align; 0],
-    bytes: Bytes, 
+    pub bytes: Bytes,
 }
+
 static ALIGNED: &'static AlignedTo<u8, [u8]> = &AlignedTo {
     _align: [],
     bytes: *include_bytes!("../shell"),
@@ -51,7 +48,6 @@ fn kernel_main(hartid: usize) {
     println!("booting kernel");
 
     w_stvec(trap_entry as usize);
-
 
     init_memory();
     unsafe { kernel_vm_init().unwrap() };
@@ -82,7 +78,6 @@ fn kernel_main(hartid: usize) {
     println!("alloc_pages test: paddr0={:?}", paddr0);
     println!("alloc_pages test: paddr1={:?}", paddr1);
 
-
     init_proc();
 
     let elf_header: *const Elf64Hdr = (SHELL as *const [u8]).cast();
@@ -101,12 +96,10 @@ fn kernel_main(hartid: usize) {
 }
 
 #[no_mangle]
-fn idle() -> !{
+fn idle() -> ! {
     println!("start idle");
     loop {
-        unsafe {
-            yield_proc()
-        }
+        unsafe { yield_proc() }
         w_sstatus(r_sstatus() | SSTATUS_SIE);
         wfi();
     }
@@ -135,13 +128,18 @@ fn panic(info: &PanicInfo) -> ! {
 fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
     unsafe {
         println!("elf addr is {:?}", elf_header);
-        println!("elf header, {:?}, {:0x}, {:?}", (*elf_header).e_phnum,
-        (*elf_header).e_entry, (*elf_header).e_phoff
-            );
+        println!(
+            "elf header, {:?}, {:0x}, {:?}",
+            (*elf_header).e_phnum,
+            (*elf_header).e_entry,
+            (*elf_header).e_phoff
+        );
         for idx in 0..(*elf_header).e_phnum {
-            let p_header = (*elf_header).get_pheader(elf_header.cast::<usize>(), idx).unwrap(); 
+            let p_header = (*elf_header)
+                .get_pheader(elf_header.cast::<usize>(), idx)
+                .unwrap();
             if !((*p_header).p_type == ProgramType::Load) {
-                continue
+                continue;
             }
             let flags = get_flags((*p_header).p_flags) | PAGE_U;
             // this is start address of mapping segment
@@ -152,7 +150,10 @@ fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
             let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
             let mut file_sz_rem = (*p_header).p_filesz;
 
-            println!("Before map, {:?}, {:?}, {:?}, {:?}, {:?}", file_sz_rem, p_start_addr, page_num, page_num, p_vaddr);
+            println!(
+                "Before map, {:?}, {:?}, {:?}, {:?}, {:?}",
+                file_sz_rem, p_start_addr, page_num, page_num, p_vaddr
+            );
             for page_idx in 0..page_num {
                 let page = alloc_pages(1).unwrap();
                 if !(file_sz_rem == 0) {
@@ -163,11 +164,7 @@ fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
                     println!("Copy args {:?}, {:?}, {:?}", copy_src, copy_dst, copy_size);
                     ptr::copy(copy_src, copy_dst, copy_size);
                 }
-                process.map_page(
-                    p_vaddr.add(PAGE_SIZE * page_idx),
-                    page,
-                    flags
-                );
+                process.map_page(p_vaddr.add(PAGE_SIZE * page_idx), page, flags);
             }
         }
     }
@@ -175,6 +172,18 @@ fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
 
 #[inline]
 fn get_flags(flags: u32) -> usize {
-    let ret = if ProgramFlags::is_executable(flags) { PAGE_X } else {0} | if ProgramFlags::is_writable(flags) { PAGE_W } else {0} | if ProgramFlags::is_readable(flags) {PAGE_R} else {0};
+    let ret = if ProgramFlags::is_executable(flags) {
+        PAGE_X
+    } else {
+        0
+    } | if ProgramFlags::is_writable(flags) {
+        PAGE_W
+    } else {
+        0
+    } | if ProgramFlags::is_readable(flags) {
+        PAGE_R
+    } else {
+        0
+    };
     ret
 }
