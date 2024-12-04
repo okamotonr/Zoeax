@@ -1,5 +1,6 @@
-use common::put_char;
-use common::sleep;
+use common::syscall::put_char;
+use common::syscall::sleep;
+use core::arch::asm;
 
 #[no_mangle]
 pub fn main() {
@@ -8,7 +9,12 @@ pub fn main() {
         for c in msg.bytes() {
             put_char(c as char);
         }
-        sleep(10);
+        
+        sleep(10000);
 
+        let msg = "wake up\n";
+        for c in msg.bytes() {
+            put_char(c as char);
+        }
     }
 }

@@ -9,14 +9,15 @@ use core::{
     cmp::min
 };
 
-use kernel::handler::trap_entry;
 use kernel::memory::{init_memory, PAGE_SIZE, alloc_pages, VirtAddr};
-use kernel::process::{yield_proc, Process, init_proc};
-use kernel::riscv::{r_sie, w_sie, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE, SSTATUS_SIE};
+use kernel::process::{yield_proc, Process, init_proc, CPU_VAR};
+use kernel::riscv::{r_sie, r_sip, r_sstatus, w_sie, w_sscratch, w_sstatus, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE, SSTATUS_SIE};
 use kernel::{println, print};
 use kernel::common::align_up;
 use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use kernel::timer::set_timer;
+
+use kernel::handler::initial_timer;
 
 use common::elf::*;
 extern "C" {
@@ -24,6 +25,7 @@ extern "C" {
     static __bss_end: u8;
     static __stack_top: u8;
     pub static __kernel_base: u8;
+    fn trap_entry();
 }
 
 #[repr(C)] // guarantee 'bytes' comes after '_align'
@@ -50,10 +52,14 @@ fn kernel_main(hartid: usize) {
 
     w_stvec(trap_entry as usize);
 
+
     init_memory();
     unsafe { kernel_vm_init().unwrap() };
 
     println!("cpu id is {}", hartid);
+    let cpu_var = ptr::addr_of!(CPU_VAR);
+    println!("cpu var address is {:?}", cpu_var);
+    w_sscratch(cpu_var as usize);
 
     // unsafe {
     //     virtio::init();
@@ -86,7 +92,7 @@ fn kernel_main(hartid: usize) {
         load_elf(init_proc, elf_header);
     }
 
-    let ret = set_timer(1000000);
+    let ret = set_timer(100000);
     println!("{:?}", ret);
 
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
@@ -96,12 +102,13 @@ fn kernel_main(hartid: usize) {
 
 #[no_mangle]
 fn idle() -> !{
+    println!("start idle");
     loop {
-        println!("Idle Process");
         unsafe {
             yield_proc()
         }
-        wfi()
+        w_sstatus(r_sstatus() | SSTATUS_SIE);
+        wfi();
     }
 }
 

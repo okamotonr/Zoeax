@@ -8,6 +8,5 @@ const TIMER: i64 = 0x54494D45;
 
 pub fn set_timer(val: usize) -> SBIRet {
     let rd_time = r_time();
-    println!("{}", rd_time);
     sbi_call((val + rd_time) as i64, 0, 0, 0, 0, 0, 0, TIMER)
 }

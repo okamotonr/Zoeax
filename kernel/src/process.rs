@@ -2,7 +2,7 @@ use crate::{
     common::{Err, KernelResult},
     memory::{PhysAddr, VirtAddr, PAGE_SIZE},
     println,
-    riscv::{w_sepc, w_sscratch, SSTATUS_SPIE},
+    riscv::{w_sepc, SSTATUS_SPIE},
     vm::{allocate_page_table, map_page, PageTableAddress, SATP_SV48},
 };
 use core::{
@@ -17,8 +17,19 @@ extern "C" {
 const PROCS_MAX: usize = 8;
 static mut PROCS: [Process; PROCS_MAX] = [Process::new(); PROCS_MAX];
 
+pub const TICK_HZ: usize = 1000;
+pub const TASK_QUANTUM: usize = (20 * (TICK_HZ / 1000)); /* 20ミリ秒 */
+pub static mut CPU_VAR: CpuVar = CpuVar {sscratch: 0, sptop: 0};
 pub static mut CURRENT_PROC: *mut Process = ptr::null_mut();
 pub static mut IDLE_PROC: Process = Process::new();
+
+
+#[repr(C)]
+pub struct CpuVar {
+    pub sscratch: usize,
+    pub sptop: usize,
+}
+
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,6 +43,7 @@ pub enum ProcessStatus {
 pub struct Process {
     pub pid: usize,
     pub status: ProcessStatus,
+    pub stack_top: VirtAddr,
     sp: VirtAddr,
     pub stack: [u8; 8192],
     page_table: PageTableAddress,
@@ -69,6 +81,7 @@ impl Process {
         Self {
             pid: 0,
             status: ProcessStatus::Unused,
+            stack_top: VirtAddr::new(0),
             sp: VirtAddr::new(0),
             stack: [0; 8192],
             page_table: PageTableAddress::init(),
@@ -90,11 +103,13 @@ impl Process {
         unsafe {
             let sp = (&mut self.stack as *mut [u8] as *mut u8).add(mem::size_of_val(&self.stack))
                 as *mut usize;
+            let sp_top = VirtAddr::new(sp as usize);
             println!("stack pointer {:?}", sp);
             println!("address is {:p}", &self.stack[0]);
             println!("address is {:p}", &self.stack[8191]);
             let stack = ptr::addr_of_mut!((*self).stack) as *mut u8;
             let _sp = stack.add(self.stack.len());
+            println!("{}", self.stack.len());
             println!("stack pointer {:?}", _sp);
             println!("stack pointer {:?}", _sp.sub(1));
             *sp.sub(1) = ip;
@@ -112,6 +127,7 @@ impl Process {
             *sp.sub(13) = 0; // s0
             *sp.sub(14) = user_entry_trampoline as usize; // ra
             self.sp = VirtAddr::new(sp.sub(14) as usize);
+            self.stack_top = sp_top;
         }
 
         let page_table = unsafe { allocate_page_table().unwrap() };
@@ -133,6 +149,7 @@ impl Process {
         Ok(proc)
     }
 
+
     fn is_usable(&self) -> bool {
         self.status == ProcessStatus::Unused
     }
@@ -152,6 +169,10 @@ pub unsafe fn yield_proc() {
         }
     }
 
+    if (*next).pid != 0 {
+        (*next).timeout_ms = TASK_QUANTUM;
+    }
+
     if (*next).pid == current_pid {
         return;
     }
@@ -159,15 +180,12 @@ pub unsafe fn yield_proc() {
     let prev = CURRENT_PROC;
     CURRENT_PROC = next;
     unsafe {
+        CPU_VAR.sptop = (*next).stack_top.addr;
         asm!(
             "sfence.vma",
             "csrw satp, {satp}",
             "sfence.vma",
             satp = in(reg) (((*next).page_table.get_address() / PAGE_SIZE) | SATP_SV48)
-        );
-        w_sscratch(
-            (&mut (*next).stack as *mut [u8] as *mut u8)
-                .offset(mem::size_of_val(&(*next).stack) as isize) as *mut usize as usize
         );
     }
 
@@ -185,6 +203,7 @@ pub fn sleep(ms_time: usize) {
     if ms_time == 0 {
         return
     }
+    println!("timeout is {}", ms_time);
 
     unsafe {
         (*CURRENT_PROC).timeout_ms = ms_time;
@@ -214,8 +233,10 @@ pub extern "C" fn switch_context(prev_sp: *mut usize, next_sp: *const usize) {
             "sd s9, 10 * 8(sp)",
             "sd s10, 11 * 8(sp)",
             "sd s11, 12 * 8(sp)",
+
             "sd sp, (a0)",
             "ld sp, (a1)",
+
             "ld ra, 0 * 8(sp)",
             "ld s0, 1 * 8(sp)",
             "ld s1, 2 * 8(sp)",
@@ -234,3 +255,21 @@ pub extern "C" fn switch_context(prev_sp: *mut usize, next_sp: *const usize) {
         )
     }
 }
+
+pub fn count_down(tick: usize) {
+    unsafe {
+        for proc in PROCS.iter_mut() {
+            (*proc).timeout_ms = (*proc).timeout_ms.saturating_sub(tick);
+            if (*proc).timeout_ms == 0 && (*proc).status == ProcessStatus::Waiting {
+                (*proc).status = ProcessStatus::Runnable;
+            }
+        }
+    }
+
+    unsafe {
+        if (*CURRENT_PROC).timeout_ms == 0 {
+            yield_proc();
+        }
+    }
+}
+

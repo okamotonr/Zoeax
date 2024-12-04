@@ -7,6 +7,8 @@ pub const SIE_STIE: usize = 1 << 5;
 /// supervisor-level external interrupts
 pub const SIE_SEIE: usize = 1 << 9;
 
+pub const SIP_STIP: usize = 1 << 5;
+
 /// interrupt-enable bit
 pub const SSTATUS_SIE: usize = 1 << 1;
 /// interrupt-enable bit active prior to the trap
@@ -64,8 +66,18 @@ pub fn r_sstatus() -> usize {
 }
 
 #[inline]
+pub fn r_sip() -> usize {
+    read_csr!("sip")
+}
+
+#[inline]
 pub fn w_sie(val: usize) {
     write_csr!("sie", val)
+}
+
+#[inline]
+pub fn w_sip(val: usize) {
+    write_csr!("sip", val)
 }
 
 #[inline]
@@ -75,7 +87,7 @@ pub fn w_sepc(addr: usize) {
 
 #[inline]
 pub fn w_sstatus(val: usize) {
-    write_csr!("sstaus", val)
+    write_csr!("sstatus", val)
 }
 
 #[inline]
