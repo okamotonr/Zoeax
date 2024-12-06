@@ -1,25 +1,34 @@
 use core::{arch::naked_asm, usize};
 
 use crate::{
-    println,
-    process::{count_down, sleep},
-    riscv::{r_scause, r_sepc, r_stval},
+    process::count_down,
+    riscv::{r_scause, r_sepc, r_stval,  SSTATUS_SUM},
     timer::set_timer,
-    uart::putchar,
+    syscall::handle_syscall,
 };
 
-use common::syscall::{PUTCHAR, SLEEP};
 
 // I wanna use enum;
-const USERSOFTWARE: usize = 1;
-const SUPERVISOR: usize = 2;
-const MACHINESOFTWARE: usize = 3;
-const USERTIMER: usize = 4;
+/// Interrupts, 
+const SUPERVISORSOFTWARE: usize = 1;
 const SUPREVISORTIMER: usize = 5;
+const SUPREVISOREXTERNAL: usize = 9;
+const COUNTER_OVERFLOW: usize = 13;
 
-const INSTMISALIGNED: usize = 0;
-const INSTRUCTIONA: usize = 1;
+/// Exceptions
+const IMISSALIGNED: usize = 0;
+const IACCESSFAULT: usize = 1;
+const ILEAGALI: usize = 2;
+const BREAKPOINT: usize = 3;
+const LMISSALIGNED: usize = 4;
+const LACCESSFAULT: usize = 5;
+const SAMISSALIGNED: usize = 6;
+const SAACCESSFAULT: usize = 7;
 const ECALLUSER: usize = 8;
+const ECALLSUPERVIOSR: usize = 9;
+const IPAGEFAULT: usize = 12;
+const LPAGEFAULT: usize = 13;
+const SAPAGEFAULT: usize = 15;
 
 #[repr(C, packed)]
 #[derive(Debug)]
@@ -191,21 +200,6 @@ pub extern "C" fn trap_entry() {
     }
 }
 
-fn handle_syscall(trap_frame: &mut TrapFrame) {
-    match trap_frame.a3 {
-        PUTCHAR => putchar(trap_frame.a0 as u8),
-        SLEEP => {
-            println!("before sleep, {:?}", trap_frame);
-            sleep(trap_frame.a0);
-            println!("after sleep, handler, {:?}", trap_frame);
-        }
-        _ =>  {
-            panic!("Unknown syscall, {:?}", trap_frame);
-        },
-    }
-    trap_frame.pc += 4;
-}
-
 // TODO: when adapt multi hart, make sscratch specify same hart cpu var when trap happened in kernel mode.
 
 #[no_mangle]
@@ -216,11 +210,30 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     let user_pc = r_sepc();
 
     if (scause >> usize::BITS - 1) == 1 {
+    //  interrupt
         match code {
             SUPREVISORTIMER => {
                 count_down(1);
                 set_timer(10000);
             }
+            SUPERVISORSOFTWARE => {
+                panic!(
+                    "supervisor software scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc
+                )
+            },
+            SUPREVISOREXTERNAL => {
+                panic!(
+                    "supervisor external scause={:x}, stval={:x}, sepc={:x}",
+                    code, stval, user_pc
+                )
+            },
+            COUNTER_OVERFLOW => {
+                panic!(
+                    "counter overflow scause={:x}, stval={:x}, sepc={:x}",
+                    code, stval, user_pc
+                )
+            },
             _ => {
                 panic!(
                     "unexpected interrupt scause={:x}, stval={:x}, sepc={:x}",
@@ -231,7 +244,69 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     } else {
         match code {
             ECALLUSER => {
-                handle_syscall(trap_frame);
+                handle_syscall(trap_frame.a0, trap_frame.a1, trap_frame.a2, trap_frame.a3, trap_frame.a4);
+                // increment pc
+                trap_frame.pc += 8;
+            }
+            IMISSALIGNED => {
+                panic!(
+                    "inst missaligned scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            IACCESSFAULT => {
+                panic!(
+                    "inst access fault scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            ILEAGALI => {
+                panic!(
+                    "inst ileagal scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            BREAKPOINT => {
+                panic!(
+                    "break point scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            LMISSALIGNED => {
+                panic!(
+                    "load missaligned scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            LACCESSFAULT => {
+                panic!(
+                    "load access fault scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            SAMISSALIGNED => {
+                panic!(
+                    "store/amo missaligned scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            SAACCESSFAULT => {
+                panic!(
+                    "store/amo access fault scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            ECALLSUPERVIOSR => {
+                panic!(
+                    "ecall from supervisor scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            IPAGEFAULT => {
+                panic!(
+                    "inst page fault scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            LPAGEFAULT => {
+                panic!(
+                    "load page fault scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
+            }
+            SAPAGEFAULT => {
+                panic!(
+                    "store/amo page fault scause={:x}, stval={:x}, sepc={:x}",
+                    scause, stval, user_pc);
             }
             _ => {
                 panic!(
@@ -241,4 +316,6 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
             }
         }
     }
+
+    trap_frame.sstatus = trap_frame.sstatus | SSTATUS_SUM;
 }

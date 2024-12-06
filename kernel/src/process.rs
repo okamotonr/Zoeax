@@ -1,13 +1,15 @@
+use common::syscall::Message;
+
 use crate::{
     common::{Err, KernelResult},
     memory::{PhysAddr, VirtAddr, PAGE_SIZE},
     println,
-    riscv::{w_sepc, SSTATUS_SPIE},
+    riscv::{w_sepc, SSTATUS_SPIE, r_satp},
     vm::{allocate_page_table, map_page, PageTableAddress, SATP_SV48},
 };
 use core::{
     arch::{asm, naked_asm},
-    mem, ptr,
+    mem::{self}, ptr,
 };
 
 extern "C" {
@@ -36,7 +38,8 @@ pub struct CpuVar {
 pub enum ProcessStatus {
     Unused,
     Runnable,
-    Waiting,
+    Sleeping,
+    Wating
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -45,9 +48,11 @@ pub struct Process {
     pub status: ProcessStatus,
     pub stack_top: VirtAddr,
     sp: VirtAddr,
-    pub stack: [u8; 8192],
-    page_table: PageTableAddress,
+    pub stack: [u8; 8192 * 2],
+    pub page_table: PageTableAddress,
     timeout_ms: usize,
+    pub message: Option<Message>,
+    pub waiter: *mut Process
 }
 
 #[no_mangle]
@@ -83,9 +88,11 @@ impl Process {
             status: ProcessStatus::Unused,
             stack_top: VirtAddr::new(0),
             sp: VirtAddr::new(0),
-            stack: [0; 8192],
+            stack: [0; 16384],
             page_table: PageTableAddress::init(),
-            timeout_ms: 0
+            timeout_ms: 0,
+            message: None,
+            waiter: ptr::null_mut()
         }
     }
 
@@ -105,13 +112,6 @@ impl Process {
                 as *mut usize;
             let sp_top = VirtAddr::new(sp as usize);
             println!("stack pointer {:?}", sp);
-            println!("address is {:p}", &self.stack[0]);
-            println!("address is {:p}", &self.stack[8191]);
-            let stack = ptr::addr_of_mut!((*self).stack) as *mut u8;
-            let _sp = stack.add(self.stack.len());
-            println!("{}", self.stack.len());
-            println!("stack pointer {:?}", _sp);
-            println!("stack pointer {:?}", _sp.sub(1));
             *sp.sub(1) = ip;
             *sp.sub(2) = 0; // s11
             *sp.sub(3) = 0; // s10
@@ -141,7 +141,7 @@ impl Process {
             PROCS
                 .iter_mut()
                 .enumerate()
-                .find(|(_, &mut x)| x.is_usable())
+                .find(|(_, &mut x)| x.is_unused())
                 .ok_or(Err::TooManyTasks)?
         };
 
@@ -149,8 +149,30 @@ impl Process {
         Ok(proc)
     }
 
+    pub fn set_message(&mut self, message: Message) -> KernelResult<()> {
+        if self.is_unused() {
+            Err(Err::ProcessNotFound)
+        }
+        else if self.message.is_some() {
+            Err(Err::MessageBoxIsFull)
+        } else {
+            self.message = Some(message);
+            if self.status == ProcessStatus::Wating {
+                self.status = ProcessStatus::Runnable;
+            }
+            Ok(())
+        }
+    }
 
-    fn is_usable(&self) -> bool {
+    pub fn waiting(&mut self) {
+        self.status = ProcessStatus::Wating
+    }
+
+    pub fn is_waiting(&self) -> bool {
+        self.status == ProcessStatus::Wating
+    }
+
+    pub fn is_unused(&self) -> bool {
         self.status == ProcessStatus::Unused
     }
     fn is_runnable(&self) -> bool {
@@ -182,9 +204,9 @@ pub unsafe fn yield_proc() {
     unsafe {
         CPU_VAR.sptop = (*next).stack_top.addr;
         asm!(
-            "sfence.vma",
+            "sfence.vma x0, x0",
             "csrw satp, {satp}",
-            "sfence.vma",
+            "sfence.vma x0, x0",
             satp = in(reg) (((*next).page_table.get_address() / PAGE_SIZE) | SATP_SV48)
         );
     }
@@ -199,6 +221,16 @@ pub fn init_proc() {
     };
 }
 
+pub fn find_proc_by_id(pid: usize) -> Option<&'static mut Process> {
+    unsafe {
+    for proc in PROCS.iter_mut() {
+        if  proc.pid == pid {
+            return Some(proc)
+        }
+    }}
+    None
+}
+
 pub fn sleep(ms_time: usize) {
     if ms_time == 0 {
         return
@@ -207,7 +239,7 @@ pub fn sleep(ms_time: usize) {
 
     unsafe {
         (*CURRENT_PROC).timeout_ms = ms_time;
-        (*CURRENT_PROC).status = ProcessStatus::Waiting;
+        (*CURRENT_PROC).status = ProcessStatus::Sleeping;
     }
     unsafe {
         yield_proc();
@@ -260,7 +292,7 @@ pub fn count_down(tick: usize) {
     unsafe {
         for proc in PROCS.iter_mut() {
             (*proc).timeout_ms = (*proc).timeout_ms.saturating_sub(tick);
-            if (*proc).timeout_ms == 0 && (*proc).status == ProcessStatus::Waiting {
+            if (*proc).timeout_ms == 0 && (*proc).status == ProcessStatus::Sleeping {
                 (*proc).status = ProcessStatus::Runnable;
             }
         }
@@ -272,4 +304,3 @@ pub fn count_down(tick: usize) {
         }
     }
 }
-

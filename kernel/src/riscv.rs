@@ -116,5 +116,9 @@ pub fn r_time() -> usize {
     ret
 }
 
+#[inline]
+pub fn r_satp() -> usize {
+    read_csr!("satp")
+}
 
 

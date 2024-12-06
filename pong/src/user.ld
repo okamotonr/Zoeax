@@ -1,3 +1,4 @@
+
 ENTRY(start)
 
 _VA_OFFSET = 0xffff80000000000;
@@ -29,9 +30,10 @@ SECTIONS {
 
         . = ALIGN(16); /* https://github.com/nuta/operating-system-in-1000-lines/pull/23 */
 
-        . += 128 * 1024; /* 64KB */
+        . += 128 * 1024;
         __stack_top = .;
 
-       /* ASSERT(. < 0x1800000, "hoge large executable") */
+        /*ASSERT(. - _VA_OFFSET < 0x1800000, "hoge large executable");*/
     }
+
 }

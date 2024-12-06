@@ -25,6 +25,7 @@ page table entry
 
 use core::ptr;
 
+use crate::println;
 use crate::common::{is_aligned, KernelResult, Err};
 use crate::memlayout::{ACLINT_SSWI_PADDR, CLINT, CLINT_SIZE, PLIC, PLIC_SIZE, UART0};
 use crate::memory::{VirtAddr, PhysAddr, alloc_pages, PAGE_SIZE, __free_ram_end, __free_ram};
@@ -47,6 +48,15 @@ extern "C" {
 }
 
 static mut KERNEL_VM: PageTableAddress = PageTableAddress::init();
+
+fn to_k_vaddr(p_addr: PhysAddr) -> VirtAddr {
+    let user_max: usize = 0x00007fffffffffff;
+    let converter = !user_max;
+    println!("{:x}", converter);
+    let new_addr = converter | p_addr.addr;
+    println!("{:x}", new_addr);
+    VirtAddr::new(new_addr)
+}
 
 impl VirtAddr {
     #[inline]
@@ -102,6 +112,9 @@ pub unsafe fn walk(page_table: PageTableAddress, vaddr: VirtAddr, alloc: bool) -
 unsafe fn _walk(page_table: PageTableAddress, vaddr: VirtAddr, alloc: bool, level: usize) -> KernelResult<PageTableEntryAddress> {
     let vpn = vaddr.get_vpn(level);
     let mut pte = page_table.get_pte(vpn);
+    if vaddr.addr == 0xffff800001000000 {
+        println!("{:?}, {:?}, {:?}, {:?}, {:?}", level, pte, page_table, vpn, pte.is_valid());
+    }
     if level == 0 {
         Ok(pte)
     } else {
@@ -121,19 +134,20 @@ pub unsafe fn map_page(root_table: PageTableAddress, vaddr: VirtAddr, paddr: Phy
     assert!(is_aligned(vaddr.addr, PAGE_SIZE), "{:?}", vaddr);
     assert!(is_aligned(paddr.addr, PAGE_SIZE));
     let mut pte = walk(root_table, vaddr, true)?;
+    if pte.is_valid() {
+        println!("wow");
+    }
     pte.write(((paddr.addr >> 12) << 10) | flags | PAGE_V);
     Ok(())
 
 }
 
 pub unsafe fn map_pages(root_table: PageTableAddress, vaddr: VirtAddr, paddr: PhysAddr, size: usize, flags: usize) -> KernelResult<()> {
-    for count in 0.. {
-        let offset = count * PAGE_SIZE;
-        if offset > size {
-            break
-        }
-        map_page(root_table, vaddr + offset.into(), paddr + offset.into(), flags)?
-    }
+    let mut offset = 0;
+    while offset < size {
+        map_page(root_table, vaddr + offset.into(), paddr + offset.into(), flags)?;
+        offset += PAGE_SIZE
+    };
     Ok(())
 }
 
@@ -155,6 +169,7 @@ pub unsafe fn kernel_vm_init() -> KernelResult<()> {
     let free_ram = ptr::addr_of!(__free_ram) as usize;
     let free_ram_end = ptr::addr_of!(__free_ram_end) as usize;
 
+    to_k_vaddr(kerenel_txt.into());
     map_pages(kernel_pt, kerenel_txt.into(), kerenel_txt.into(), kerenel_txt_end - kerenel_txt, PAGE_R | PAGE_X)?;
     map_pages(kernel_pt, ro_datat.into(), ro_datat.into(), ro_datat_end - ro_datat, PAGE_R)?;
     map_pages(kernel_pt, kernel_data.into(), kernel_data.into(), kernel_data_end - kernel_data, PAGE_R | PAGE_W)?;
