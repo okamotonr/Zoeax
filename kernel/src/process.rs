@@ -4,17 +4,13 @@ use crate::{
     common::{Err, KernelResult},
     memory::{PhysAddr, VirtAddr, PAGE_SIZE},
     println,
-    riscv::{w_sepc, SSTATUS_SPIE, r_satp},
+    riscv::{w_sepc, SSTATUS_SPIE, w_sstatus, r_sstatus},
     vm::{allocate_page_table, map_page, PageTableAddress, SATP_SV48},
 };
 use core::{
     arch::{asm, naked_asm},
-    mem::{self}, ptr,
+    ptr,
 };
-
-extern "C" {
-    static __kernel_base: u8;
-}
 
 const PROCS_MAX: usize = 8;
 static mut PROCS: [Process; PROCS_MAX] = [Process::new(); PROCS_MAX];
@@ -24,6 +20,8 @@ pub const TASK_QUANTUM: usize = (20 * (TICK_HZ / 1000)); /* 20ミリ秒 */
 pub static mut CPU_VAR: CpuVar = CpuVar {sscratch: 0, sptop: 0};
 pub static mut CURRENT_PROC: *mut Process = ptr::null_mut();
 pub static mut IDLE_PROC: Process = Process::new();
+const STACK_SIZE: usize = PAGE_SIZE * 4;
+const STACK_CANARY: usize = 0xdeadbee21;
 
 
 #[repr(C)]
@@ -31,7 +29,6 @@ pub struct CpuVar {
     pub sscratch: usize,
     pub sptop: usize,
 }
-
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,7 +45,8 @@ pub struct Process {
     pub status: ProcessStatus,
     pub stack_top: VirtAddr,
     sp: VirtAddr,
-    pub stack: [u8; 8192 * 2],
+    pub stack: [u8; STACK_SIZE],
+    stack_bottom: VirtAddr,
     pub page_table: PageTableAddress,
     timeout_ms: usize,
     pub message: Option<Message>,
@@ -59,11 +57,9 @@ pub struct Process {
 fn user_entry(ip: usize) -> ! {
     unsafe {
         w_sepc(ip);
+        w_sstatus(r_sstatus() | SSTATUS_SPIE);
         asm!(
-            "la a0, {sstatus}",
-            "csrw sstatus, a0",
             "sret",
-            sstatus = const SSTATUS_SPIE,
             options(noreturn)
         );
     }
@@ -88,7 +84,8 @@ impl Process {
             status: ProcessStatus::Unused,
             stack_top: VirtAddr::new(0),
             sp: VirtAddr::new(0),
-            stack: [0; 16384],
+            stack: [0; STACK_SIZE],
+            stack_bottom: VirtAddr::new(0),
             page_table: PageTableAddress::init(),
             timeout_ms: 0,
             message: None,
@@ -108,10 +105,9 @@ impl Process {
 
         // kernel stack
         unsafe {
-            let sp = (&mut self.stack as *mut [u8] as *mut u8).add(mem::size_of_val(&self.stack))
-                as *mut usize;
+            let sp_bottom = &self.stack[0] as *const u8;
+            let sp = sp_bottom.add(STACK_SIZE) as *mut usize;
             let sp_top = VirtAddr::new(sp as usize);
-            println!("stack pointer {:?}", sp);
             *sp.sub(1) = ip;
             *sp.sub(2) = 0; // s11
             *sp.sub(3) = 0; // s10
@@ -128,6 +124,8 @@ impl Process {
             *sp.sub(14) = user_entry_trampoline as usize; // ra
             self.sp = VirtAddr::new(sp.sub(14) as usize);
             self.stack_top = sp_top;
+            self.stack_bottom = VirtAddr::new(sp_bottom as usize);
+            *(self.stack_bottom.addr as *mut usize) = STACK_CANARY;
         }
 
         let page_table = unsafe { allocate_page_table().unwrap() };

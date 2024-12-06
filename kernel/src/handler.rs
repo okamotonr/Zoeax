@@ -2,7 +2,7 @@ use core::{arch::naked_asm, usize};
 
 use crate::{
     process::count_down,
-    riscv::{r_scause, r_sepc, r_stval,  SSTATUS_SUM},
+    riscv::{r_scause, r_sepc, r_stval},
     timer::set_timer,
     syscall::handle_syscall,
 };
@@ -208,7 +208,6 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     let code = scause & !(1 << usize::BITS - 1);
     let stval = r_stval();
     let user_pc = r_sepc();
-
     if (scause >> usize::BITS - 1) == 1 {
     //  interrupt
         match code {
@@ -316,6 +315,4 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
             }
         }
     }
-
-    trap_frame.sstatus = trap_frame.sstatus | SSTATUS_SUM;
 }
