@@ -11,7 +11,7 @@ use kernel::println;
 use kernel::process::{init_proc, yield_proc, Process, CPU_VAR};
 use kernel::riscv::{
     r_sie, r_sstatus, w_sie, w_sscratch, w_sstatus, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE,
-    SSTATUS_SIE,
+    SSTATUS_SIE, SSTATUS_SUM
 };
 use kernel::timer::set_timer;
 use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
@@ -35,8 +35,15 @@ static ALIGNED: &'static AlignedTo<u8, [u8]> = &AlignedTo {
     bytes: *include_bytes!("../shell"),
 };
 
+static ALIGNED_PONG: &'static AlignedTo<u8, [u8]> = &AlignedTo {
+    _align: [],
+    bytes: *include_bytes!("../pong"),
+};
+
 #[no_mangle]
 static SHELL: &'static [u8] = &ALIGNED.bytes;
+#[no_mangle]
+static PONG: &'static [u8] = &ALIGNED_PONG.bytes;
 
 #[no_mangle]
 fn kernel_main(hartid: usize) {
@@ -54,7 +61,6 @@ fn kernel_main(hartid: usize) {
 
     println!("cpu id is {}", hartid);
     let cpu_var = ptr::addr_of!(CPU_VAR);
-    println!("cpu var address is {:?}", cpu_var);
     w_sscratch(cpu_var as usize);
 
     // unsafe {
@@ -73,22 +79,23 @@ fn kernel_main(hartid: usize) {
     //     virtio::read_write_disk(buf as *const [u8] as *mut u8, 0, true).unwrap();
     // }
 
-    let paddr0 = alloc_pages(2);
-    let paddr1 = alloc_pages(1);
-    println!("alloc_pages test: paddr0={:?}", paddr0);
-    println!("alloc_pages test: paddr1={:?}", paddr1);
 
     init_proc();
+    w_sstatus(SSTATUS_SUM);
 
     let elf_header: *const Elf64Hdr = (SHELL as *const [u8]).cast();
+    let pong_elf: *const Elf64Hdr = (PONG as *const [u8]).cast();
 
     unsafe {
         let init_proc = Process::allocate((*elf_header).e_entry).unwrap();
+        let pong = Process::allocate((*pong_elf).e_entry).unwrap();
         load_elf(init_proc, elf_header);
+        load_elf(pong, pong_elf);
+
+        println!("{:?}, {:?}, {:x}, {:x}", init_proc.pid, pong.pid, init_proc.page_table.get_address(), pong.page_table.get_address());
     }
 
-    let ret = set_timer(100000);
-    println!("{:?}", ret);
+    set_timer(100000);
 
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
 
@@ -97,7 +104,6 @@ fn kernel_main(hartid: usize) {
 
 #[no_mangle]
 fn idle() -> ! {
-    println!("start idle");
     loop {
         unsafe { yield_proc() }
         w_sstatus(r_sstatus() | SSTATUS_SIE);
@@ -127,13 +133,6 @@ fn panic(info: &PanicInfo) -> ! {
 
 fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
     unsafe {
-        println!("elf addr is {:?}", elf_header);
-        println!(
-            "elf header, {:?}, {:0x}, {:?}",
-            (*elf_header).e_phnum,
-            (*elf_header).e_entry,
-            (*elf_header).e_phoff
-        );
         for idx in 0..(*elf_header).e_phnum {
             let p_header = (*elf_header)
                 .get_pheader(elf_header.cast::<usize>(), idx)
@@ -150,10 +149,6 @@ fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
             let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
             let mut file_sz_rem = (*p_header).p_filesz;
 
-            println!(
-                "Before map, {:?}, {:?}, {:?}, {:?}, {:?}",
-                file_sz_rem, p_start_addr, page_num, page_num, p_vaddr
-            );
             for page_idx in 0..page_num {
                 let page = alloc_pages(1).unwrap();
                 if !(file_sz_rem == 0) {
@@ -161,7 +156,6 @@ fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
                     let copy_dst = page.addr as *mut usize;
                     let copy_size = min(PAGE_SIZE, file_sz_rem);
                     file_sz_rem = file_sz_rem.wrapping_sub(PAGE_SIZE);
-                    println!("Copy args {:?}, {:?}, {:?}", copy_src, copy_dst, copy_size);
                     ptr::copy(copy_src, copy_dst, copy_size);
                 }
                 process.map_page(p_vaddr.add(PAGE_SIZE * page_idx), page, flags);

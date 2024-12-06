@@ -5,10 +5,13 @@ set -xue
 QEMU=qemu-system-riscv64
 KERNEL=target/riscv64gc-unknown-none-elf/debug/kernel
 USER=target/riscv64gc-unknown-none-elf/debug/user
+PONG=target/riscv64gc-unknown-none-elf/debug/pong
 OBJCOPY=llvm-objcopy
 
 CFLAGS="-std=c11 -O2 -g3 -Wall -Wextra -ffreestanding -nostdlib"
 (cd user && cargo build ) 
+(cd pong && cargo build)
+cp $PONG kernel/pong
 cp $USER kernel/shell
 # $OBJCOPY --set-section-flags .bss=alloc,contents -O binary $USER shell.bin
 # $OBJCOPY -Ibinary -Oelf64-littleriscv shell.bin shell.bin.o.single_float

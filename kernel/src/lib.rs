@@ -12,3 +12,4 @@ pub mod virtio;
 mod memlayout;
 pub mod vm;
 pub mod timer;
+pub mod syscall;

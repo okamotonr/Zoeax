@@ -1,9 +1,11 @@
 use core::{ptr, marker::PhantomData, ops, fmt};
 use crate::common::{KernelResult, Err};
+use core::arch::naked_asm;
 
 extern "C" {
     pub static __free_ram: u8;
     pub static __free_ram_end: u8;
+    pub static __kernel_base: u8;
 }
 
 pub const PAGE_SIZE: usize = 4096;
@@ -11,6 +13,70 @@ pub const PAGE_SIZE: usize = 4096;
 // dummy init
 static mut NEXT_PADDR: PhysAddr = PhysAddr::new(0);
 static mut RAM_END: PhysAddr = PhysAddr::new(0);
+
+pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResult<()> {
+    let kernel_base = ptr::addr_of!(__kernel_base) as usize;
+    // TODO:
+    //if dst < PAGE_SIZE.into() || dst > kernel_base.into() {
+    //    return Err(Err::InvalidUserAddress)
+    //}
+    //if dst + size_of::<T>().into() > kernel_base.into() {
+    //    return Err(Err::InvalidUserAddress)
+    //}
+    mem_copy_to_user(dst.addr as *mut T, src.addr as *const T, size_of::<T>());
+    Ok(())
+}
+
+pub unsafe fn copy_from_user<T: Sized>(addr: VirtAddr, dst: *mut T) -> KernelResult<()> {
+    let kernel_base = ptr::addr_of!(__kernel_base) as usize;
+    // TODO:
+    // if addr < PAGE_SIZE.into() || addr > kernel_base.into() {
+    //     return Err(Err::InvalidUserAddress)
+    // }
+    // if addr + size_of::<T>().into() > kernel_base.into() {
+    //     return Err(Err::InvalidUserAddress)
+    // }
+    mem_copy_from_user(dst, addr.addr as *const T, size_of::<T>());
+    Ok(())
+}
+
+#[naked]
+extern "C" fn mem_copy_from_user<T>(dst: *mut T, src: *const T, len: usize) {
+    unsafe {
+        naked_asm!(
+            "beqz a2, 2f",
+            "1:",
+            "lb a3, 0(a1)",
+            "sb a3, 0(a0)",
+            "addi a1, a1, 1",
+            "addi a0, a0, 1",
+            "addi a2, a2, -1",
+            "bnez a2, 1b",
+            "2:",
+            "ret"
+        )
+    }
+}
+
+#[naked]
+extern "C" fn mem_copy_to_user<T>(dst: *mut T, src: *const T, len: usize) {
+    unsafe {
+        naked_asm!(
+            //".global riscv32_usercopy2",
+            "beqz a2, 2f",        // a2 (コピー長) がゼロならラベル「2」にジャンプ
+            "1:",
+            "lb a3, 0(a1)",       // a1レジスタの指すアドレス (カーネルポインタ) から1バイト読み込む
+            //"riscv32_usercopy2:",
+            "sb a3, 0(a0)",       // a0レジスタの指すアドレス (ユーザーポインタ) に1バイト書き込む
+            "addi a0, a0, 1",     // a0レジスタ (ユーザーポインタ) を1バイト進める
+            "addi a1, a1, 1",     // a1レジスタ (カーネルポインタ) を1バイト進める
+            "addi a2, a2, -1",    // a2レジスタの値を1減らす
+            "bnez a2, 1b",        // a2レジスタの値がゼロでなければラベル「1」にジャンプ
+            "2:",
+            "ret"
+        )
+    }
+}
 
 
 #[repr(C)]

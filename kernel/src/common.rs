@@ -1,3 +1,5 @@
+use crate::memory::VirtAddr;
+
 pub fn is_aligned(value: usize, align: usize) -> bool {
     value % align == 0
 }
@@ -13,9 +15,11 @@ pub enum Err {
     NoMemory,
     TooManyTasks,
     PteNotFound,
-    OutOfMemory
+    OutOfMemory,
+    ProcessNotFound,
+    MessageBoxIsFull,
+    InvalidUserAddress
 }
 
 pub type KernelResult<T> = Result<T, Err>;
-
 
