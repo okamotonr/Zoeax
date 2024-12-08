@@ -16,7 +16,7 @@ const PROCS_MAX: usize = 8;
 static mut PROCS: [Process; PROCS_MAX] = [Process::new(); PROCS_MAX];
 
 pub const TICK_HZ: usize = 1000;
-pub const TASK_QUANTUM: usize = (20 * (TICK_HZ / 1000)); /* 20ミリ秒 */
+pub const TASK_QUANTUM: usize = 20 * (TICK_HZ / 1000); // 20 ms;
 pub static mut CPU_VAR: CpuVar = CpuVar {sscratch: 0, sptop: 0};
 pub static mut CURRENT_PROC: *mut Process = ptr::null_mut();
 pub static mut IDLE_PROC: Process = Process::new();
@@ -44,9 +44,9 @@ pub struct Process {
     pub pid: usize,
     pub status: ProcessStatus,
     pub stack_top: VirtAddr,
-    sp: VirtAddr,
+    pub sp: VirtAddr,
     pub stack: [u8; STACK_SIZE],
-    stack_bottom: VirtAddr,
+    pub stack_bottom: VirtAddr,
     pub page_table: PageTableAddress,
     timeout_ms: usize,
     pub message: Option<Message>,
@@ -300,5 +300,19 @@ pub fn count_down(tick: usize) {
         if (*CURRENT_PROC).timeout_ms == 0 {
             yield_proc();
         }
+    }
+}
+
+pub fn check_canary() {
+    let mut top: usize;
+    unsafe {
+        asm!(
+            "csrrw tp, sscratch, tp",
+            "ld {}, 8 * 1(tp)",
+            "csrrw tp, sscratch, tp",
+            out(reg) top
+        );
+        let bottom = (top - STACK_SIZE) as *const usize;
+        assert!(*bottom == STACK_CANARY)
     }
 }
