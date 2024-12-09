@@ -23,7 +23,7 @@ pub fn main() {
     let mut count = 0;
     for c in msg.bytes() {
         message.data[count] = c;
-        count += 2;
+        count += 1;
     }
     send(2, &message);
     let mut recv = Message::new();

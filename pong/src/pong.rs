@@ -20,10 +20,9 @@ pub fn main() {
     for c in "pong: ".bytes() {
          put_char(c as char);
     }
-    // Error occured if not comment out
-    // for c in message.data {
-    //      put_char(c as char);
-    // }
+    for c in message.data {
+          put_char(c as char);
+    }
 
     sleep(100);
     let msg = "pong: wake up\n";

@@ -1,5 +1,6 @@
 /target
 shell.bin*
 qemu.log
+.gdb_history
 
 

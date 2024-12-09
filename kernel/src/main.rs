@@ -160,10 +160,10 @@ fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
             for page_idx in 0..page_num {
                 let page = alloc_pages(1).unwrap();
                 if !(file_sz_rem == 0) {
-                    let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
+                    let copy_src = p_start_addr.byte_add(PAGE_SIZE * page_idx);
                     let copy_dst = page.addr as *mut usize;
                     let copy_size = min(PAGE_SIZE, file_sz_rem);
-                    file_sz_rem = file_sz_rem.wrapping_sub(PAGE_SIZE);
+                    file_sz_rem = file_sz_rem.saturating_sub(PAGE_SIZE);
                     ptr::copy(copy_src, copy_dst, copy_size);
                 }
                 process.map_page(p_vaddr.add(PAGE_SIZE * page_idx), page, flags);
