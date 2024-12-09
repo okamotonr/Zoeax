@@ -3,12 +3,13 @@
 #![feature(naked_functions)]
 
 use core::{arch::naked_asm, cmp::min, panic::PanicInfo, ptr};
+use core::arch::asm;
 
 use kernel::common::align_up;
 use kernel::handler::trap_entry;
 use kernel::memory::{alloc_pages, init_memory, VirtAddr, PAGE_SIZE};
 use kernel::println;
-use kernel::process::{init_proc, yield_proc, Process, CPU_VAR};
+use kernel::process::{init_proc, yield_proc, Process, CPU_VAR, IDLE_PROC};
 use kernel::riscv::{
     r_sie, r_sstatus, w_sie, w_sscratch, w_sstatus, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE,
     SSTATUS_SIE, SSTATUS_SUM
@@ -60,7 +61,7 @@ fn kernel_main(hartid: usize) {
     unsafe { kernel_vm_init().unwrap() };
 
     println!("cpu id is {}", hartid);
-    let cpu_var = ptr::addr_of!(CPU_VAR);
+    let cpu_var = &raw const CPU_VAR;
     w_sscratch(cpu_var as usize);
 
     // unsafe {
@@ -83,8 +84,8 @@ fn kernel_main(hartid: usize) {
     init_proc();
     w_sstatus(SSTATUS_SUM);
 
-    let elf_header: *const Elf64Hdr = (SHELL as *const [u8]).cast();
-    let pong_elf: *const Elf64Hdr = (PONG as *const [u8]).cast();
+    let elf_header = (SHELL as *const [u8]).cast::<Elf64Hdr>();
+    let pong_elf = (PONG as *const [u8]).cast::<Elf64Hdr>();
 
     unsafe {
         let init_proc = Process::allocate((*elf_header).e_entry).unwrap();
@@ -92,7 +93,9 @@ fn kernel_main(hartid: usize) {
         load_elf(init_proc, elf_header);
         load_elf(pong, pong_elf);
 
-        println!("{:?}, {:?}, {:x}, {:x}", init_proc.pid, pong.pid, init_proc.page_table.get_address(), pong.page_table.get_address());
+        println!("{:?}, {:?}, {:?}", init_proc.pid, init_proc.stack_bottom, init_proc.stack_top);
+        println!("{:?}, {:?}, {:?}", pong.pid, pong.stack_bottom, pong.stack_top);
+        println!("{:x}", *(init_proc.stack_bottom.addr as *const usize));
     }
 
     set_timer(100000);
@@ -104,6 +107,11 @@ fn kernel_main(hartid: usize) {
 
 #[no_mangle]
 fn idle() -> ! {
+    unsafe {
+        // initialize
+        let sp = IDLE_PROC.sp.addr;
+        asm!("mv sp, {sp}", sp = in(reg) sp);
+    }
     loop {
         unsafe { yield_proc() }
         w_sstatus(r_sstatus() | SSTATUS_SIE);

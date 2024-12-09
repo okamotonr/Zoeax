@@ -1,5 +1,5 @@
 use crate::{
-    common::{Err, KernelResult}, memory::{copy_from_user, copy_to_user, VirtAddr}, println, process::{find_proc_by_id, sleep, yield_proc, ProcessStatus, CURRENT_PROC}, uart::putchar
+    common::{Err, KernelResult}, memory::{copy_from_user, copy_to_user, VirtAddr}, println, process::{check_canary, find_proc_by_id, sleep, yield_proc, ProcessStatus, CURRENT_PROC}, uart::putchar
 };
 
 use core::ptr;
@@ -58,6 +58,7 @@ fn sys_recv(mptr: usize) -> KernelResult<()> {
             (*(*CURRENT_PROC).waiter).status = ProcessStatus::Runnable;
             (*CURRENT_PROC).waiter = ptr::null_mut();
         }
+        println!("{:?} i am waiting", (*CURRENT_PROC).pid);
         (*CURRENT_PROC).waiting();
         yield_proc()
     }

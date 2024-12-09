@@ -2,9 +2,10 @@ use core::{arch::naked_asm, usize};
 
 use crate::{
     process::count_down,
-    riscv::{r_scause, r_sepc, r_stval,  SSTATUS_SUM},
+    riscv::{r_scause, r_sepc, r_stval},
     timer::set_timer,
     syscall::handle_syscall,
+    process::check_canary,
 };
 
 
@@ -82,7 +83,7 @@ pub extern "C" fn trap_entry() {
         // sscratch has cpu var address
         // tmp = tp
         // tp = &CPU_VAR
-        // sscratch = tp
+        // sscratch = tmp
         "csrrw tp, sscratch, tp",
 
         // CPU_VAR.sscratch = a0
@@ -209,6 +210,7 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     let stval = r_stval();
     let user_pc = r_sepc();
 
+    check_canary();
     if (scause >> usize::BITS - 1) == 1 {
     //  interrupt
         match code {
@@ -316,6 +318,5 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
             }
         }
     }
-
-    trap_frame.sstatus = trap_frame.sstatus | SSTATUS_SUM;
+    check_canary();
 }
