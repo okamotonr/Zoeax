@@ -6,6 +6,7 @@ use crate::{
     timer::set_timer,
     syscall::handle_syscall,
     process::check_canary,
+    process::CURRENT_PROC,
 };
 
 
@@ -248,7 +249,7 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
             ECALLUSER => {
                 handle_syscall(trap_frame.a0, trap_frame.a1, trap_frame.a2, trap_frame.a3, trap_frame.a4);
                 // increment pc
-                trap_frame.pc += 8;
+                trap_frame.pc += 4;
             }
             IMISSALIGNED => {
                 panic!(
@@ -307,7 +308,8 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
             }
             SAPAGEFAULT => {
                 panic!(
-                    "store/amo page fault scause={:x}, stval={:x}, sepc={:x}",
+                    "store/amo page fault pid={}, scause={:x}, stval={:x}, sepc={:x}",
+                    unsafe {(*CURRENT_PROC).pid},
                     scause, stval, user_pc);
             }
             _ => {
