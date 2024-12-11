@@ -17,6 +17,7 @@ use kernel::riscv::{
 };
 use kernel::timer::set_timer;
 use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
+use core::arch::global_asm;
 
 use common::elf::*;
 extern "C" {
@@ -25,6 +26,8 @@ extern "C" {
     static __stack_top: u8;
     pub static __kernel_base: u8;
 }
+
+global_asm!(include_str!("boot.S"));
 
 #[repr(C)] // guarantee 'bytes' comes after '_align'
 pub struct AlignedTo<Align, Bytes: ?Sized> {
@@ -47,7 +50,7 @@ static SHELL: &'static [u8] = &ALIGNED.bytes;
 #[no_mangle]
 static PONG: &'static [u8] = &ALIGNED_PONG.bytes;
 
-#[no_mangle]
+#[export_name = "__kernel_main"]
 fn kernel_main(hartid: usize) {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
@@ -120,20 +123,6 @@ fn idle() -> ! {
         unsafe { yield_proc() }
         w_sstatus(r_sstatus() | SSTATUS_SIE);
         wfi();
-    }
-}
-
-#[link_section = ".text.boot"]
-#[naked]
-#[no_mangle]
-extern "C" fn boot() {
-    unsafe {
-        naked_asm!(
-            "la sp, {stack_top}",
-            "j kernel_main",
-            stack_top = sym  __stack_top,
-            // options(noreturn)
-        );
     }
 }
 
