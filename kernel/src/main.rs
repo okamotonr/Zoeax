@@ -8,8 +8,9 @@ use core::arch::asm;
 use kernel::common::align_up;
 use kernel::handler::trap_entry;
 use kernel::memory::{alloc_pages, init_memory, VirtAddr, PAGE_SIZE};
+use kernel::process::Process;
 use kernel::println;
-use kernel::process::{init_proc, yield_proc, Process, CPU_VAR, IDLE_PROC};
+use kernel::scheduler::{yield_proc, allocate_proc, CPU_VAR, init_proc, IDLE_PROC, SCHEDULER};
 use kernel::riscv::{
     r_sie, r_sstatus, w_sie, w_sscratch, w_sstatus, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE,
     SSTATUS_SIE, SSTATUS_SUM
@@ -88,14 +89,17 @@ fn kernel_main(hartid: usize) {
     let pong_elf = (PONG as *const [u8]).cast::<Elf64Hdr>();
 
     unsafe {
-        let init_proc = Process::allocate((*elf_header).e_entry).unwrap();
-        let pong = Process::allocate((*pong_elf).e_entry).unwrap();
+        let init_proc = allocate_proc((*elf_header).e_entry).unwrap();
+        let pong = allocate_proc((*pong_elf).e_entry).unwrap();
         load_elf(init_proc, elf_header);
         load_elf(pong, pong_elf);
+
 
         println!("{:?}, {:?}, {:?}", init_proc.pid, init_proc.stack_bottom, init_proc.stack_top);
         println!("{:?}, {:?}, {:?}", pong.pid, pong.stack_bottom, pong.stack_top);
         println!("{:x}", *(init_proc.stack_bottom.addr as *const usize));
+        SCHEDULER.push(init_proc);
+        SCHEDULER.push(pong);
     }
 
     set_timer(100000);

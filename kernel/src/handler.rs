@@ -1,12 +1,12 @@
 use core::{arch::naked_asm, usize};
 
 use crate::{
-    process::count_down,
     riscv::{r_scause, r_sepc, r_stval},
     timer::set_timer,
     syscall::handle_syscall,
     process::check_canary,
-    process::CURRENT_PROC,
+    scheduler::count_down,
+    scheduler::CURRENT_PROC,
 };
 
 
