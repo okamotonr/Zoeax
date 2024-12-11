@@ -1,8 +1,8 @@
 use core::{marker::PhantomData, ptr::NonNull};
-use core::ops::DerefMut;
+use core::ops::{DerefMut, Deref};
 
 pub struct ListItem<'a, T> {
-    pub value: &'a T,
+    value: T,
     next: Option<NonNull<ListItem<'a, T>>>,
     _marker: PhantomData<&'a T>,
 }
@@ -14,7 +14,7 @@ pub struct LinkedList<'a, T> {
 }
 
 impl<'a, T> ListItem<'a, T> {
-    pub const fn new(value: &'a T) -> Self {
+    pub const fn new(value: T) -> Self {
         ListItem {
             value,
             next: None,
@@ -25,7 +25,7 @@ impl<'a, T> ListItem<'a, T> {
 }
 
 impl<'a, T> LinkedList<'a, T> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         LinkedList {
             head: None,
             last: None,
@@ -64,6 +64,20 @@ impl<'a, T> LinkedList<'a, T> {
         result.map(|ptr| unsafe { &mut *ptr.as_ptr() })
     }
 
+}
+
+impl<'a, T> Deref for ListItem<'a, T> {
+    type Target = T;
+    
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<'a, T> DerefMut for ListItem<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
 }
 
 #[cfg(test)]

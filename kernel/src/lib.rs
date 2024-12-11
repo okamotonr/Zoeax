@@ -13,3 +13,4 @@ mod memlayout;
 pub mod vm;
 pub mod timer;
 pub mod syscall;
+pub mod scheduler;
