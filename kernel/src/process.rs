@@ -167,7 +167,6 @@ impl Process {
     }
 }
 
-
 pub fn check_canary() {
     let mut top: usize;
     unsafe {

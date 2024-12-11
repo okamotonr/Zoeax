@@ -2,10 +2,9 @@ use crate::{
     common::{Err, KernelResult},
     memory::{copy_from_user, copy_to_user, VirtAddr},
     println,
-    process::{ProcessStatus, Process},
-    scheduler::{find_proc_by_id, yield_proc, CURRENT_PROC},
+    process::{Process, ProcessStatus},
+    scheduler::{find_proc_by_id, sleep, yield_proc, CURRENT_PROC, SCHEDULER},
     uart::putchar,
-    scheduler::sleep,
 };
 
 use core::ptr;
@@ -46,6 +45,7 @@ fn sys_send(pid: usize, mptr: VirtAddr) -> KernelResult<()> {
         );
         return Err(Err::ProcessNotFound);
     }
+
     if !target_proc.is_waiting() {
         unsafe {
             target_proc.waiter = &mut *(*CURRENT_PROC) as *mut Process;
@@ -58,13 +58,19 @@ fn sys_send(pid: usize, mptr: VirtAddr) -> KernelResult<()> {
     let mut send_m = Message::new();
     unsafe { copy_from_user(mptr, &mut send_m)? };
     target_proc.set_message(send_m)?;
+    unsafe {
+        SCHEDULER.push(target_proc);
+    }
     Ok(())
 }
 
 fn sys_recv(mptr: usize) -> KernelResult<()> {
     unsafe {
         if !(*CURRENT_PROC).waiter.is_null() {
-            (*(*CURRENT_PROC).waiter).status = ProcessStatus::Runnable;
+            let pid = (*(*CURRENT_PROC).waiter).pid;
+            let proc = find_proc_by_id(pid).unwrap();
+            proc.resume();
+            SCHEDULER.push(proc);
             (*CURRENT_PROC).waiter = ptr::null_mut();
         }
         println!("{:?} i am waiting", (*CURRENT_PROC).pid);
@@ -75,9 +81,6 @@ fn sys_recv(mptr: usize) -> KernelResult<()> {
         let src = &(*CURRENT_PROC).message.unwrap() as *const Message as usize;
         copy_to_user::<Message>(src.into(), mptr.into())?;
         (*CURRENT_PROC).message = None;
-    }
-    unsafe {
-    println!("rcv, {:?}", (*CURRENT_PROC).pid);
     }
     Ok(())
 }

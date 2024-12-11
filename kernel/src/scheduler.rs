@@ -154,7 +154,7 @@ pub fn sleep(ms_time: usize) {
     }
 }
 
-pub fn find_proc_by_id(pid: usize) -> Option<&'static mut Process> {
+pub fn find_proc_by_id(pid: usize) -> Option<&'static mut Proc<'static>> {
     unsafe {
         for proc in PROCS.iter_mut() {
             if proc.pid == pid {
@@ -186,6 +186,7 @@ pub fn count_down(tick: usize) {
 pub fn init_proc() {
     unsafe {
         IDLE_PROC.init(0, 0).unwrap();
+        IDLE_PROC.waiting();
         CURRENT_PROC = &raw mut IDLE_PROC;
     };
 }
