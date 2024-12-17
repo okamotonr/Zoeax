@@ -211,7 +211,6 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     let stval = r_stval();
     let user_pc = r_sepc();
 
-    check_canary();
     if (scause >> usize::BITS - 1) == 1 {
     //  interrupt
         match code {
@@ -308,8 +307,7 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
             }
             SAPAGEFAULT => {
                 panic!(
-                    "store/amo page fault pid={}, scause={:x}, stval={:x}, sepc={:x}",
-                    unsafe {(*CURRENT_PROC).pid},
+                    "store/amo page fault, scause={:x}, stval={:x}, sepc={:x}",
                     scause, stval, user_pc);
             }
             _ => {
@@ -320,5 +318,4 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
             }
         }
     }
-    check_canary();
 }

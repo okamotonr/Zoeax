@@ -5,18 +5,18 @@
 use core::{arch::naked_asm, cmp::min, panic::PanicInfo, ptr};
 use core::arch::asm;
 
-use kernel::common::align_up;
-use kernel::handler::trap_entry;
-use kernel::memory::{alloc_pages, init_memory, VirtAddr, PAGE_SIZE};
-use kernel::process::Process;
-use kernel::println;
-use kernel::scheduler::{yield_proc, allocate_proc, CPU_VAR, init_proc, IDLE_PROC, SCHEDULER};
-use kernel::riscv::{
+use crate::common::align_up;
+use crate::handler::trap_entry;
+use crate::memory::{alloc_pages, init_memory, VirtAddr, PAGE_SIZE};
+use crate::process::Process;
+use crate::println;
+use crate::scheduler::{yield_proc, allocate_proc, CPU_VAR, init_proc, IDLE_PROC, SCHEDULER};
+use crate::riscv::{
     r_sie, r_sstatus, w_sie, w_sscratch, w_sstatus, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE,
     SSTATUS_SIE, SSTATUS_SUM
 };
-use kernel::timer::set_timer;
-use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
+use crate::timer::set_timer;
+use crate::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use core::arch::global_asm;
 
 use common::elf::*;
@@ -25,8 +25,6 @@ extern "C" {
     static __bss_end: u8;
     static __stack_top: u8;
 }
-
-global_asm!(include_str!("boot.S"));
 
 #[repr(C)] // guarantee 'bytes' comes after '_align'
 pub struct AlignedTo<Align, Bytes: ?Sized> {
@@ -49,8 +47,8 @@ static SHELL: &'static [u8] = &ALIGNED.bytes;
 #[no_mangle]
 static PONG: &'static [u8] = &ALIGNED_PONG.bytes;
 
-#[export_name = "_kernel_main"]
-extern "C" fn kernel_main(hartid: usize) {
+#[export_name = "__kernel_main"]
+pub fn kernel_main(hartid: usize) -> ! {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
@@ -113,7 +111,6 @@ extern "C" fn kernel_main(hartid: usize) {
 
 #[no_mangle]
 fn idle() -> ! {
-    println!("enter idle");
     unsafe {
         // initialize
         let sp = IDLE_PROC.sp.addr;
@@ -126,11 +123,11 @@ fn idle() -> ! {
     }
 }
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
-    loop {}
-}
+// #[panic_handler]
+// fn panic(info: &PanicInfo) -> ! {
+//     println!("{}", info);
+//     loop {}
+// }
 
 fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
     unsafe {

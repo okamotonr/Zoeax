@@ -28,7 +28,8 @@ use core::ptr;
 use crate::println;
 use crate::common::{is_aligned, KernelResult, Err};
 use crate::memlayout::{ACLINT_SSWI_PADDR, CLINT, CLINT_SIZE, PLIC, PLIC_SIZE, UART0};
-use crate::memory::{VirtAddr, PhysAddr, alloc_pages, PAGE_SIZE, __free_ram_end, __free_ram};
+use crate::memory::{alloc_pages, PhysAddr, VirtAddr, __free_ram, __free_ram_end, PAGE_SIZE};
+use core::arch::asm;
 /* 64bit arch*/
 pub const SATP_SV48: usize = 9 << 60;
 pub const PAGE_V: usize = 1 << 0;
@@ -36,9 +37,9 @@ pub const PAGE_R: usize = 1 << 1;
 pub const PAGE_W: usize = 1 << 2;
 pub const PAGE_X: usize = 1 << 3;
 pub const PAGE_U: usize = 1 << 4;
+pub const KERNEL_CODE_PFX: usize = 0xffffffff00000000;
 
 extern "C" {
-    static __kernel_base: u8;
     static __text: u8;
     static __text_end: u8;
     static __data: u8;
@@ -166,21 +167,28 @@ pub unsafe fn kernel_vm_init() -> KernelResult<()> {
     let ro_datat_end = ptr::addr_of!(__rodata_end) as usize;
     let kernel_data = ptr::addr_of!(__data) as usize;
     let kernel_data_end = ptr::addr_of!(__data_end) as usize;
-    let free_ram = ptr::addr_of!(__free_ram) as usize;
+    let free_ram_phys = ptr::addr_of!(__free_ram) as usize;
     let free_ram_end = ptr::addr_of!(__free_ram_end) as usize;
 
-    to_k_vaddr(kerenel_txt.into());
-    map_pages(kernel_pt, kerenel_txt.into(), kerenel_txt.into(), kerenel_txt_end - kerenel_txt, PAGE_R | PAGE_X)?;
-    map_pages(kernel_pt, ro_datat.into(), ro_datat.into(), ro_datat_end - ro_datat, PAGE_R)?;
-    map_pages(kernel_pt, kernel_data.into(), kernel_data.into(), kernel_data_end - kernel_data, PAGE_R | PAGE_W)?;
-    map_pages(kernel_pt, free_ram.into(), free_ram.into(), free_ram_end - free_ram, PAGE_R | PAGE_W)?;
+    map_pages(kernel_pt, kerenel_txt.into(), (kerenel_txt & !KERNEL_CODE_PFX).into(), kerenel_txt_end - kerenel_txt, PAGE_R | PAGE_X)?;
+    map_pages(kernel_pt, ro_datat.into(), (ro_datat & !KERNEL_CODE_PFX).into(), ro_datat_end - ro_datat, PAGE_R)?;
+    map_pages(kernel_pt, kernel_data.into(), (kernel_data & !KERNEL_CODE_PFX).into(), kernel_data_end - kernel_data, PAGE_R | PAGE_W)?;
+    map_pages(kernel_pt, to_k_vaddr(free_ram_phys.into()), free_ram_phys.into(), free_ram_end - free_ram_phys, PAGE_R | PAGE_W)?;
 
-    map_pages(kernel_pt, UART0.into(), UART0.into(), PAGE_SIZE, PAGE_R | PAGE_W)?;
+    // map_pages(kernel_pt, UART0.into(), UART0.into(), PAGE_SIZE, PAGE_R | PAGE_W)?;
     // map_pages(kernel_pt, VIRTIO0.into(), VIRTIO0.into(), PAGE_SIZE, PAGE_R | PAGE_W)
-    map_pages(kernel_pt, PLIC.into(), PLIC.into(), PLIC_SIZE, PAGE_R + PAGE_W)?;
-    map_pages(kernel_pt, CLINT.into(), CLINT.into(), CLINT_SIZE, PAGE_R | PAGE_W)?;
-    map_pages(kernel_pt, ACLINT_SSWI_PADDR.into(), ACLINT_SSWI_PADDR.into(), PAGE_SIZE, PAGE_R | PAGE_W)?;
+    // map_pages(kernel_pt, PLIC.into(), PLIC.into(), PLIC_SIZE, PAGE_R + PAGE_W)?;
+    // map_pages(kernel_pt, CLINT.into(), CLINT.into(), CLINT_SIZE, PAGE_R | PAGE_W)?;
+    // map_pages(kernel_pt, ACLINT_SSWI_PADDR.into(), ACLINT_SSWI_PADDR.into(), PAGE_SIZE, PAGE_R | PAGE_W)?;
 
     KERNEL_VM = kernel_pt;
+
+    asm!(
+        "sfence.vma x0, x0",
+        "csrw satp, {satp}",
+        "sfence.vma x0, x0",
+        satp = in(reg) ((kernel_pt.get_address() / PAGE_SIZE) | SATP_SV48)
+    );
+
     Ok(())
 }

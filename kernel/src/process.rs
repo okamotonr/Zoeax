@@ -5,6 +5,7 @@ use crate::{
     memory::{PhysAddr, VirtAddr, PAGE_SIZE},
     riscv::{w_sepc, SSTATUS_SPIE, w_sstatus, r_sstatus},
     vm::{allocate_page_table, map_page, PageTableAddress},
+    println,
 };
 use core::{
     arch::{asm, naked_asm},
@@ -171,9 +172,8 @@ pub fn check_canary() {
     let mut top: usize;
     unsafe {
         asm!(
-            "csrrw tp, sscratch, tp",
-            "ld {}, 8 * 1(tp)",
-            "csrrw tp, sscratch, tp",
+            "csrr a0, sscratch",
+            "ld {}, 8 * 1(a0)",
             out(reg) top
         );
         let bottom = (top - STACK_SIZE) as *const usize;

@@ -1,11 +1,11 @@
 use core::{ptr, marker::PhantomData, ops, fmt};
 use crate::common::{KernelResult, Err};
+use crate::println;
 use core::arch::naked_asm;
 
 extern "C" {
     pub static __free_ram: u8;
     pub static __free_ram_end: u8;
-    pub static __kernel_base: u8;
 }
 
 pub const PAGE_SIZE: usize = 4096;
@@ -15,7 +15,6 @@ static mut NEXT_PADDR: PhysAddr = PhysAddr::new(0);
 static mut RAM_END: PhysAddr = PhysAddr::new(0);
 
 pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResult<()> {
-    let kernel_base = ptr::addr_of!(__kernel_base) as usize;
     // TODO:
     //if dst < PAGE_SIZE.into() || dst > kernel_base.into() {
     //    return Err(Err::InvalidUserAddress)
@@ -28,7 +27,6 @@ pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResu
 }
 
 pub unsafe fn copy_from_user<T: Sized>(addr: VirtAddr, dst: *mut T) -> KernelResult<()> {
-    let kernel_base = ptr::addr_of!(__kernel_base) as usize;
     // TODO:
     // if addr < PAGE_SIZE.into() || addr > kernel_base.into() {
     //     return Err(Err::InvalidUserAddress)

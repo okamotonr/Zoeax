@@ -7,6 +7,7 @@
 .section ".boot.text", "ax"
 .global boot
 
+
 boot:
 	.option push
 	.option norelax
@@ -76,7 +77,6 @@ _abs_start:
 	csrw sip, 0
 
 	/* Setup identity mapping */
-
 	PPN t2, __page_init_id_lvl2
 	PTE_SET __page_kernel_level_3, _RAM_START, 3, t2, PTE_VALID
 
@@ -92,11 +92,11 @@ _abs_start:
 	PTE_SET_FAR __page_kernel_lvl2, _KERNEL_CODE_VIRTUAL, 2, t2, PTE_VALID | PTE_EXECUTE | PTE_READ | PTE_WRITE
 
 	/* 2MB kernel stack mapping */
-	PPN t2, __page_stack_lvl1
-	PTE_SET_FAR __page_kernel_lvl2, _VIRTUAL_STACK, 2, t2, PTE_VALID
-
-	PPN t2, _PHYSICAL_STACK
-	PTE_SET_FAR __page_stack_lvl1, _VIRTUAL_STACK, 1, t2, PTE_VALID | PTE_READ | PTE_WRITE
+#	#PPN t2, __page_stack_lvl1
+	# PTE_SET_FAR __page_kernel_lvl2, __stack_bottom, 2, t2, PTE_VALID
+	#
+	# PPN t2, __stack_bottom_phyis 
+	# PTE_SET_FAR __page_stack_lvl1, __stack_bottom, 1, t2, PTE_VALID | PTE_READ | PTE_WRITE
 
 	li t1, 9
 	slli t1, t1, 60
@@ -104,11 +104,7 @@ _abs_start:
 	or t0, t0, t1
 	csrw satp, t0
 
-	/* setup global pointer (see .data in hades.x) */
-	LA_FAR gp, __global_pointer$
 
-	/* setup virtual address stack (see .stack in hades.x) */
-	LA_FAR sp, _sstack
 
 	li x1, 0
 	li x2, 0
@@ -140,9 +136,18 @@ _abs_start:
 	li x30, 0
 	li x31, 0
 
+.Ltmp2: auipc a2, %pcrel_hi(__free_ram_phys)
+        addi  a2, a2, %pcrel_lo(.Ltmp2)
+.Ltmp3: auipc a3, %pcrel_hi(__free_ram_end_phys)
+        addi  a3, a3, %pcrel_lo(.Ltmp3)
+
+	/* setup global pointer (see .data in hades.x) */
+	LA_FAR gp, __global_pointer$
+	/* setup virtual address stack (see .stack in hades.x) */
+	LA_FAR sp, __stack_top
 	/* jump to main in virtual addresses */
-	LA_FAR a2, _kernel_main
-	jalr zero, 0(a2)
+	LA_FAR a4, _kernel_main
+	jalr zero, 0(a4)
 
 	.cfi_endproc
 
