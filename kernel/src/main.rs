@@ -16,7 +16,7 @@ use kernel::riscv::{
     SSTATUS_SIE, SSTATUS_SUM
 };
 use kernel::timer::set_timer;
-use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
+use kernel::vm::{alloc_vm, kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use core::arch::global_asm;
 
 use common::elf::*;
@@ -50,7 +50,7 @@ static SHELL: &'static [u8] = &ALIGNED.bytes;
 static PONG: &'static [u8] = &ALIGNED_PONG.bytes;
 
 #[export_name = "_kernel_main"]
-extern "C" fn kernel_main(hartid: usize) {
+extern "C" fn kernel_main(hartid: usize, _dtb_addr: usize, free_ram_phys: usize, free_ram_end_phys: usize) {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
@@ -60,8 +60,8 @@ extern "C" fn kernel_main(hartid: usize) {
 
     w_stvec(trap_entry as usize);
 
-    init_memory();
-    unsafe { kernel_vm_init().unwrap() };
+    init_memory(free_ram_phys, free_ram_end_phys);
+    unsafe { kernel_vm_init(free_ram_phys, free_ram_end_phys).unwrap() };
 
     println!("cpu id is {}", hartid);
     let cpu_var = &raw const CPU_VAR;
@@ -144,22 +144,22 @@ fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
             let flags = get_flags((*p_header).p_flags) | PAGE_U;
             // this is start address of mapping segment
             let p_vaddr = VirtAddr::new((*p_header).p_vaddr);
-            let p_start_addr = elf_header.cast::<usize>().byte_add((*p_header).p_offset);
+            let p_start_addr = elf_header.cast::<u8>().add((*p_header).p_offset);
             // Sometime memsz > filesz, for example bss
             // so have to call copy with caring of this situation.
             let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
             let mut file_sz_rem = (*p_header).p_filesz;
 
             for page_idx in 0..page_num {
-                let page = alloc_pages(1).unwrap();
+                let page = alloc_vm().unwrap();
                 if !(file_sz_rem == 0) {
-                    let copy_src = p_start_addr.byte_add(PAGE_SIZE * page_idx);
-                    let copy_dst = page.addr as *mut usize;
+                    let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
+                    let copy_dst = page.addr as *mut u8;
                     let copy_size = min(PAGE_SIZE, file_sz_rem);
                     file_sz_rem = file_sz_rem.saturating_sub(PAGE_SIZE);
-                    ptr::copy(copy_src, copy_dst, copy_size);
+                    ptr::copy::<u8>(copy_src, copy_dst, copy_size);
                 }
-                process.map_page(p_vaddr.add(PAGE_SIZE * page_idx), page, flags);
+                process.map_page(p_vaddr.add(PAGE_SIZE * page_idx), page.into(), flags);
             }
         }
     }
