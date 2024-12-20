@@ -1,28 +1,27 @@
 ENTRY(start)
 
-_VA_OFFSET = 0xffff80000000000;
 
 SECTIONS {
-    . = 0xffff800001000000;
+    . = 0x0000000001000000;
 
-    .text ALIGN(4096): AT(ADDR(.text) - _VA_OFFSET){
+    .text ALIGN(4096): {
         KEEP(*(.text.start));
         *(.text .text.*);
     }
 
-    .rodata ALIGN(4096): AT(ADDR(.rodata) - _VA_OFFSET) {
+    .rodata ALIGN(4096): {
         *(.rodata .rodata.*);
         . = ALIGN(16);
         *(.srodata .srodata.*);
         KEEP(*(.symbols));
     }
 
-    .data ALIGN(4096): AT(ADDR(.data) - _VA_OFFSET) {
+    .data ALIGN(4096):  {
         *(.data .data.*);
         *(.sdata .sdata.*);
     }
 
-    .bss ALIGN(4096): AT(ADDR(.bss) - _VA_OFFSET) {
+    .bss ALIGN(4096): {
         *(.bss .bss.);
         . = ALIGN(16);
         *(.sbss .sbss.*);

@@ -4,7 +4,7 @@ use crate::{
     common::{Err, KernelResult},
     memory::{PhysAddr, VirtAddr, PAGE_SIZE},
     riscv::{w_sepc, SSTATUS_SPIE, w_sstatus, r_sstatus},
-    vm::{allocate_page_table, map_page, PageTableAddress},
+    vm::{allocate_page_table, map_page, PageTable},
 };
 use core::{
     arch::{asm, naked_asm},
@@ -32,34 +32,10 @@ pub struct Process {
     pub sp: VirtAddr,
     pub stack: [u8; STACK_SIZE],
     pub stack_bottom: VirtAddr,
-    pub page_table: PageTableAddress,
+    pub page_table: PageTable,
     pub timeout_ms: usize,
     pub message: Option<Message>,
     pub waiter: *mut Process
-}
-
-#[no_mangle]
-fn user_entry(ip: usize) -> ! {
-    unsafe {
-        w_sepc(ip);
-        w_sstatus(r_sstatus() | SSTATUS_SPIE);
-        asm!(
-            "sret",
-            options(noreturn)
-        );
-    }
-}
-
-#[no_mangle]
-#[naked]
-extern "C" fn user_entry_trampoline() {
-    unsafe {
-        naked_asm!(
-            ".balign 8",
-            "ld a0, 0 * 8(sp)", // ip
-            "j user_entry"
-        )
-    }
 }
 
 impl Process {
@@ -71,7 +47,7 @@ impl Process {
             sp: VirtAddr::new(0),
             stack: [0; STACK_SIZE],
             stack_bottom: VirtAddr::new(0),
-            page_table: PageTableAddress::init(),
+            page_table: PageTable::init(),
             timeout_ms: 0,
             message: None,
             waiter: ptr::null_mut()
@@ -80,7 +56,7 @@ impl Process {
 
     pub fn map_page(&mut self, v_addr: VirtAddr, p_addr: PhysAddr, flags: usize) {
         unsafe {
-            map_page(self.page_table, v_addr, p_addr, flags).unwrap();
+            map_page(self.page_table, v_addr, p_addr, flags, false).unwrap();
         }
     }
 
@@ -167,13 +143,37 @@ impl Process {
     }
 }
 
+#[no_mangle]
+fn user_entry(ip: usize) -> ! {
+    unsafe {
+        w_sepc(ip);
+        w_sstatus(r_sstatus() | SSTATUS_SPIE);
+        asm!(
+            "sret",
+            options(noreturn)
+        );
+    }
+}
+
+#[no_mangle]
+#[naked]
+extern "C" fn user_entry_trampoline() {
+    unsafe {
+        naked_asm!(
+            ".balign 8",
+            "ld a0, 0 * 8(sp)", // ip
+            "j user_entry"
+        )
+    }
+}
+
+
 pub fn check_canary() {
     let mut top: usize;
     unsafe {
         asm!(
-            "csrrw tp, sscratch, tp",
-            "ld {}, 8 * 1(tp)",
-            "csrrw tp, sscratch, tp",
+            "csrr a0, sscratch",
+            "ld {}, 8 * 1(a0)",
             out(reg) top
         );
         let bottom = (top - STACK_SIZE) as *const usize;

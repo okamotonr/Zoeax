@@ -1,11 +1,10 @@
-use core::{ptr, marker::PhantomData, ops, fmt};
+use core::{fmt, marker::PhantomData, ops::{self, Deref}, ptr};
 use crate::common::{KernelResult, Err};
 use core::arch::naked_asm;
 
 extern "C" {
     pub static __free_ram: u8;
     pub static __free_ram_end: u8;
-    pub static __kernel_base: u8;
 }
 
 pub const PAGE_SIZE: usize = 4096;
@@ -15,7 +14,6 @@ static mut NEXT_PADDR: PhysAddr = PhysAddr::new(0);
 static mut RAM_END: PhysAddr = PhysAddr::new(0);
 
 pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResult<()> {
-    let kernel_base = ptr::addr_of!(__kernel_base) as usize;
     // TODO:
     //if dst < PAGE_SIZE.into() || dst > kernel_base.into() {
     //    return Err(Err::InvalidUserAddress)
@@ -28,7 +26,6 @@ pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResu
 }
 
 pub unsafe fn copy_from_user<T: Sized>(addr: VirtAddr, dst: *mut T) -> KernelResult<()> {
-    let kernel_base = ptr::addr_of!(__kernel_base) as usize;
     // TODO:
     // if addr < PAGE_SIZE.into() || addr > kernel_base.into() {
     //     return Err(Err::InvalidUserAddress)
@@ -78,7 +75,6 @@ extern "C" fn mem_copy_to_user<T>(dst: *mut T, src: *const T, len: usize) {
     }
 }
 
-
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Address<T> {
@@ -105,6 +101,30 @@ impl<T> From<usize> for Address<T> {
 impl<T> Into<usize> for Address<T> {
     fn into(self) -> usize {
         self.addr
+    }
+}
+
+impl<T, S> From<*const S> for Address<T> {
+    fn from(value: *const S) -> Self {
+        Self::new(value as usize)
+    }
+} 
+
+impl<T, S> From<*mut S> for Address<T> {
+    fn from(value: *mut S) -> Self {
+        Self::new(value as usize)
+    }
+} 
+
+impl<T, S> Into<*const S> for Address<T> {
+    fn into(self) -> *const S {
+        self.addr as *const S
+    }
+}
+
+impl<T, S> Into<*mut S> for Address<T> {
+    fn into(self) -> *mut S {
+        self.addr as *mut S
     }
 }
 
@@ -141,11 +161,13 @@ impl From<PhysAddr> for VirtAddr {
     }
 }
 
-pub fn init_memory() {
+pub fn init_memory(free_ram_phys: usize, free_ram_end_phys: usize) {
     unsafe {
-        NEXT_PADDR = PhysAddr::new(ptr::addr_of!(__free_ram) as usize);
-        RAM_END = PhysAddr::new(ptr::addr_of!(__free_ram_end) as usize);
+        NEXT_PADDR = PhysAddr::new(free_ram_phys);
+        RAM_END = PhysAddr::new(free_ram_end_phys);
+        ptr::write_bytes(free_ram_phys as *mut u8, 0, free_ram_end_phys - free_ram_phys);
     }
+
 }
 
 pub fn alloc_pages(n: usize) -> KernelResult<PhysAddr> {
@@ -156,7 +178,7 @@ pub fn alloc_pages(n: usize) -> KernelResult<PhysAddr> {
         if NEXT_PADDR.addr > RAM_END.addr {
             Err(Err::OutOfMemory)
         } else {
-            ptr::write_bytes(paddr.addr as *mut u8, 0, n * PAGE_SIZE);
+            // ptr::write_bytes(paddr.addr as *mut u8, 0, n * PAGE_SIZE);
             Ok(paddr)
         }
     }

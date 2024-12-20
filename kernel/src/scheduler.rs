@@ -1,9 +1,6 @@
 use crate::common::{Err, KernelResult};
-use crate::memory::PAGE_SIZE;
 use crate::process::Process;
-use crate::vm::SATP_SV48;
 use common::list::{LinkedList, ListItem};
-use core::arch::asm;
 use core::arch::naked_asm;
 use core::ptr;
 
@@ -91,12 +88,7 @@ pub unsafe fn yield_proc() {
 unsafe fn switch_context(prev: *mut Proc, next: *const Proc) {
     CURRENT_PROC = next as *mut Proc;
     CPU_VAR.sptop = (*next).stack_top.addr;
-    asm!(
-        "sfence.vma x0, x0",
-        "csrw satp, {satp}",
-        "sfence.vma x0, x0",
-        satp = in(reg) (((*next).page_table.get_address() / PAGE_SIZE) | SATP_SV48)
-    );
+    (*next).page_table.activate();
     asm_switch_context(&mut ((*prev).sp.addr), &(*next).sp.addr)
 }
 
