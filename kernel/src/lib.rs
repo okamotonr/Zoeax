@@ -14,3 +14,5 @@ pub mod vm;
 pub mod timer;
 pub mod syscall;
 pub mod scheduler;
+pub mod capability;
+pub mod object;
