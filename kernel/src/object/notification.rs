@@ -5,14 +5,14 @@ use common::list::{LinkedList, ListItem};
 
 use super::tcb::{ThreadControlBlock, ThreadInfo};
 
-pub struct Notfication<'a> {
+pub struct Notification<'a> {
     notify_bit: Option<NonZeroU64>,
     wait_queue: LinkedList<'a, ThreadInfo>
 }
 
-impl<'a> Notfication<'a> {
+impl<'a> Notification<'a> {
     pub fn new() -> Self {
-        Notfication {
+        Notification {
             notify_bit: None,
             wait_queue: LinkedList::new()
         }

@@ -1,17 +1,43 @@
-use crate::{common::{Err, KernelResult}, memory::PhysAddr, vm::KernelVAddress};
-use crate::object;
+use crate::{
+    common::{Err, KernelResult},
+    memory::PhysAddr,
+    vm::KernelVAddress,
+};
 
-use core::ops::{DerefMut, Deref};
+use core::mem;
+use core::ops::{Deref, DerefMut};
+
+pub mod cnode;
+pub mod endpoint;
+pub mod notification;
+pub mod tcb;
+pub mod untyped;
 
 const CAP_TYPE_BIT: usize = 0x1f << 59;
+const PADDING_BIT: usize = 0x7ff << 48;
+const ADDRESS_BIT: usize = !(CAP_TYPE_BIT | PADDING_BIT);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
 pub struct RawCapability([usize; 2]);
 
+/*
+ * RawCapability[1]
+ * | cap_type | padding | address or none |
+ * 64   5         11       48
+ */
+
 impl RawCapability {
     pub const fn null() -> Self {
         Self([0; 2])
+    }
+
+    pub fn is_null(&self) -> bool {
+        if let Ok(CapabilityType::Null) = self.get_cap_type() {
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -30,103 +56,92 @@ impl DerefMut for RawCapability {
 
 impl RawCapability {
     pub fn get_cap_type(&self) -> KernelResult<CapabilityType> {
-        CapabilityType::try_from_u8(
-            ((&self.0[1] & CAP_TYPE_BIT) >> 59) as u8
-        )
+        CapabilityType::try_from_u8(((&self[1] & CAP_TYPE_BIT) >> 59) as u8)
     }
 
+    pub fn set_cap_dep_val(&mut self, val: usize) {
+        self[0] = val;
+    }
+
+    pub fn get_address(&self) -> PhysAddr {
+        PhysAddr::new(self[1] & ADDRESS_BIT)
+    }
+
+    pub fn set_cap_type(&mut self, cap_type: CapabilityType) {
+        self[1] = (self[1] & !CAP_TYPE_BIT) | ((cap_type as u8 as usize) << 59)
+    }
+
+    pub fn set_address(&mut self, address: PhysAddr) {
+        self[1] = (self[1] & CAP_TYPE_BIT) | <PhysAddr as Into<usize>>::into(address)
+    }
+
+    pub fn set_address_and_type(&mut self, address: PhysAddr, cap_type: CapabilityType) {
+        self[1] = ((cap_type as u8 as usize) << 59) & <PhysAddr as Into<usize>>::into(address)
+    }
 }
 
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum CapabilityType {
+    Null,
     Untyped,
     TCB,
     EndPoint,
-    CNode
+    CNode,
+    Notification,
+    Frame,
 }
 
 impl CapabilityType {
     pub fn try_from_u8(val: u8) -> KernelResult<Self> {
         match val {
+            0 => Ok(Self::Null),
             1 => Ok(Self::Untyped),
             3 => Ok(Self::TCB),
             5 => Ok(Self::EndPoint),
             7 => Ok(Self::CNode),
-            _ => Err(Err::UnknownCapType)
+            9 => Ok(Self::Notification),
+            _ => Err(Err::UnknownCapType),
         }
     }
 }
 
-pub trait Capability where Self: Sized {
-    fn init(addr: KernelVAddress, user_size: usize) -> Self;
-    fn from_raw(raw_cap: RawCapability) -> KernelResult<Self>;
-    fn get_object_size(user_size: usize) -> usize;
-    fn get_raw_cap(&self) -> RawCapability;
-}
+pub trait Capability
+where
+    Self: Sized,
+{
+    type KernelObject<'x>;
+    const CAP_TYPE: CapabilityType;
 
-/*
- * | 47 bit free_idx | 10 bit padd | 1 bit is_device | 6 bit block_size |
- * 64                                                                   0
- */
-
-pub struct UntypedCap(RawCapability);
-
-const ADDRESS_LENGTH: usize = 47; // sv48
-impl UntypedCap {
-    pub fn retype<T: Capability>(&mut self, user_size: usize) -> KernelResult<T> {
-        // 1, whether memory is enough or not
-        // 2, write object into free memory area
-        // 3, create capability of object
-        // 4, update self information
-        let block_size = self.block_size();
-        let object_size = T::get_object_size(user_size);
-        (block_size < object_size).then_some(()).ok_or(Err::NoMemory)?;
-        todo!()
-    }
-
-    pub fn get_free_index(&self) -> KernelVAddress {
-        let physadd = PhysAddr::new((&self.0[0] >> (64 - ADDRESS_LENGTH)) as usize);
-        physadd.into()
-    }
-
-    pub fn is_device(&self) -> bool {
-        ((&self.0[0] >> 6) & 0x1) == 1
-    }
-
-    pub fn block_size(&self) -> usize {
-        &self.0[0] & 0x3f
-    }
-}
-
-pub struct TCBCap(RawCapability);
-
-pub struct CNodeCap(RawCapability);
-
-pub struct EndPointCap(RawCapability);
-
-pub struct NotificationCap(RawCapability);
-
-impl Capability for UntypedCap {
     fn init(addr: KernelVAddress, user_size: usize) -> Self {
-        let mut raw_capability = RawCapability([0; 2]);
-
-        todo!();
-        Self(raw_capability)
+        let mut raw_cap = Self::create_raw_cap(addr);
+        let val = Self::create_cap_dep_val(addr, user_size);
+        raw_cap.set_cap_dep_val(val);
+        Self::new(raw_cap)
     }
-    fn from_raw(raw_cap: RawCapability) -> KernelResult<Self> {
-        if let CapabilityType::Untyped = raw_cap.get_cap_type()? {
-            Ok(Self(raw_cap))
+    fn try_from_raw(raw_cap: RawCapability) -> KernelResult<Self> {
+        let cap_type = raw_cap.get_cap_type()?;
+        if cap_type == Self::CAP_TYPE {
+            Ok(Self::new(raw_cap))
         } else {
             Err(Err::UnexpectedCapType)
         }
     }
-
-    fn get_object_size(user_size: usize) -> usize {
-        todo!()
+    fn create_raw_cap(addr: KernelVAddress) -> RawCapability {
+        let mut raw_capability = RawCapability::null();
+        raw_capability.set_address_and_type(addr.into(), Self::CAP_TYPE);
+        raw_capability
     }
-
-    fn get_raw_cap(&self) -> RawCapability {
-        self.0
+    fn create_cap_dep_val(_addr: KernelVAddress, _user_size: usize) -> usize {
+        0
     }
+    fn get_object_size<'a>(_user_size: usize) -> usize {
+        mem::size_of::<Self::KernelObject<'a>>()
+    }
+    fn can_be_retyped_from_device_memory() -> bool {
+        false
+    }
+    fn new(raw_cap: RawCapability) -> Self;
+    fn get_raw_cap(&self) -> RawCapability;
+    fn init_object(&mut self) -> ();
 }

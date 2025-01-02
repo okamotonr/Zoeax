@@ -64,6 +64,7 @@ pub struct ThreadInfo {
     pub sp: VirtAddr,
     pub stack: [u8; STACK_SIZE],
     pub root_cnode: CNodeEntry,
+    pub vspace: CNodeEntry,
     pub registers: Registers,
     pub msg_buffer: usize
 }

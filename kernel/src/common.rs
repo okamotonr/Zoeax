@@ -18,7 +18,10 @@ pub enum Err {
     MessageBoxIsFull,
     InvalidUserAddress,
     UnknownCapType,
-    UnexpectedCapType
+    UnexpectedCapType,
+    CanNotNewFromDeviceMemory,
+    NoEnoughSlot,
+    NotEntrySlot
 }
 
 pub type KernelResult<T> = Result<T, Err>;
