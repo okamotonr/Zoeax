@@ -12,6 +12,7 @@ pub mod endpoint;
 pub mod notification;
 pub mod tcb;
 pub mod untyped;
+pub mod page_table;
 
 const CAP_TYPE_BIT: usize = 0x1f << 59;
 const PADDING_BIT: usize = 0x7ff << 48;
@@ -89,7 +90,8 @@ pub enum CapabilityType {
     EndPoint,
     CNode,
     Notification,
-    Frame,
+    PageTable,
+    Page
 }
 
 impl CapabilityType {
@@ -101,6 +103,8 @@ impl CapabilityType {
             5 => Ok(Self::EndPoint),
             7 => Ok(Self::CNode),
             9 => Ok(Self::Notification),
+            2 => Ok(Self::PageTable),
+            4 => Ok(Self::Page),
             _ => Err(Err::UnknownCapType),
         }
     }

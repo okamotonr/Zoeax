@@ -1,5 +1,3 @@
-use core::ptr::NonNull;
-
 use common::list::ListItem;
 
 use crate::memory::{VirtAddr, PAGE_SIZE};
@@ -9,6 +7,7 @@ use super::cnode::CNodeEntry;
 
 const STACK_SIZE: usize = PAGE_SIZE * 4;
 pub type ThreadControlBlock<'a> = ListItem<'a, ThreadInfo>;
+
 
 pub enum ThreadState {
     Inactive,
@@ -74,3 +73,8 @@ impl ThreadInfo {
     }
 }
 
+impl Default for ThreadInfo {
+    fn default() -> Self {
+        todo!()
+    }
+}

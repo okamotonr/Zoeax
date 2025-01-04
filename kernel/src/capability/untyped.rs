@@ -128,7 +128,17 @@ impl UntypedCap {
                 user_size,
                 num,
             ),
-            CapabilityType::Frame => {
+            CapabilityType::PageTable => {
+                todo!();
+                untyped_cap._invocation::<EndPointCap>(
+                    length,
+                    src_slot,
+                    dest_cnode,
+                    user_size,
+                    num,
+                )
+            },
+            CapabilityType::Page => {
                 todo!();
                 untyped_cap._invocation::<EndPointCap>(
                     length,

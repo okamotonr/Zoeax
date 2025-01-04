@@ -17,6 +17,7 @@ use kernel::riscv::{
 };
 use kernel::timer::set_timer;
 use kernel::vm::{alloc_vm, kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
+use kernel::init_proc::load_elf;
 use core::arch::global_asm;
 
 use common::elf::*;
@@ -130,56 +131,4 @@ fn idle() -> ! {
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
     loop {}
-}
-
-
-fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
-    unsafe {
-        for idx in 0..(*elf_header).e_phnum {
-            let p_header = (*elf_header)
-                .get_pheader(elf_header.cast::<usize>(), idx)
-                .unwrap();
-            if !((*p_header).p_type == ProgramType::Load) {
-                continue;
-            }
-            let flags = get_flags((*p_header).p_flags) | PAGE_U;
-            // this is start address of mapping segment
-            let p_vaddr = VirtAddr::new((*p_header).p_vaddr);
-            let p_start_addr = elf_header.cast::<u8>().add((*p_header).p_offset);
-            // Sometime memsz > filesz, for example bss
-            // so have to call copy with caring of this situation.
-            let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
-            let mut file_sz_rem = (*p_header).p_filesz;
-
-            for page_idx in 0..page_num {
-                let page = alloc_vm().unwrap();
-                if !(file_sz_rem == 0) {
-                    let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
-                    let copy_dst = page.addr as *mut u8;
-                    let copy_size = min(PAGE_SIZE, file_sz_rem);
-                    file_sz_rem = file_sz_rem.saturating_sub(PAGE_SIZE);
-                    ptr::copy::<u8>(copy_src, copy_dst, copy_size);
-                }
-                process.map_page(p_vaddr.add(PAGE_SIZE * page_idx), page.into(), flags);
-            }
-        }
-    }
-}
-
-#[inline]
-fn get_flags(flags: u32) -> usize {
-    let ret = if ProgramFlags::is_executable(flags) {
-        PAGE_X
-    } else {
-        0
-    } | if ProgramFlags::is_writable(flags) {
-        PAGE_W
-    } else {
-        0
-    } | if ProgramFlags::is_readable(flags) {
-        PAGE_R
-    } else {
-        0
-    };
-    ret
 }

@@ -21,7 +21,11 @@ pub enum Err {
     UnexpectedCapType,
     CanNotNewFromDeviceMemory,
     NoEnoughSlot,
-    NotEntrySlot
+    NotEntrySlot,
+    VaddressAlreadyMapped,
+    PageTableAlreadyMapped,
+    PageAlreadyMapped,
+    PageTableNotMappedYet
 }
 
 pub type KernelResult<T> = Result<T, Err>;

@@ -14,5 +14,13 @@ impl Capability for EndPointCap {
     fn get_raw_cap(&self) -> RawCapability {
         self.0
     }
+
+    fn init_object<'x>(&mut self) -> () {
+        let addr = KernelVAddress::from(self.0.get_address());
+        let ptr = <KernelVAddress as Into<*mut Self::KernelObject<'x>>>::into(addr); 
+        unsafe {
+            *ptr = Self::KernelObject::new();
+        }
+    }
 }
 
