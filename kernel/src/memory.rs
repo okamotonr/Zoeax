@@ -194,12 +194,12 @@ impl BumpAllocator {
     }
 
     pub fn allocate_page(&mut self) -> PhysAddr {
-        self.allocate_bytes(PAGE_SIZE)
+        self.allocate_pages(1)
     }
 
-    pub fn allocate_bytes(&mut self, bytes: usize) -> PhysAddr {
+    pub fn allocate_pages(&mut self, page_num: usize) -> PhysAddr {
         let ret = self.start_addr;
-        self.start_addr = self.start_addr.add(bytes);
+        self.start_addr = self.start_addr.add(PAGE_SIZE * page_num);
         assert!(self.start_addr <= self.end_addr);
         ret
     }

@@ -1,7 +1,5 @@
 use crate::{
-    common::{Err, KernelResult},
-    memory::PhysAddr,
-    vm::KernelVAddress,
+    common::{Err, KernelResult}, memory::PhysAddr, println, vm::KernelVAddress
 };
 
 use core::mem;
@@ -77,7 +75,8 @@ impl RawCapability {
     }
 
     pub fn set_address_and_type(&mut self, address: PhysAddr, cap_type: CapabilityType) {
-        self[1] = ((cap_type as u8 as usize) << 59) & <PhysAddr as Into<usize>>::into(address)
+        let v = ((cap_type as u8 as usize) << 59) | <PhysAddr as Into<usize>>::into(address);
+        self[1] = v
     }
 }
 

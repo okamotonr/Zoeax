@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use core::mem::align_of_val;
 
 use crate::capability::Err;
 use crate::capability::PhysAddr;

@@ -16,6 +16,7 @@ use crate::object::CNodeEntry;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
 use crate::object::ThreadInfo;
+use crate::println;
 use crate::riscv::SSTATUS_SPIE;
 use crate::scheduler::create_idle_thread;
 use crate::scheduler::schedule;
@@ -33,16 +34,21 @@ const ROOT_VSPACE_IDX: usize = 3;
 
 // Only initalization
 impl CNode {
-    pub fn write_slot(&mut self, cap: RawCapability, index: usize) {
+    fn write_slot(&mut self, cap: RawCapability, index: usize) {
+        println!("{:p}", self);
         let root = (self as *mut Self).cast::<CNodeEntry>();
+        println!("{:?}", root);
         let entry = CNodeEntry::new_with_rawcap(cap);
         unsafe { *root.add(index) = entry }
     }
 }
 
 impl CNodeCap {
-    pub fn write_slot(&mut self, cap: RawCapability, index: usize) {
+    fn write_slot(&mut self, cap: RawCapability, index: usize) {
+        println!("{:?}", self.get_raw_cap().get_address());
+        println!("{:?}", self.get_raw_cap().get_cap_type());
         let cnode = self.get_cnode(1, index).unwrap();
+        println!("{:p}", &cnode);
         cnode.write_slot(cap, index);
     }
 }
@@ -54,26 +60,28 @@ struct RootServerMemory<'a> {
 }
 
 impl<'a> RootServerMemory<'a> {
-    pub fn alloc_obj<'x, T>(
+    fn alloc_obj<'x, T>(
         bump_allocator: &mut BumpAllocator,
         user_size: usize,
     ) -> &'a mut MaybeUninit<T::KernelObject<'x>>
     where
         T: Capability,
     {
-        let start_address = bump_allocator.allocate_bytes(T::get_object_size(user_size)).into();
+        // easiest way to care align.
+        let start_address = bump_allocator.allocate_pages(
+            align_up(T::get_object_size(user_size), PAGE_SIZE) / PAGE_SIZE).into();
         let cnode_ptr = <KernelVAddress as Into<*mut T::KernelObject<'x>>>::into(start_address);
         unsafe { cnode_ptr.as_uninit_mut().unwrap() }
     }
 
-    pub fn init_with_uninit(bump_allocator: &mut BumpAllocator) -> Self {
+    fn init_with_uninit(bump_allocator: &mut BumpAllocator) -> Self {
         let cnode = Self::alloc_obj::<CNodeCap>(bump_allocator, ROOT_CNODE_ENTRY_NUM);
         let vspace = Self::alloc_obj::<PageTableCap>(bump_allocator, 0);
         let tcb = Self::alloc_obj::<TCBCap>(bump_allocator, 0);
         Self { cnode, vspace, tcb }
     }
 
-    pub fn create_root_cnode(&mut self) -> CNodeCap {
+    fn create_root_cnode(&mut self) -> CNodeCap {
         let cnode = self.cnode.write(CNode::new());
         let cap = CNodeCap::init((cnode as *const CNode).into(), ROOT_CNODE_ENTRY_NUM);
         cnode.write_slot(cap.get_raw_cap(), ROOT_CNODE_IDX);
@@ -81,7 +89,7 @@ impl<'a> RootServerMemory<'a> {
     }
 
     /// create address space of initial server.
-    pub fn create_address_space(
+    fn create_address_space(
         &mut self,
         cnode_cap: &mut CNodeCap,
         elf_header: *const Elf64Hdr,
@@ -89,6 +97,7 @@ impl<'a> RootServerMemory<'a> {
     ) -> PageTableCap {
         let root_page_table = self.vspace.write(PageTable::new());
         let mut cap = PageTableCap::init((root_page_table as *const PageTable).into(), 0);
+        println!("Here");
         cnode_cap.write_slot(cap.get_raw_cap(), ROOT_VSPACE_IDX);
         unsafe {
             for idx in 0..(*elf_header).e_phnum {
@@ -102,7 +111,7 @@ impl<'a> RootServerMemory<'a> {
         cap
     }
 
-    pub fn create_root_tcb(
+    fn create_root_tcb(
         &mut self,
         cnode_cap: &mut CNodeCap,
         vspace_cap: &mut PageTableCap,
@@ -127,6 +136,7 @@ impl<'a> RootServerMemory<'a> {
 
         let cap = TCBCap::init((tcb as *const ThreadControlBlock).into(), 0);
         cnode_cap.write_slot(cap.get_raw_cap(), ROOT_TCB_IDX);
+        println!("or here? {:?}", cap.get_raw_cap().get_cap_type());
         cap
     }
 }
@@ -273,6 +283,7 @@ fn create_initial_thread(
     // 8, call return_to_user(after returning user, to clear stack)
     // 1, create root cnode and insert self cap into self(root cnode)
     let mut root_cnode_cap = root_server_mem.create_root_cnode();
+    println!("is something wrong? {:?}", root_cnode_cap.get_raw_cap().get_cap_type());
     // 2, create vm space for root server,
     let mut vspace_cap =
         root_server_mem.create_address_space(&mut root_cnode_cap, elf_header, &mut bootstage_mbr);

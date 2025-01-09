@@ -114,6 +114,7 @@ impl CNodeEntry {
     }
 }
 
+#[derive(Debug)]
 pub struct CNode;
 
 impl CNode {

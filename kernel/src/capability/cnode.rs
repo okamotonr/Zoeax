@@ -13,7 +13,6 @@ use core::mem;
 pub struct CNodeCap(RawCapability);
 impl Capability for CNodeCap {
     const CAP_TYPE: CapabilityType = CapabilityType::CNode;
-    // TODO:
     type KernelObject<'x> = CNode;
     fn new(raw_cap: RawCapability) -> Self {
         Self(raw_cap)
@@ -60,11 +59,15 @@ impl CNodeCap {
     }
 
     fn get_entry_num(&self) -> usize {
-        todo!()
+        self.radix()
     }
 
     pub fn lookup_entry(&mut self, index: usize) -> KernelResult<&mut CNodeEntry> {
         self.get_cnode(1, index)?.lookup_entry(0)
+    }
+
+    fn radix(&self) -> usize {
+        self.0[0]
     }
 }
 

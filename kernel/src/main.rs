@@ -7,7 +7,7 @@ use core::arch::asm;
 
 use kernel::common::align_up;
 use kernel::handler::trap_entry;
-use kernel::memory::BumpAllocator;
+use kernel::memory::{BumpAllocator, PhysAddr};
 use kernel::println;
 use kernel::scheduler::{CPU_VAR, IDLE_THREAD, SCHEDULER};
 use kernel::riscv::{
@@ -50,7 +50,7 @@ static SHELL: &'static [u8] = &ALIGNED.bytes;
 static PONG: &'static [u8] = &ALIGNED_PONG.bytes;
 
 #[export_name = "_kernel_main"]
-extern "C" fn kernel_main(hartid: usize, _dtb_addr: usize, free_ram_phys: usize, free_ram_end_phys: usize) {
+extern "C" fn kernel_main(hartid: usize, _dtb_addr: PhysAdd, free_ram_phys: usize, free_ram_end_phys: usize) {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
@@ -65,8 +65,7 @@ extern "C" fn kernel_main(hartid: usize, _dtb_addr: usize, free_ram_phys: usize,
     unsafe { kernel_vm_init(free_ram_end_phys) };
 
     println!("cpu id is {}", hartid);
-    let cpu_var = &raw const CPU_VAR;
-    w_sscratch(cpu_var as usize);
+    w_sscratch(&raw const CPU_VAR as usize);
 
     w_sstatus(SSTATUS_SUM);
 
