@@ -1,16 +1,15 @@
 use core::num::NonZeroU64;
-use core::borrow::BorrowMut;
 
 use common::list::{LinkedList, ListItem};
 
 use super::tcb::{ThreadControlBlock, ThreadInfo};
 
-pub struct Notification<'a> {
+pub struct Notification {
     notify_bit: Option<NonZeroU64>,
-    wait_queue: LinkedList<'a, ThreadInfo>
+    wait_queue: LinkedList<ThreadInfo>
 }
 
-impl<'a> Notification<'a> {
+impl Notification {
     pub fn new() -> Self {
         Notification {
             notify_bit: None,
@@ -38,7 +37,7 @@ impl<'a> Notification<'a> {
         }
     }
 
-    pub fn wait_notify(&mut self, thread: &'a mut ThreadControlBlock<'a>) {
+    pub fn wait_notify(&mut self, thread: &mut ThreadControlBlock) {
         if let Some(bit) = self.notify_bit.take() {
             thread.registers.a1 = u64::from(bit) as usize;
             wake_up_thread(thread);
@@ -49,12 +48,12 @@ impl<'a> Notification<'a> {
     }
 }
 
-fn wake_up_thread<'a, T>(_: &mut ListItem<'a, T>) {
+fn wake_up_thread<T>(_:&mut ListItem<T>) {
     // 1, change thread state to Runnable
     // 2, put into runqueu
     todo!()
 }
-fn block_thread<'a, T>(_: &mut ListItem<'a, T>) {
+fn block_thread<T>(_: &mut ListItem<T>) {
     // 1, change thread state block
     todo!()
 }

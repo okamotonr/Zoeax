@@ -1,39 +1,36 @@
-use core::{marker::PhantomData, ptr::NonNull};
+use core::ptr::NonNull;
 use core::ops::{DerefMut, Deref};
 
-pub struct ListItem<'a, T> {
+// TODO: Double LinkedList
+pub struct ListItem<T> {
     value: T,
-    next: Option<NonNull<ListItem<'a, T>>>,
-    _marker: PhantomData<&'a T>,
+    next: Option<NonNull<Self>>,
 }
 
-pub struct LinkedList<'a, T> {
-    head: Option<NonNull<ListItem<'a, T>>>,
-    last: Option<NonNull<ListItem<'a, T>>>,
-    _marker: PhantomData<&'a T>,
+pub struct LinkedList<T> {
+    head: Option<NonNull<ListItem<T>>>,
+    last: Option<NonNull<ListItem<T>>>,
 }
 
-impl<'a, T> ListItem<'a, T> {
+impl<T> ListItem<T> {
     pub const fn new(value: T) -> Self {
         ListItem {
             value,
             next: None,
-            _marker: PhantomData
         }
     }
 
 }
 
-impl<'a, T> LinkedList<'a, T> {
+impl<T> LinkedList<T> {
     pub const fn new() -> Self {
         LinkedList {
             head: None,
             last: None,
-            _marker: PhantomData
         }
     }
 
-    pub fn push(&mut self, item: &'a mut ListItem<'a, T>) {
+    pub fn push(&mut self, item: &mut ListItem<T>) {
         let ptr = unsafe {
             NonNull::new_unchecked(item as *mut ListItem<T>)
         };
@@ -51,7 +48,8 @@ impl<'a, T> LinkedList<'a, T> {
         self.head.is_none()
     }
 
-    pub fn pop(&mut self) -> Option<&'a mut ListItem<'a, T>> {
+    pub fn pop<'a, 'b>(&'b mut self) -> Option<&'a mut ListItem<T>>
+    where 'a : 'b {
         let result = self.head.take();
         let next = result.and_then(|mut ptr| unsafe {
             ptr.as_mut().next
@@ -61,12 +59,12 @@ impl<'a, T> LinkedList<'a, T> {
         }
 
         self.head = next;
-        result.map(|ptr| unsafe { &mut *ptr.as_ptr() })
+        result.map(|ptr| unsafe {&mut *ptr.as_ptr()})
     }
 
 }
 
-impl<'a, T> Deref for ListItem<'a, T> {
+impl<T> Deref for ListItem<T> {
     type Target = T;
     
     fn deref(&self) -> &Self::Target {
@@ -74,7 +72,7 @@ impl<'a, T> Deref for ListItem<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for ListItem<'a, T> {
+impl<T> DerefMut for ListItem<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.value
     }
@@ -83,9 +81,4 @@ impl<'a, T> DerefMut for ListItem<'a, T> {
 #[cfg(test)]
 #[macro_use]
 mod test {
-    use super::ListItem;
-    use super::LinkedList;
-
-    #[test]
-    fn test_run() {}
 }

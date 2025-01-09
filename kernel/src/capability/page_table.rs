@@ -1,4 +1,5 @@
 use crate::common::Err;
+use crate::memory::PAGE_SIZE;
 use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
 use crate::{
@@ -16,15 +17,15 @@ use crate::{
 pub struct PageTableCap(RawCapability);
 
 impl PageTableCap {
-    pub fn map(&mut self, parent: Self, vaddr: VirtAddr) -> KernelResult<()> {
+    pub fn map(&mut self, root_table: &mut Self, vaddr: VirtAddr) -> KernelResult<usize> {
         (!self.is_mapped())
             .then_some(())
             .ok_or(Err::PageTableAlreadyMapped)?;
-        let parent_table = parent.get_pagetable();
+        let parent_table = root_table.get_pagetable();
         let table = self.get_pagetable();
-        table.map(parent_table, vaddr)?;
+        let level = table.map(parent_table, vaddr)?;
         self.set_mapped(vaddr);
-        Ok(())
+        Ok(level)
     }
 
     pub fn get_pagetable(&self) -> &mut PageTable {
@@ -52,14 +53,14 @@ pub struct PageCap(RawCapability);
 impl PageCap {
     pub fn map(
         &mut self,
-        page_table: &mut PageTableCap,
+        root_table: &mut PageTableCap,
         vaddr: VirtAddr,
         flags: usize,
     ) -> KernelResult<()> {
         (!self.is_mapped())
             .then_some(())
             .ok_or(Err::PageAlreadyMapped)?;
-        let parent_table = page_table.get_pagetable();
+        let parent_table = root_table.get_pagetable();
         let page = self.get_page();
         page.map(parent_table, vaddr, flags)?;
         self.set_mapped(vaddr);
@@ -79,6 +80,9 @@ impl PageCap {
     fn is_mapped(&self) -> bool {
         todo!()
     }
+    pub fn get_address(&self) -> KernelVAddress {
+        self.0.get_address().into()
+    }
 }
 
 impl Capability for PageTableCap {
@@ -95,6 +99,9 @@ impl Capability for PageTableCap {
     fn init_object(&mut self) -> () {
         todo!()
     }
+    fn get_object_size<'a>(_user_size: usize) -> usize {
+        PAGE_SIZE// page size, bytes
+    }
 }
 
 impl Capability for PageCap {
@@ -110,5 +117,9 @@ impl Capability for PageCap {
 
     fn init_object(&mut self) -> () {
         todo!()
+    }
+
+    fn get_object_size<'a>(_user_size: usize) -> usize {
+        PAGE_SIZE // page size, bytes
     }
 }

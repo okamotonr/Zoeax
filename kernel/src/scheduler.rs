@@ -1,44 +1,23 @@
 use crate::common::{Err, KernelResult};
-use crate::process::Process;
+use crate::object::{ThreadInfo, ThreadControlBlock};
 use common::list::{LinkedList, ListItem};
 use core::arch::naked_asm;
 use core::ptr;
+use crate::riscv::{r_sstatus, w_sstatus, wfi, SSTATUS_SIE, SSTATUS_SPIE, SSTATUS_SPP};
 
-type Proc<'a> = ListItem<'a, Process>;
+pub static mut IDLE_THREAD: ThreadControlBlock = ThreadControlBlock::new(ThreadInfo::idle_init());
 
-const PROCS_MAX: usize = 8;
-static mut PROCS: [Proc; PROCS_MAX] = [
-    ListItem::new(Process::new()),
-    ListItem::new(Process::new()),
-    ListItem::new(Process::new()),
-    ListItem::new(Process::new()),
-    ListItem::new(Process::new()),
-    ListItem::new(Process::new()),
-    ListItem::new(Process::new()),
-    ListItem::new(Process::new()),
-];
-
-pub static mut IDLE_PROC: Proc = ListItem::new(Process::new());
-pub static mut CURRENT_PROC: *mut Proc = ptr::null_mut();
+pub static mut CURRENT_PROC: *mut ThreadControlBlock = ptr::null_mut();
 pub const TICK_HZ: usize = 1000;
 pub const TASK_QUANTUM: usize = 20 * (TICK_HZ / 1000); // 20 ms;
 pub static mut CPU_VAR: CpuVar = CpuVar {
     sscratch: 0,
     sptop: 0,
 };
-pub static mut SCHEDULER: Scheduler<'static> = Scheduler::new();
+pub static mut SCHEDULER: Scheduler = Scheduler::new();
 
-pub fn allocate_proc(ip: usize) -> KernelResult<&'static mut ListItem<'static, Process>> {
-    let (i, proc) = unsafe {
-        PROCS
-            .iter_mut()
-            .enumerate()
-            .find(|(_, ref x)| x.is_unused())
-            .ok_or(Err::TooManyTasks)?
-    };
-
-    proc.init(ip, i + 1)?;
-    Ok(proc)
+extern "C" {
+    static __stack_top: u8;
 }
 
 #[repr(C)]
@@ -47,27 +26,27 @@ pub struct CpuVar {
     pub sptop: usize,
 }
 
-pub struct Scheduler<'a> {
-    runqueue: LinkedList<'a, Process>,
+pub struct Scheduler {
+    runqueue: LinkedList<ThreadInfo>,
 }
 
-impl<'a> Scheduler<'a> {
+impl Scheduler {
     pub const fn new() -> Self {
         Self {
             runqueue: LinkedList::new(),
         }
     }
 
-    pub fn push(&mut self, proc: &'a mut ListItem<'a, Process>) {
+    pub fn push(&mut self, proc: &mut ThreadControlBlock) {
         self.runqueue.push(proc);
     }
 
-    pub fn sched(&mut self) -> Option<&mut ListItem<'a, Process>> {
+    pub fn sched(&mut self) -> Option<&mut ListItem<ThreadInfo>> {
         self.runqueue.pop()
     }
 }
 
-pub unsafe fn yield_proc() {
+pub unsafe fn schedule() {
     let next = if let Some(next) = SCHEDULER.sched() {
         next.set_timeout(TASK_QUANTUM);
         if (*CURRENT_PROC).is_runnable() {
@@ -78,19 +57,14 @@ pub unsafe fn yield_proc() {
         if (*CURRENT_PROC).is_runnable() {
             return;
         }
-        &raw mut IDLE_PROC
+        &raw mut IDLE_THREAD
     };
-
-    let prev = CURRENT_PROC;
-    switch_context(prev, next);
+    // change page table
+    (*next).activate_vspace();
+    CURRENT_PROC = next;
 }
 
-unsafe fn switch_context(prev: *mut Proc, next: *const Proc) {
-    CURRENT_PROC = next as *mut Proc;
-    CPU_VAR.sptop = (*next).stack_top.addr;
-    (*next).page_table.activate();
-    asm_switch_context(&mut ((*prev).sp.addr), &(*next).sp.addr)
-}
+fn switch_context(prev: &ThreadInfo, next: &ThreadInfo) {}
 
 #[naked]
 #[no_mangle]
@@ -132,54 +106,20 @@ pub extern "C" fn asm_switch_context(prev_sp: *mut usize, next_sp: *const usize)
     }
 }
 
-pub fn sleep(ms_time: usize) {
-    if ms_time == 0 {
-        return;
-    }
-
+pub fn create_idle_thread() {
     unsafe {
-        (*CURRENT_PROC).set_timeout(ms_time);
-        (*CURRENT_PROC).sleep();
-    }
-    unsafe {
-        yield_proc();
+        (*IDLE_THREAD).registers.nextpc = idle as usize;
+        (*IDLE_THREAD).registers.sstatus = SSTATUS_SPP | SSTATUS_SPIE;
+        (*IDLE_THREAD).registers.sp = __stack_top as usize;
     }
 }
 
-pub fn find_proc_by_id(pid: usize) -> Option<&'static mut Proc<'static>> {
-    unsafe {
-        for proc in PROCS.iter_mut() {
-            if proc.pid == pid {
-                return Some(proc);
-            }
-        }
-    }
-    None
-}
-
-pub fn count_down(tick: usize) {
-    unsafe {
-        for proc in PROCS.iter_mut() {
-            (*proc).timeout_ms = (*proc).timeout_ms.saturating_sub(tick);
-            if (*proc).timeout_ms == 0 && (*proc).is_sleeping() {
-                (*proc).resume();
-                SCHEDULER.push(proc);
-            }
-        }
-    }
-
-    unsafe {
-        if (*CURRENT_PROC).timeout_ms == 0 {
-            yield_proc();
-        }
+#[no_mangle]
+fn idle() -> ! {
+    loop {
+        w_sstatus(r_sstatus() | SSTATUS_SIE);
+        wfi();
     }
 }
 
-pub fn init_proc() {
-    unsafe {
-        IDLE_PROC.init(0, 0).unwrap();
-        IDLE_PROC.waiting();
-        CURRENT_PROC = &raw mut IDLE_PROC;
-    };
-}
 

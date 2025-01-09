@@ -84,8 +84,17 @@ impl CNodeEntry {
             mdb: ManagementDB([0; 2]),
         }
     }
+
     pub fn cap(&self) -> RawCapability {
         self.cap
+    }
+
+    pub fn insert(&mut self, parent: &mut Self, cap: RawCapability) {
+        self.cap = cap;
+        if let Some(prev_next) = parent.get_next() {
+            self.set_next(prev_next);
+        };
+        parent.set_next(self)
     }
 
     pub fn set_next(&mut self, next: &mut Self) {

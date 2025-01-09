@@ -4,9 +4,6 @@ use crate::{
     riscv::{r_scause, r_sepc, r_stval},
     timer::set_timer,
     syscall::handle_syscall,
-    process::check_canary,
-    scheduler::count_down,
-    scheduler::CURRENT_PROC,
 };
 
 
@@ -215,7 +212,6 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     //  interrupt
         match code {
             SUPREVISORTIMER => {
-                count_down(1);
                 set_timer(10000);
             }
             SUPERVISORSOFTWARE => {

@@ -7,7 +7,7 @@ pub struct EndPointCap(RawCapability);
 impl Capability for EndPointCap {
     const CAP_TYPE: CapabilityType = CapabilityType::EndPoint;
     // TODO
-    type KernelObject<'x> = Endpoint<'x>;
+    type KernelObject<'x> = Endpoint;
     fn new(raw_cap: RawCapability) -> Self {
         Self(raw_cap)
     }

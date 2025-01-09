@@ -36,10 +36,11 @@ impl Capability for CNodeCap {
 
 impl CNodeCap {
     pub fn insert_cap(&mut self, src_slot: &mut CNodeEntry, new_cap: RawCapability, index: usize) -> KernelResult<()> {
+        todo!();
         Ok(())
     }
 
-    pub fn get_cnode(&mut self, num:usize, offset: usize) -> KernelResult<&mut CNode> {
+    pub fn get_cnode(&mut self, num: usize, offset: usize) -> KernelResult<&mut CNode> {
         (self.get_entry_num() >= num + offset).then_some(()).ok_or(Err::NoEnoughSlot)?;
         let ptr: KernelVAddress = self.0.get_address().into();
         let ptr: *mut CNodeEntry = ptr.into();
@@ -60,6 +61,10 @@ impl CNodeCap {
 
     fn get_entry_num(&self) -> usize {
         todo!()
+    }
+
+    pub fn lookup_entry(&mut self, index: usize) -> KernelResult<&mut CNodeEntry> {
+        self.get_cnode(1, index)?.lookup_entry(0)
     }
 }
 

@@ -1,5 +1,5 @@
-use core::{fmt, marker::PhantomData, ops::{self, Deref}, ptr};
-use crate::common::{KernelResult, Err};
+use core::{fmt, marker::PhantomData, ops, ptr};
+use crate::common::KernelResult;
 use core::arch::naked_asm;
 
 extern "C" {
@@ -8,10 +8,6 @@ extern "C" {
 }
 
 pub const PAGE_SIZE: usize = 4096;
-
-// dummy init
-static mut NEXT_PADDR: PhysAddr = PhysAddr::new(0);
-static mut RAM_END: PhysAddr = PhysAddr::new(0);
 
 pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResult<()> {
     // TODO:
@@ -87,8 +83,16 @@ impl<T> Address<T> {
         Self { addr, _phantom: PhantomData }
     }
 
-    pub fn add(&self, count: usize) -> Self {
-        Self { addr: self.addr + count, _phantom: self._phantom }
+    pub fn add(self, val: usize) -> Self {
+        Self::new(self.addr + val)
+    }
+
+    pub fn bit_or(self, val: usize) -> Self {
+        Self::new(self.addr | val)
+    }
+
+    pub fn bit_and(self, val: usize) -> Self {
+        Self::new(self.addr & val)
     }
 }
 
@@ -147,6 +151,19 @@ impl<T> ops::AddAssign for Address<T> {
     }
 }
 
+impl<T> ops::Sub for Address<T> {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(self.addr - rhs.addr)
+    }
+}
+
+impl<T> ops::SubAssign for Address<T> {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.addr -= rhs.addr
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Physical;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -161,25 +178,33 @@ impl From<PhysAddr> for VirtAddr {
     }
 }
 
-pub fn init_memory(free_ram_phys: usize, free_ram_end_phys: usize) {
-    unsafe {
-        NEXT_PADDR = PhysAddr::new(free_ram_phys);
-        RAM_END = PhysAddr::new(free_ram_end_phys);
-        ptr::write_bytes(free_ram_phys as *mut u8, 0, free_ram_end_phys - free_ram_phys);
-    }
-
+/// Physical Page Allocator
+/// Allocated Page will never be reclaimed
+pub struct BumpAllocator {
+    start_addr: PhysAddr,
+    end_addr: PhysAddr
 }
 
-pub fn alloc_pages(n: usize) -> KernelResult<PhysAddr> {
-    unsafe {
-        let paddr = NEXT_PADDR;
-        NEXT_PADDR += PhysAddr::new(n * PAGE_SIZE);
+impl BumpAllocator {
+    pub unsafe fn new(free_ram_phys: usize, free_ram_end_phys: usize) -> Self {
+        assert!(free_ram_phys < free_ram_end_phys);
 
-        if NEXT_PADDR.addr > RAM_END.addr {
-            Err(Err::OutOfMemory)
-        } else {
-            // ptr::write_bytes(paddr.addr as *mut u8, 0, n * PAGE_SIZE);
-            Ok(paddr)
-        }
+        ptr::write_bytes(free_ram_phys as *mut u8, 0, free_ram_end_phys - free_ram_phys);
+        Self {start_addr: free_ram_phys.into(), end_addr: free_ram_end_phys.into()}
+    }
+
+    pub fn allocate_page(&mut self) -> PhysAddr {
+        self.allocate_bytes(PAGE_SIZE)
+    }
+
+    pub fn allocate_bytes(&mut self, bytes: usize) -> PhysAddr {
+        let ret = self.start_addr;
+        self.start_addr = self.start_addr.add(bytes);
+        assert!(self.start_addr <= self.end_addr);
+        ret
+    }
+
+    pub fn end_allocation(self) -> (PhysAddr, PhysAddr) {
+        (self.start_addr, self.end_addr)
     }
 }

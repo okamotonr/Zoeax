@@ -10,12 +10,12 @@ pub enum EndpointState {
     Idel,
 }
 
-pub struct Endpoint<'a> {
+pub struct Endpoint {
     ep_state: EndpointState,
-    queue: LinkedList<'a, ThreadInfo>
+    queue: LinkedList<ThreadInfo>
 }
 
-impl<'a> Endpoint<'a> {
+impl Endpoint {
     pub fn new() -> Self {
         Endpoint {
             ep_state: EndpointState::Idel,
@@ -23,7 +23,7 @@ impl<'a> Endpoint<'a> {
         }
     }
 
-    fn pop_from_queue(&mut self, ep_state: EndpointState) -> Option<&'a mut ThreadControlBlock<'a>> {
+    fn pop_from_queue<'a>(&mut self, ep_state: EndpointState) -> Option<&'a mut ThreadControlBlock> {
         if self.is_idle() {
             self.ep_state = ep_state
         }
@@ -31,7 +31,9 @@ impl<'a> Endpoint<'a> {
         if self.ep_state == ep_state {
             None
         } else {
-            let ret = self.queue.pop();
+            let ret = {
+                self.queue.pop()
+            };
             if self.queue.is_empty() {
                 self.ep_state = EndpointState::Idel;
             }
@@ -39,7 +41,7 @@ impl<'a> Endpoint<'a> {
         }
     }
 
-    pub fn send(&mut self, thread: &'a mut ThreadControlBlock<'a>) {
+    pub fn send(&mut self, thread: &mut ThreadControlBlock) {
         if let Some(reciever_thread) = self.pop_from_queue(EndpointState::Send) {
             reciever_thread.set_msg(thread.msg_buffer);
             wake_up_thread(thread);
@@ -50,7 +52,7 @@ impl<'a> Endpoint<'a> {
         }
     }
 
-    pub fn recv(&mut self, thread: &'a mut ThreadControlBlock<'a>) {
+    pub fn recv(&mut self, thread: &mut ThreadControlBlock) {
         if let Some(send_thread) = self.pop_from_queue(EndpointState::Recv) {
             thread.set_msg(send_thread.msg_buffer);
             wake_up_thread(thread);
@@ -66,12 +68,12 @@ impl<'a> Endpoint<'a> {
     }
 }
 
-fn wake_up_thread<'a, T>(_: &mut ListItem<'a, T>) {
+fn wake_up_thread<T>(_:&mut ListItem<T>) {
     // 1, change thread state to Runnable
     // 2, put into runqueu
     todo!()
 }
-fn block_thread<'a, T>(_: &mut ListItem<'a, T>) {
+fn block_thread<T>(_: &mut ListItem<T>) {
     // 1, change thread state block
     todo!()
 }

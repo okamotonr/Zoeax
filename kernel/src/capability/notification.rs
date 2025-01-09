@@ -7,7 +7,7 @@ pub struct NotificationCap(RawCapability);
 impl Capability for NotificationCap {
     const CAP_TYPE: CapabilityType = CapabilityType::Notification;
     // TODO
-    type KernelObject<'x> = Notification<'static>;
+    type KernelObject<'x> = Notification;
     fn new(raw_cap: RawCapability) -> Self {
         Self(raw_cap)
     }

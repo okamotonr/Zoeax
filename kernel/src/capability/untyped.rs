@@ -187,7 +187,6 @@ impl UntypedCap {
     }
 }
 
-// TODO: Interable
 pub struct CapGenerator<C: Capability> {
     num: usize,              // mutable
     address: KernelVAddress, // mutable
