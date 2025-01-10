@@ -1,6 +1,6 @@
 use crate::{
     common::{Err, KernelResult},
-    memory::{copy_from_user, copy_to_user, VirtAddr},
+    address::{copy_from_user, copy_to_user, VirtAddr},
     println,
     scheduler::{CURRENT_PROC, SCHEDULER},
     uart::putchar,

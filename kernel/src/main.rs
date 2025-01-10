@@ -5,18 +5,9 @@
 use core::{arch::naked_asm, cmp::min, panic::PanicInfo, ptr};
 use core::arch::asm;
 
-use kernel::common::align_up;
-use kernel::handler::{return_to_user, trap_entry};
-use kernel::memory::{BumpAllocator, PhysAddr};
+use kernel::handler::return_to_user;
 use kernel::println;
-use kernel::scheduler::{CPU_VAR, IDLE_THREAD, SCHEDULER};
-use kernel::riscv::{
-    r_sie, r_sstatus, w_sie, w_sscratch, w_sstatus, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE,
-    SSTATUS_SIE, SSTATUS_SUM
-};
-use kernel::timer::set_timer;
-use kernel::vm::{kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
-use kernel::init_proc::kernel_init;
+use kernel::init::init_kernel;
 use core::arch::global_asm;
 
 use common::elf::*;
@@ -50,34 +41,16 @@ static SHELL: &'static [u8] = &ALIGNED.bytes;
 static PONG: &'static [u8] = &ALIGNED_PONG.bytes;
 
 #[export_name = "_kernel_main"]
-extern "C" fn kernel_main(hartid: usize, _dtb_addr: PhysAddr, free_ram_phys: usize, free_ram_end_phys: usize) -> ! {
+extern "C" fn kernel_main(hartid: usize, _dtb_addr: usize, free_ram_phys: usize, free_ram_end_phys: usize) -> ! {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
         ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
     };
-    println!("booting kernel");
-
-    w_stvec(trap_entry as usize);
-    let bump_allocator = unsafe {
-        BumpAllocator::new(free_ram_phys, free_ram_end_phys)
-    };
-    unsafe { kernel_vm_init(free_ram_end_phys) };
-
     println!("cpu id is {}", hartid);
-    unsafe {
-        CPU_VAR.sptop = &raw const __stack_top as usize;
-    }
-    w_sscratch(&raw const CPU_VAR as usize);
-
-    w_sstatus(SSTATUS_SUM);
-
     let elf_header = (SHELL as *const [u8]).cast::<Elf64Hdr>();
 
-
-    w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
-    kernel_init(bump_allocator, elf_header);
-    set_timer(100000);
+    init_kernel(elf_header, free_ram_phys, free_ram_end_phys, &raw const __stack_top as usize);
     println!("return to user");
     unsafe {
         return_to_user()

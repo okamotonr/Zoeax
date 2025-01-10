@@ -1,4 +1,5 @@
 use common::elf::*;
+use super::pm::BumpAllocator;
 
 use crate::capability::cnode::CNodeCap;
 use crate::capability::page_table::PageCap;
@@ -8,16 +9,15 @@ use crate::capability::untyped::UntypedCap;
 use crate::capability::Capability;
 use crate::capability::RawCapability;
 use crate::common::{align_up, Err};
-use crate::memory::BumpAllocator;
-use crate::memory::VirtAddr;
-use crate::memory::PAGE_SIZE;
+use crate::address::VirtAddr;
+use crate::address::PAGE_SIZE;
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
 use crate::object::ThreadInfo;
 use crate::println;
-use crate::riscv::SSTATUS_SIE;
+
 use crate::riscv::SSTATUS_SPIE;
 use crate::riscv::SSTATUS_SUM;
 use crate::scheduler::create_idle_thread;
@@ -266,7 +266,7 @@ fn get_flags(flags: u32) -> usize {
     ret
 }
 
-pub fn kernel_init(mut bump_allocator: BumpAllocator, elf_header: *const Elf64Hdr) {
+pub fn init_root_server(mut bump_allocator: BumpAllocator, elf_header: *const Elf64Hdr) {
     let mut root_server_mem = RootServerMemory::init_with_uninit(&mut bump_allocator);
     let bootstage_mbr = BootStateManager::new(
         bump_allocator,

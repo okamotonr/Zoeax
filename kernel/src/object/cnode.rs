@@ -1,4 +1,4 @@
-use crate::{capability::RawCapability, common::KernelResult, memory::PhysAddr, vm::KernelVAddress};
+use crate::{capability::RawCapability, common::KernelResult, address::PhysAddr, vm::KernelVAddress};
 use core::mem;
 
 /*

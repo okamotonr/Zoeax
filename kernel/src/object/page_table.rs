@@ -1,5 +1,5 @@
 use crate::{
-    common::{Err, KernelResult}, memory::{PhysAddr, VirtAddr, PAGE_SIZE}, println, vm::{KernelVAddress, KERNEL_CODE_PFX, KERNEL_VM_ROOT}
+    common::{Err, KernelResult}, address::{PhysAddr, VirtAddr, PAGE_SIZE}, println, vm::{KernelVAddress, KERNEL_CODE_PFX, KERNEL_VM_ROOT}
 };
 
 use core::arch::asm;
