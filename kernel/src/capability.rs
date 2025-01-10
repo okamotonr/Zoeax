@@ -17,7 +17,7 @@ const PADDING_BIT: usize = 0x7ff << 48;
 const ADDRESS_BIT: usize = !(CAP_TYPE_BIT | PADDING_BIT);
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct RawCapability([usize; 2]);
 
 /*
@@ -83,14 +83,15 @@ impl RawCapability {
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum CapabilityType {
-    Null,
-    Untyped,
-    TCB,
-    EndPoint,
-    CNode,
-    Notification,
-    PageTable,
-    Page
+    Null = 0,
+    Untyped = 1,
+    TCB = 3,
+    EndPoint = 5,
+    CNode = 7,
+    Notification = 9,
+    // Arch
+    PageTable = 2,
+    Page = 4
 }
 
 impl CapabilityType {

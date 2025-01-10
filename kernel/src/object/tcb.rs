@@ -13,7 +13,7 @@ pub fn resume(thread: &mut ThreadControlBlock) {
     unsafe { SCHEDULER.push(thread) }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum ThreadState {
     Inactive,
     Runnable,
@@ -21,8 +21,14 @@ pub enum ThreadState {
     Idle,
 }
 
+impl Default for ThreadState {
+    fn default() -> Self {
+        ThreadState::Inactive
+    }
+}
+
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Registers {
     pub ra: usize,
     pub sp: usize,
@@ -60,7 +66,6 @@ pub struct Registers {
     pub scause: usize,
     pub sstatus: usize,
     pub sepc: usize,
-    pub nextpc: usize,
 }
 
 impl Registers {
@@ -100,11 +105,11 @@ impl Registers {
             scause: 0,
             sstatus: 0,
             sepc: 0,
-            nextpc: 0,
         }
     }
 }
 
+#[derive(Debug, Default)]
 pub struct ThreadInfo {
     pub status: ThreadState,
     pub time_slice: usize,
@@ -141,12 +146,6 @@ impl ThreadInfo {
     }
 
     pub fn activate_vspace(&self) {
-    }
-}
-
-impl Default for ThreadInfo {
-    fn default() -> Self {
-        todo!()
     }
 }
 
@@ -191,7 +190,6 @@ impl Index<usize> for Registers {
             32 => &self.scause,
             33 => &self.sstatus,
             34 => &self.sepc,
-            35 => &self.nextpc,
             _ => panic!("Unknown Index"),
         }
     }
@@ -236,7 +234,6 @@ impl IndexMut<usize> for Registers {
             32 => &mut self.scause,
             33 => &mut self.sstatus,
             34 => &mut self.sepc,
-            35 => &mut self.nextpc,
             _ => panic!("Unknown Index"),
         }
     }

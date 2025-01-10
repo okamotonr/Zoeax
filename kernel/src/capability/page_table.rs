@@ -39,7 +39,7 @@ impl PageTableCap {
     }
 
     fn is_mapped(&self) -> bool {
-        todo!()
+        ((self.0[0] >> 48) & 0x1) == 1
     }
 }
 
@@ -78,7 +78,7 @@ impl PageCap {
     }
 
     fn is_mapped(&self) -> bool {
-        todo!()
+        ((self.0[0] >> 48) & 0x1) == 1
     }
     pub fn get_address(&self) -> KernelVAddress {
         self.0.get_address().into()

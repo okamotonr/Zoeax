@@ -11,7 +11,7 @@ use core::mem;
  * 64                          0
  *       48               16
  */
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ManagementDB([usize; 2]);
 
 impl ManagementDB {
@@ -65,6 +65,7 @@ impl ManagementDB {
     }
 }
 
+#[derive(Debug, Default)]
 pub struct CNodeEntry {
     cap: RawCapability,
     mdb: ManagementDB,

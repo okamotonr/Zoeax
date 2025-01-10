@@ -35,9 +35,8 @@ const ROOT_VSPACE_IDX: usize = 3;
 // Only initalization
 impl CNode {
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        println!("{:p}", self);
+        println!("{:?}", cap.get_cap_type());
         let root = (self as *mut Self).cast::<CNodeEntry>();
-        println!("{:?}", root);
         let entry = CNodeEntry::new_with_rawcap(cap);
         unsafe { *root.add(index) = entry }
     }
@@ -48,7 +47,7 @@ impl CNodeCap {
         println!("{:?}", self.get_raw_cap().get_address());
         println!("{:?}", self.get_raw_cap().get_cap_type());
         let cnode = self.get_cnode(1, index).unwrap();
-        println!("{:p}", &cnode);
+        println!("{:p}", cnode);
         cnode.write_slot(cap, index);
     }
 }
@@ -136,7 +135,6 @@ impl<'a> RootServerMemory<'a> {
 
         let cap = TCBCap::init((tcb as *const ThreadControlBlock).into(), 0);
         cnode_cap.write_slot(cap.get_raw_cap(), ROOT_TCB_IDX);
-        println!("or here? {:?}", cap.get_raw_cap().get_cap_type());
         cap
     }
 }
@@ -300,4 +298,5 @@ fn create_initial_thread(
     root_cnode_cap.write_slot(untyped_cap.get_raw_cap(), untyped_cap_idx);
     // 7, set initial thread into current thread
     root_tcb.make_runnable();
+    println!("root process initialization finished");
 }

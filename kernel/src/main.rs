@@ -6,7 +6,7 @@ use core::{arch::naked_asm, cmp::min, panic::PanicInfo, ptr};
 use core::arch::asm;
 
 use kernel::common::align_up;
-use kernel::handler::trap_entry;
+use kernel::handler::{return_to_user, trap_entry};
 use kernel::memory::{BumpAllocator, PhysAddr};
 use kernel::println;
 use kernel::scheduler::{CPU_VAR, IDLE_THREAD, SCHEDULER};
@@ -50,7 +50,7 @@ static SHELL: &'static [u8] = &ALIGNED.bytes;
 static PONG: &'static [u8] = &ALIGNED_PONG.bytes;
 
 #[export_name = "_kernel_main"]
-extern "C" fn kernel_main(hartid: usize, _dtb_addr: PhysAdd, free_ram_phys: usize, free_ram_end_phys: usize) {
+extern "C" fn kernel_main(hartid: usize, _dtb_addr: PhysAddr, free_ram_phys: usize, free_ram_end_phys: usize) -> ! {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
@@ -75,6 +75,7 @@ extern "C" fn kernel_main(hartid: usize, _dtb_addr: PhysAdd, free_ram_phys: usiz
 
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
     kernel_init(bump_allocator, elf_header);
+    return_to_user()
 
 }
 #[panic_handler]

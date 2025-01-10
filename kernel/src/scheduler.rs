@@ -5,8 +5,10 @@ use core::arch::naked_asm;
 use core::ptr;
 use crate::riscv::{r_sstatus, w_sstatus, wfi, SSTATUS_SIE, SSTATUS_SPIE, SSTATUS_SPP};
 
+// TODO: use once_cell
 pub static mut IDLE_THREAD: ThreadControlBlock = ThreadControlBlock::new(ThreadInfo::idle_init());
 
+// TODO: use unsafe_cell
 pub static mut CURRENT_PROC: *mut ThreadControlBlock = ptr::null_mut();
 pub const TICK_HZ: usize = 1000;
 pub const TASK_QUANTUM: usize = 20 * (TICK_HZ / 1000); // 20 ms;
@@ -14,6 +16,8 @@ pub static mut CPU_VAR: CpuVar = CpuVar {
     sscratch: 0,
     sptop: 0,
 };
+
+// TODO: use unsafe_cell
 pub static mut SCHEDULER: Scheduler = Scheduler::new();
 
 extern "C" {
@@ -119,6 +123,12 @@ fn idle() -> ! {
     loop {
         w_sstatus(r_sstatus() | SSTATUS_SIE);
         wfi();
+    }
+}
+
+pub fn get_current_tcb<'a>() -> &'a ThreadControlBlock {
+    unsafe {
+        & *CURRENT_PROC
     }
 }
 
