@@ -65,17 +65,23 @@ extern "C" fn kernel_main(hartid: usize, _dtb_addr: PhysAddr, free_ram_phys: usi
     unsafe { kernel_vm_init(free_ram_end_phys) };
 
     println!("cpu id is {}", hartid);
+    unsafe {
+        CPU_VAR.sptop = &raw const __stack_top as usize;
+    }
     w_sscratch(&raw const CPU_VAR as usize);
 
     w_sstatus(SSTATUS_SUM);
 
     let elf_header = (SHELL as *const [u8]).cast::<Elf64Hdr>();
 
-    set_timer(100000);
 
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
     kernel_init(bump_allocator, elf_header);
-    return_to_user()
+    set_timer(100000);
+    println!("return to user");
+    unsafe {
+        return_to_user()
+    }
 
 }
 #[panic_handler]

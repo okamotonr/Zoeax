@@ -1,5 +1,5 @@
 use crate::{
-    common::{Err, KernelResult}, memory::{PhysAddr, VirtAddr, PAGE_SIZE}, println, vm::{KernelVAddress, KERNEL_VM_ROOT}
+    common::{Err, KernelResult}, memory::{PhysAddr, VirtAddr, PAGE_SIZE}, println, vm::{KernelVAddress, KERNEL_CODE_PFX, KERNEL_VM_ROOT}
 };
 
 use core::arch::asm;
@@ -29,7 +29,7 @@ impl PageTable {
         if level == 0 {
             Err(Err::VaddressAlreadyMapped)
         } else {
-            entry.write(self as *const _ as usize, PAGE_V);
+            entry.write(KernelVAddress::from(self as *const _), PAGE_V);
             Ok(level - 1)
         }
     }
@@ -72,6 +72,18 @@ impl PageTable {
             ptr::copy::<u8>(k_root, self_addr, PAGE_SIZE);
         };
     }
+
+    pub unsafe fn activate_kernel_table() {
+        let address = (&raw const KERNEL_VM_ROOT as *const _ as usize) & !KERNEL_CODE_PFX;
+        unsafe {
+            asm!(
+                "sfence.vma x0, x0",
+                "csrw satp, {satp}",
+                "sfence.vma x0, x0",
+                satp = in(reg) (SATP_SV48 | (address >> 12))
+            )
+        }
+    }
 }
 
 // 4kb page
@@ -89,7 +101,7 @@ impl Page {
             if entry.is_valid() {
                 Err(Err::VaddressAlreadyMapped)
             } else {
-                entry.write(self as *const _ as usize, flags | PAGE_V);
+                entry.write(KernelVAddress::from(self as *const _), flags | PAGE_V);
                 Ok(())
             }
         }
@@ -103,12 +115,20 @@ impl PTE {
         self.0 & PAGE_V != 0
     }
 
-    pub fn write(&mut self, addr: usize, flags: usize) {
-        self.0 = ((addr >> 12) << 10) | flags
+    pub fn write(&mut self, addr: KernelVAddress, flags: usize) {
+        let phys: PhysAddr = addr.into();
+        let addr = phys.addr;
+        println!("walk");
+        println!("{:x}", addr);
+        println!("{:x}", addr >> 12);
+        self.0 = ((addr >> 12) << 10) | flags;
+        println!("{:x}", self.0);
     }
 
     pub fn as_page_table(&mut self) -> &mut PageTable {
-        let raw = (self.0 << 2) & !0xfff;
-        unsafe { (raw as *mut PageTable).as_mut().unwrap() }
+        let phys_addr = PhysAddr::from((self.0 << 2) & !0xfff);
+        let raw: *mut PageTable = KernelVAddress::from(phys_addr).into();
+        println!("{:?}", raw);
+        unsafe { &mut *raw }
     }
 }

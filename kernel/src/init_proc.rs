@@ -17,7 +17,9 @@ use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
 use crate::object::ThreadInfo;
 use crate::println;
+use crate::riscv::SSTATUS_SIE;
 use crate::riscv::SSTATUS_SPIE;
+use crate::riscv::SSTATUS_SUM;
 use crate::scheduler::create_idle_thread;
 use crate::scheduler::schedule;
 use crate::vm::KernelVAddress;
@@ -95,7 +97,11 @@ impl<'a> RootServerMemory<'a> {
         bootstage_mbr: &mut BootStateManager,
     ) -> PageTableCap {
         let root_page_table = self.vspace.write(PageTable::new());
+
+
+        root_page_table.copy_global_mapping();
         let mut cap = PageTableCap::init((root_page_table as *const PageTable).into(), 0);
+        cap.root_map().unwrap();
         println!("Here");
         cnode_cap.write_slot(cap.get_raw_cap(), ROOT_VSPACE_IDX);
         unsafe {
@@ -120,8 +126,8 @@ impl<'a> RootServerMemory<'a> {
             .tcb
             .write(ThreadControlBlock::new(ThreadInfo::default()));
         // TODO: per arch
-        tcb.registers.sstatus = SSTATUS_SPIE;
-        tcb.registers.nextpc = entry_point.into();
+        tcb.registers.sstatus = SSTATUS_SPIE | SSTATUS_SUM;
+        tcb.registers.sepc = entry_point.into();
 
         // insert cnode_cap into tcb cnode_cap
         let raw_cap = cnode_cap.get_raw_cap();
@@ -268,6 +274,7 @@ pub fn kernel_init(mut bump_allocator: BumpAllocator, elf_header: *const Elf64Hd
         ROOT_CNODE_ENTRY_NUM - 1,
     );
     create_initial_thread(&mut root_server_mem, bootstage_mbr, elf_header);
+
     unsafe {
         schedule();
     }
@@ -281,7 +288,6 @@ fn create_initial_thread(
     // 8, call return_to_user(after returning user, to clear stack)
     // 1, create root cnode and insert self cap into self(root cnode)
     let mut root_cnode_cap = root_server_mem.create_root_cnode();
-    println!("is something wrong? {:?}", root_cnode_cap.get_raw_cap().get_cap_type());
     // 2, create vm space for root server,
     let mut vspace_cap =
         root_server_mem.create_address_space(&mut root_cnode_cap, elf_header, &mut bootstage_mbr);

@@ -1,7 +1,6 @@
-use crate::common::{Err, KernelResult};
 use crate::object::{ThreadInfo, ThreadControlBlock};
+use crate::println;
 use common::list::{LinkedList, ListItem};
-use core::arch::naked_asm;
 use core::ptr;
 use crate::riscv::{r_sstatus, w_sstatus, wfi, SSTATUS_SIE, SSTATUS_SPIE, SSTATUS_SPP};
 
@@ -25,6 +24,7 @@ extern "C" {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct CpuVar {
     pub sscratch: usize,
     pub sptop: usize,
@@ -52,6 +52,7 @@ impl Scheduler {
 
 pub unsafe fn schedule() {
     let next = if let Some(next) = SCHEDULER.sched() {
+        println!("get next");
         next.set_timeout(TASK_QUANTUM);
         if (*CURRENT_PROC).is_runnable() {
             SCHEDULER.push(CURRENT_PROC.as_mut().unwrap());
@@ -68,58 +69,18 @@ pub unsafe fn schedule() {
     CURRENT_PROC = next;
 }
 
-fn switch_context(prev: &ThreadInfo, next: &ThreadInfo) {}
-
-#[naked]
-#[no_mangle]
-pub extern "C" fn asm_switch_context(prev_sp: *mut usize, next_sp: *const usize) {
-    unsafe {
-        naked_asm!(
-            "addi sp, sp, -13 * 8",
-            "sd ra, 0 * 8(sp)",
-            "sd s0, 1 * 8(sp)",
-            "sd s1, 2 * 8(sp)",
-            "sd s2, 3 * 8(sp)",
-            "sd s3, 4 * 8(sp)",
-            "sd s4, 5 * 8(sp)",
-            "sd s5, 6 * 8(sp)",
-            "sd s6, 7 * 8(sp)",
-            "sd s7, 8 * 8(sp)",
-            "sd s8, 9 * 8(sp)",
-            "sd s9, 10 * 8(sp)",
-            "sd s10, 11 * 8(sp)",
-            "sd s11, 12 * 8(sp)",
-            "sd sp, (a0)",
-            "ld sp, (a1)",
-            "ld ra, 0 * 8(sp)",
-            "ld s0, 1 * 8(sp)",
-            "ld s1, 2 * 8(sp)",
-            "ld s2, 3 * 8(sp)",
-            "ld s3, 4 * 8(sp)",
-            "ld s4, 5 * 8(sp)",
-            "ld s5, 6 * 8(sp)",
-            "ld s6, 7 * 8(sp)",
-            "ld s7, 8 * 8(sp)",
-            "ld s8, 9 * 8(sp)",
-            "ld s9, 10 * 8(sp)",
-            "ld s10, 11 * 8(sp)",
-            "ld s11, 12 * 8(sp)",
-            "addi sp, sp, 13 * 8",
-            "ret"
-        )
-    }
-}
-
 pub fn create_idle_thread() {
     unsafe {
-        (*IDLE_THREAD).registers.nextpc = idle as usize;
+        (*IDLE_THREAD).registers.sepc = idle as usize;
         (*IDLE_THREAD).registers.sstatus = SSTATUS_SPP | SSTATUS_SPIE;
-        (*IDLE_THREAD).registers.sp = __stack_top as usize;
+        (*IDLE_THREAD).registers.sp = &raw const __stack_top as usize;
+        CURRENT_PROC = &raw mut IDLE_THREAD;
     }
 }
 
 #[no_mangle]
 fn idle() -> ! {
+    println!("In the Idle");
     loop {
         w_sstatus(r_sstatus() | SSTATUS_SIE);
         wfi();

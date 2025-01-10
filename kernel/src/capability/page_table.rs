@@ -2,6 +2,8 @@ use crate::common::Err;
 use crate::memory::PAGE_SIZE;
 use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
+use crate::print;
+use crate::println;
 use crate::{
     capability::{Capability, CapabilityType, RawCapability},
     common::KernelResult,
@@ -34,8 +36,27 @@ impl PageTableCap {
         unsafe { ptr.as_mut().unwrap() }
     }
 
+    pub unsafe fn activate(&self) -> KernelResult<()> {
+        self.is_mapped().then_some(()).ok_or(Err::PageTableNotMappedYet)?;
+        let page_table = self.get_pagetable();
+        println!("call activation");
+        unsafe {
+            Ok(page_table.activate())
+        }
+    }
+
     fn set_mapped(&mut self, vaddr: VirtAddr) {
-        self.0[0] |= (0x1 << 48 | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff))
+        self.0[0] |= 0x1 << 48 | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff)
+    }
+
+    pub fn root_map(&mut self) -> KernelResult<()> {
+        (!self.is_mapped())
+            .then_some(())
+            .ok_or(Err::PageTableAlreadyMapped)?;
+        let vaddr = self.get_pagetable();
+        let addr = VirtAddr::from(vaddr as *const PageTable);
+        println!("{addr:?}");
+        Ok(self.set_mapped(addr))
     }
 
     fn is_mapped(&self) -> bool {

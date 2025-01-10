@@ -1,4 +1,9 @@
 use common::list::ListItem;
+use crate::common::KernelResult;
+use crate::object::PageTable;
+use crate::println;
+use crate::{capability::page_table::PageTableCap, vm::KernelVAddress};
+use crate::capability::Capability;
 
 use crate::scheduler::SCHEDULER;
 use core::ops::{Index, IndexMut};
@@ -145,7 +150,18 @@ impl ThreadInfo {
         }
     }
 
-    pub fn activate_vspace(&self) {
+    pub unsafe fn activate_vspace(&self) {
+        if let Err(e) = self.activate_vspace_inner() {
+            println!("{e:?}");
+            PageTable::activate_kernel_table();
+        } 
+    }
+
+    unsafe fn activate_vspace_inner(&self) -> KernelResult<()> {
+        let pt_cap = PageTableCap::try_from_raw(self.vspace.cap())?;
+        unsafe {
+            pt_cap.activate()
+        }
     }
 }
 

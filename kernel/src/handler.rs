@@ -1,11 +1,7 @@
 use core::{arch::{naked_asm, asm}, usize, mem::offset_of};
 
 use crate::{
-    riscv::{r_scause, r_sepc, r_stval},
-    timer::set_timer,
-    syscall::handle_syscall,
-    scheduler::get_current_tcb,
-    object::Registers,
+    object::Registers, println, riscv::{r_scause, r_sepc, r_stval}, scheduler::get_current_tcb, syscall::handle_syscall, timer::set_timer
 };
 
 
@@ -321,7 +317,10 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
 #[no_mangle]
 pub unsafe fn return_to_user() -> ! {
     let tcb = get_current_tcb();
-
+    let address = &raw const tcb.registers as usize;
+    let reg = &tcb.registers;
+    println!("{reg:x?}");
+    println!("{address:x?}");
     asm!(
         // restore registers
         // t0 is used to store current tcb's registers base address,
@@ -368,11 +367,11 @@ pub unsafe fn return_to_user() -> ! {
         "csrw sstatus, t1",
 
         // restore t1 and t0
-        "ld t1 {t1_offset}(t0)",
-        "ld t0 {t0_offset}(t0)",
+        "ld t1, {t1_offset}(t0)",
+        "ld t0, {t0_offset}(t0)",
 
         "sret",
-        in ("t0") &raw const tcb.registers as usize,
+        in ("t0") address,
         ra_offset = const offset_of!(Registers, ra),
         sp_offset = const offset_of!(Registers, sp),
         gp_offset = const offset_of!(Registers, gp),

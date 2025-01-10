@@ -102,9 +102,9 @@ impl<T> From<usize> for Address<T> {
     }
 }
 
-impl<T> Into<usize> for Address<T> {
-    fn into(self) -> usize {
-        self.addr
+impl<T> From<Address<T>> for usize {
+    fn from(item: Address<T>) -> Self {
+        item.addr
     }
 }
 
