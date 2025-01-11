@@ -1,5 +1,3 @@
-use crate::memory::VirtAddr;
-
 pub fn is_aligned(value: usize, align: usize) -> bool {
     value % align == 0
 }
@@ -7,6 +5,11 @@ pub fn is_aligned(value: usize, align: usize) -> bool {
 /// align should be power of 2.
 pub fn align_up(value: usize, align: usize) -> usize {
     (value + align - 1) & !(align - 1)
+}
+
+/// align should be power of 2.
+pub fn align_down(value: usize, align: usize) -> usize {
+    (value) & !(align - 1)
 }
 
 #[repr(u8)]
@@ -18,7 +21,16 @@ pub enum Err {
     OutOfMemory,
     ProcessNotFound,
     MessageBoxIsFull,
-    InvalidUserAddress
+    InvalidUserAddress,
+    UnknownCapType,
+    UnexpectedCapType,
+    CanNotNewFromDeviceMemory,
+    NoEnoughSlot,
+    NotEntrySlot,
+    VaddressAlreadyMapped,
+    PageTableAlreadyMapped,
+    PageAlreadyMapped,
+    PageTableNotMappedYet
 }
 
 pub type KernelResult<T> = Result<T, Err>;

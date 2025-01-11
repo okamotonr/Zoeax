@@ -6,6 +6,7 @@ use common::syscall::recieve;
 
 #[no_mangle]
 pub fn main() {
+    loop {}
     let msg = "I am ping server\n";
     for c in msg.bytes() {
         put_char(c as char);

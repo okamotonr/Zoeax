@@ -5,18 +5,9 @@
 use core::{arch::naked_asm, cmp::min, panic::PanicInfo, ptr};
 use core::arch::asm;
 
-use kernel::common::align_up;
-use kernel::handler::trap_entry;
-use kernel::memory::{alloc_pages, init_memory, VirtAddr, PAGE_SIZE};
-use kernel::process::Process;
+use kernel::handler::return_to_user;
 use kernel::println;
-use kernel::scheduler::{yield_proc, allocate_proc, CPU_VAR, init_proc, IDLE_PROC, SCHEDULER};
-use kernel::riscv::{
-    r_sie, r_sstatus, w_sie, w_sscratch, w_sstatus, w_stvec, wfi, SIE_SEIE, SIE_SSIE, SIE_STIE,
-    SSTATUS_SIE, SSTATUS_SUM
-};
-use kernel::timer::set_timer;
-use kernel::vm::{alloc_vm, kernel_vm_init, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
+use kernel::init::init_kernel;
 use core::arch::global_asm;
 
 use common::elf::*;
@@ -50,135 +41,24 @@ static SHELL: &'static [u8] = &ALIGNED.bytes;
 static PONG: &'static [u8] = &ALIGNED_PONG.bytes;
 
 #[export_name = "_kernel_main"]
-extern "C" fn kernel_main(hartid: usize, _dtb_addr: usize, free_ram_phys: usize, free_ram_end_phys: usize) {
+extern "C" fn kernel_main(hartid: usize, _dtb_addr: usize, free_ram_phys: usize, free_ram_end_phys: usize) -> ! {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
         ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
     };
-    println!("booting kernel");
-
-    w_stvec(trap_entry as usize);
-
-    init_memory(free_ram_phys, free_ram_end_phys);
-    unsafe { kernel_vm_init(free_ram_phys, free_ram_end_phys).unwrap() };
-
     println!("cpu id is {}", hartid);
-    let cpu_var = &raw const CPU_VAR;
-    w_sscratch(cpu_var as usize);
-
-    // unsafe {
-    //     virtio::init();
-    //     println!("init virtio");
-    //
-    //     let mut buf: [u8; virtio::SECTOR_SIZE as usize] = [0; virtio::SECTOR_SIZE as usize];
-    //     virtio::read_write_disk(&mut buf as *mut [u8] as *mut u8, 0, false).unwrap();
-    //     let text = buf.iter().take_while(|c| **c != 0);
-    //     for c in text {
-    //         print!("{}", *c as char);
-    //     }
-    //     println!();
-    //
-    //     let buf = b"hello from kernel!!!\n";
-    //     virtio::read_write_disk(buf as *const [u8] as *mut u8, 0, true).unwrap();
-    // }
-
-
-    init_proc();
-    w_sstatus(SSTATUS_SUM);
-
     let elf_header = (SHELL as *const [u8]).cast::<Elf64Hdr>();
-    let pong_elf = (PONG as *const [u8]).cast::<Elf64Hdr>();
 
+    init_kernel(elf_header, free_ram_phys, free_ram_end_phys, &raw const __stack_top as usize);
+    println!("return to user");
     unsafe {
-        let init_proc = allocate_proc((*elf_header).e_entry).unwrap();
-        let pong = allocate_proc((*pong_elf).e_entry).unwrap();
-        load_elf(init_proc, elf_header);
-        load_elf(pong, pong_elf);
-
-
-        println!("{:?}, {:?}, {:?}", init_proc.pid, init_proc.stack_bottom, init_proc.stack_top);
-        println!("{:?}, {:?}, {:?}", pong.pid, pong.stack_bottom, pong.stack_top);
-        println!("{:x}", *(init_proc.stack_bottom.addr as *const usize));
-        SCHEDULER.push(init_proc);
-        SCHEDULER.push(pong);
+        return_to_user()
     }
 
-    set_timer(100000);
-
-    w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
-
-    idle()
 }
-
-#[no_mangle]
-fn idle() -> ! {
-    println!("enter idle");
-    unsafe {
-        // initialize
-        let sp = IDLE_PROC.sp.addr;
-        asm!("mv sp, {sp}", sp = in(reg) sp);
-    }
-    loop {
-        unsafe { yield_proc() }
-        w_sstatus(r_sstatus() | SSTATUS_SIE);
-        wfi();
-    }
-}
-
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
     loop {}
-}
-
-fn load_elf(process: &mut Process, elf_header: *const Elf64Hdr) {
-    unsafe {
-        for idx in 0..(*elf_header).e_phnum {
-            let p_header = (*elf_header)
-                .get_pheader(elf_header.cast::<usize>(), idx)
-                .unwrap();
-            if !((*p_header).p_type == ProgramType::Load) {
-                continue;
-            }
-            let flags = get_flags((*p_header).p_flags) | PAGE_U;
-            // this is start address of mapping segment
-            let p_vaddr = VirtAddr::new((*p_header).p_vaddr);
-            let p_start_addr = elf_header.cast::<u8>().add((*p_header).p_offset);
-            // Sometime memsz > filesz, for example bss
-            // so have to call copy with caring of this situation.
-            let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
-            let mut file_sz_rem = (*p_header).p_filesz;
-
-            for page_idx in 0..page_num {
-                let page = alloc_vm().unwrap();
-                if !(file_sz_rem == 0) {
-                    let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
-                    let copy_dst = page.addr as *mut u8;
-                    let copy_size = min(PAGE_SIZE, file_sz_rem);
-                    file_sz_rem = file_sz_rem.saturating_sub(PAGE_SIZE);
-                    ptr::copy::<u8>(copy_src, copy_dst, copy_size);
-                }
-                process.map_page(p_vaddr.add(PAGE_SIZE * page_idx), page.into(), flags);
-            }
-        }
-    }
-}
-
-#[inline]
-fn get_flags(flags: u32) -> usize {
-    let ret = if ProgramFlags::is_executable(flags) {
-        PAGE_X
-    } else {
-        0
-    } | if ProgramFlags::is_writable(flags) {
-        PAGE_W
-    } else {
-        0
-    } | if ProgramFlags::is_readable(flags) {
-        PAGE_R
-    } else {
-        0
-    };
-    ret
 }

@@ -1,12 +1,7 @@
-use core::{arch::naked_asm, usize};
+use core::{arch::{naked_asm, asm}, usize, mem::offset_of};
 
 use crate::{
-    riscv::{r_scause, r_sepc, r_stval},
-    timer::set_timer,
-    syscall::handle_syscall,
-    process::check_canary,
-    scheduler::count_down,
-    scheduler::CURRENT_PROC,
+    object::Registers, println, riscv::{r_scause, r_sepc, r_stval}, scheduler::get_current_tcb, syscall::handle_syscall, timer::set_timer
 };
 
 
@@ -215,7 +210,6 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     //  interrupt
         match code {
             SUPREVISORTIMER => {
-                count_down(1);
                 set_timer(10000);
             }
             SUPERVISORSOFTWARE => {
@@ -318,4 +312,99 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
             }
         }
     }
+}
+
+#[no_mangle]
+pub unsafe fn return_to_user() -> ! {
+    let tcb = get_current_tcb();
+    let address = &raw const tcb.registers as usize;
+    let reg = &tcb.registers;
+    println!("{reg:x?}");
+    println!("{address:x?}");
+    asm!(
+        // restore registers
+        // t0 is used to store current tcb's registers base address,
+        // t1 will be used to restore sregs.
+
+        "ld ra, {ra_offset}(t0)",
+        "ld sp, {sp_offset}(t0)",
+        "ld gp, {gp_offset}(t0)",
+        "ld tp, {tp_offset}(t0)",
+        // t0 and t1 was skipped because they will be restored after.
+        "ld t2, {t2_offset}(t0)",
+        "ld s0, {s0_offset}(t0)",
+        "ld s1, {s1_offset}(t0)",
+        "ld a0, {a0_offset}(t0)",
+        "ld a1, {a1_offset}(t0)",
+        "ld a2, {a2_offset}(t0)",
+        "ld a3, {a3_offset}(t0)",
+        "ld a4, {a4_offset}(t0)",
+        "ld a5, {a5_offset}(t0)",
+        "ld a6, {a6_offset}(t0)",
+        "ld a7, {a7_offset}(t0)",
+
+        "ld s2, {s2_offset}(t0)",
+        "ld s3, {s3_offset}(t0)",
+        "ld s4, {s4_offset}(t0)",
+        "ld s5, {s5_offset}(t0)",
+        "ld s6, {s6_offset}(t0)",
+        "ld s7, {s7_offset}(t0)",
+        "ld s8, {s8_offset}(t0)",
+        "ld s9, {s9_offset}(t0)",
+        "ld s10, {s10_offset}(t0)",
+        "ld s11, {s11_offset}(t0)",
+        "ld t3, {t3_offset}(t0)",
+        "ld t4, {t4_offset}(t0)",
+        "ld t5, {t5_offset}(t0)",
+        "ld t6, {t6_offset}(t0)",
+
+        // restore sepc
+        "ld t1, {sepc_offset}(t0)",
+        "csrw sepc, t1",
+
+        // restore sstatus
+        "ld t1, {sstatus_offset}(t0)",
+        "csrw sstatus, t1",
+
+        // restore t1 and t0
+        "ld t1, {t1_offset}(t0)",
+        "ld t0, {t0_offset}(t0)",
+
+        "sret",
+        in ("t0") address,
+        ra_offset = const offset_of!(Registers, ra),
+        sp_offset = const offset_of!(Registers, sp),
+        gp_offset = const offset_of!(Registers, gp),
+        tp_offset = const offset_of!(Registers, tp),
+        t0_offset = const offset_of!(Registers, t0),
+        t1_offset = const offset_of!(Registers, t1),
+        t2_offset = const offset_of!(Registers, t2),
+        s0_offset = const offset_of!(Registers, s0),
+        s1_offset = const offset_of!(Registers, s1),
+        a0_offset = const offset_of!(Registers, a0),
+        a1_offset = const offset_of!(Registers, a1),
+        a2_offset = const offset_of!(Registers, a2),
+        a3_offset = const offset_of!(Registers, a3),
+        a4_offset = const offset_of!(Registers, a4),
+        a5_offset = const offset_of!(Registers, a5),
+        a6_offset = const offset_of!(Registers, a6),
+        a7_offset = const offset_of!(Registers, a7),
+        s2_offset = const offset_of!(Registers, s2),
+        s3_offset = const offset_of!(Registers, s3),
+        s4_offset = const offset_of!(Registers, s4),
+        s5_offset = const offset_of!(Registers, s5),
+        s6_offset = const offset_of!(Registers, s6),
+        s7_offset = const offset_of!(Registers, s7),
+        s8_offset = const offset_of!(Registers, s8),
+        s9_offset = const offset_of!(Registers, s9),
+        s10_offset = const offset_of!(Registers, s10),
+        s11_offset = const offset_of!(Registers, s11),
+        t3_offset = const offset_of!(Registers, t3),
+        t4_offset = const offset_of!(Registers, t4),
+        t5_offset = const offset_of!(Registers, t5),
+        t6_offset = const offset_of!(Registers, t6),
+        sstatus_offset = const offset_of!(Registers, sstatus),
+        sepc_offset = const offset_of!(Registers, sepc),
+        options(noreturn)
+    )
 }
