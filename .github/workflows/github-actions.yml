@@ -3,51 +3,49 @@ name: Rust Continuous-Integration
 on: [push, pull_request]
 
 jobs:
-  check:
-    name: Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          target: riscv64gc-unknown-none-elf
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          target: riscv64gc-unknown-none-elf
-          override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Add component
+        run: |
+          rustup set profile minimal
+          rustup install nightly
+          rustup target add riscv64gc-unknown-none-elf
+          rustup override set nightly
+          rustup component add rustfmt
+      - name: Cargo fmt
+        run: cargo fmt --all --check
+
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Add component
+        run: |
+          rustup set profile minimal
+          rustup install nightly
+          rustup target add riscv64gc-unknown-none-elf
+          rustup override set nightly
+      - name: Cargo check
+        run: cargo check
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          target: riscv64gc-unknown-none-elf
-          override: true
-      - run: rustup component add clippy
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Add component
+        run: |
+          rustup set profile minimal
+          rustup install nightly
+          rustup target add riscv64gc-unknown-none-elf
+          rustup override set nightly
+          rustup component add rustfmt
+      - name: Cargo clippy
+        run: cargo clippy -- -D warnings
