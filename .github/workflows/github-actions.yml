@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Add component
         run: |
           rustup set profile minimal
@@ -24,13 +24,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Add component
         run: |
           rustup set profile minimal
           rustup install nightly
           rustup target add riscv64gc-unknown-none-elf
           rustup override set nightly
+          cp stub.elf kernel/rootserver
       - name: Cargo check
         run: cargo check
 
@@ -39,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Add component
         run: |
           rustup set profile minimal
@@ -47,5 +48,6 @@ jobs:
           rustup target add riscv64gc-unknown-none-elf
           rustup override set nightly
           rustup component add rustfmt
+          cp stub.elf kernel/rootserver
       - name: Cargo clippy
         run: cargo clippy -- -D warnings
