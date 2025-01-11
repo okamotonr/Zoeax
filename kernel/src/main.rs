@@ -26,18 +26,11 @@ pub struct AlignedTo<Align, Bytes: ?Sized> {
 
 static ALIGNED: &AlignedTo<u8, [u8]> = &AlignedTo {
     _align: [],
-    bytes: *include_bytes!("../shell"),
-};
-
-static ALIGNED_PONG: &AlignedTo<u8, [u8]> = &AlignedTo {
-    _align: [],
-    bytes: *include_bytes!("../pong"),
+    bytes: *include_bytes!("../rootserver"),
 };
 
 #[no_mangle]
-static SHELL: &[u8] = &ALIGNED.bytes;
-#[no_mangle]
-static PONG: &[u8] = &ALIGNED_PONG.bytes;
+static ROOTSERVER: &[u8] = &ALIGNED.bytes;
 
 #[export_name = "_kernel_main"]
 extern "C" fn kernel_main(
@@ -52,7 +45,7 @@ extern "C" fn kernel_main(
         ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
     };
     println!("cpu id is {}", hartid);
-    let elf_header = (SHELL as *const [u8]).cast::<Elf64Hdr>();
+    let elf_header = (ROOTSERVER as *const [u8]).cast::<Elf64Hdr>();
 
     init_kernel(
         elf_header,

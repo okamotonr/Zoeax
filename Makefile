@@ -39,7 +39,7 @@ build:
 	pushd user && cargo build $(CARGO_FLAGS) && popd
 	pushd pong && cargo build $(CARGO_FLAGS) && popd
 	cp $(pong_elf) kernel/pong
-	cp $(user_elf) kernel/shell
+	cp $(user_elf) kernel/rootserver
 	pushd kernel && cargo build $(CARGO_FLAGS) && popd
 
 .PHONY: clean

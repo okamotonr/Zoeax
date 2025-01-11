@@ -47,7 +47,7 @@ jobs:
           rustup install nightly
           rustup target add riscv64gc-unknown-none-elf
           rustup override set nightly
-          rustup component add rustfmt
+          rustup component add clippy
           cp stub.elf kernel/rootserver
       - name: Cargo clippy
         run: cargo clippy -- -D warnings
