@@ -12,6 +12,7 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
+          target: riscv64gc-unknown-none-elf
           override: true
       - uses: actions-rs/cargo@v1
         with:
@@ -26,6 +27,7 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
+          target: riscv64gc-unknown-none-elf
           override: true
       - run: rustup component add rustfmt
       - uses: actions-rs/cargo@v1
@@ -42,6 +44,7 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
+          target: riscv64gc-unknown-none-elf
           override: true
       - run: rustup component add clippy
       - uses: actions-rs/cargo@v1
