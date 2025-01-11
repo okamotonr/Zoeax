@@ -1,12 +1,12 @@
-use crate::common::Err;
 use crate::address::PAGE_SIZE;
+use crate::common::Err;
 use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
 use crate::println;
 use crate::{
+    address::VirtAddr,
     capability::{Capability, CapabilityType, RawCapability},
     common::KernelResult,
-    address::VirtAddr,
     vm::KernelVAddress,
 };
 
@@ -36,7 +36,9 @@ impl PageTableCap {
     }
 
     pub unsafe fn activate(&mut self) -> KernelResult<()> {
-        self.is_mapped().then_some(()).ok_or(Err::PageTableNotMappedYet)?;
+        self.is_mapped()
+            .then_some(())
+            .ok_or(Err::PageTableNotMappedYet)?;
         let page_table = self.get_pagetable();
         println!("call activation");
         unsafe {
@@ -128,7 +130,7 @@ impl Capability for PageTableCap {
         todo!()
     }
     fn get_object_size<'a>(_user_size: usize) -> usize {
-        PAGE_SIZE// page size, bytes
+        PAGE_SIZE // page size, bytes
     }
 }
 

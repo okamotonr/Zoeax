@@ -1,11 +1,11 @@
 use crate::address::{PhysAddr, VirtAddr};
-use crate::object::PageTable;
-use crate::vm::{KERNEL_VM_ROOT, LV2TABLE, KernelVAddress, KERNEL_CODE_PFX, SATP_SV48};
 use crate::common::align_down;
+use crate::object::PageTable;
 use crate::println;
+use crate::vm::{KernelVAddress, KERNEL_CODE_PFX, KERNEL_VM_ROOT, LV2TABLE, SATP_SV48};
 
-use core::ptr;
 use core::arch::asm;
+use core::ptr;
 
 // so dirty...
 fn pte(paddr: PhysAddr, leaf: bool) -> usize {

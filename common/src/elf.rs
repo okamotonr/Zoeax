@@ -26,7 +26,11 @@ pub struct Elf64Hdr {
 
 impl Elf64Hdr {
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn get_sheader(&self, elf_header_addr: *const usize, idx: u16) -> Option<*const Elf64Shdr> {
+    pub unsafe fn get_sheader(
+        &self,
+        elf_header_addr: *const usize,
+        idx: u16,
+    ) -> Option<*const Elf64Shdr> {
         if self.e_shnum <= idx {
             None
         } else {
@@ -38,7 +42,11 @@ impl Elf64Hdr {
     }
 
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn get_pheader(&self, elf_header_addr: *const usize, idx: u16) -> Option<*const Elf64Phdr> {
+    pub unsafe fn get_pheader(
+        &self,
+        elf_header_addr: *const usize,
+        idx: u16,
+    ) -> Option<*const Elf64Phdr> {
         if self.e_phnum <= idx {
             None
         } else {
@@ -60,7 +68,7 @@ pub enum ElfClass {
     None,
     Class32,
     Class64,
-    ClassNum
+    ClassNum,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -68,15 +76,12 @@ pub enum ElfClass {
 pub enum ElfData {
     None,
     TwoLsb,
-    TwoMsb
+    TwoMsb,
 }
 
 impl ElfIdent {
     pub fn is_elf(&self) -> bool {
-        self.0[0] == 0x7f
-            && self.0[1] == b'E'
-            && self.0[2] == b'L'
-            && self.0[3] == b'F'
+        self.0[0] == 0x7f && self.0[1] == b'E' && self.0[2] == b'L' && self.0[3] == b'F'
     }
 
     pub fn elfclass(&self) -> ElfClass {
@@ -84,9 +89,8 @@ impl ElfIdent {
             0 => ElfClass::None,
             1 => ElfClass::Class32,
             2 => ElfClass::Class64,
-            _ => panic!("Unknown")
+            _ => panic!("Unknown"),
         }
-        
     }
 
     pub fn elfdata(&self) -> ElfData {
@@ -94,7 +98,7 @@ impl ElfIdent {
             0 => ElfData::None,
             1 => ElfData::TwoLsb,
             2 => ElfData::TwoMsb,
-            _ => panic!("Unknown")
+            _ => panic!("Unknown"),
         }
     }
 
@@ -102,7 +106,7 @@ impl ElfIdent {
         match self.0[6] {
             0 => ElfVersion::None,
             1 => ElfVersion::Current,
-            _ => panic!("Unknown")
+            _ => panic!("Unknown"),
         }
     }
 }
@@ -114,7 +118,7 @@ pub enum ElfType {
     Rel,
     Exec,
     Dyn,
-    Core
+    Core,
 }
 
 // TODO: riscv
@@ -138,14 +142,14 @@ pub enum ElfMachine {
     Sparcv9,
     IA64,
     X86_64,
-    Vax
+    Vax,
 }
 
 #[repr(u32)]
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ElfVersion {
     None,
-    Current
+    Current,
 }
 
 // Program header
@@ -173,14 +177,14 @@ pub enum ProgramType {
     Shlib,
     Phdr,
     Tls,
-} 
+}
 
 #[repr(u32)]
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ProgramFlags {
     X = 0x01,
     W = 0x02,
-    R = 0x04
+    R = 0x04,
 }
 
 impl ProgramFlags {
@@ -257,7 +261,7 @@ pub enum StInfo {
     Global,
     Weak,
     BLoproc,
-    BHiproc
+    BHiproc,
 }
 
 #[repr(u8)]
@@ -266,7 +270,7 @@ pub enum StOther {
     Default,
     Internal,
     Hidden,
-    Protected
+    Protected,
 }
 
 impl StOther {
@@ -322,7 +326,7 @@ pub enum Dtag {
     BindNow,
     Runpath,
     Loproc,
-    Hiproc
+    Hiproc,
 }
 
 pub union DUnion {

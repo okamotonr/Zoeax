@@ -1,7 +1,7 @@
 use core::arch::asm;
 
 /// supervisor-level software interrupts
-pub const SIE_SSIE: usize = 1 << 1;  
+pub const SIE_SSIE: usize = 1 << 1;
 /// supervisor-level timer interrupts
 pub const SIE_STIE: usize = 1 << 5;
 /// supervisor-level external interrupts
@@ -38,7 +38,6 @@ macro_rules! write_csr {
     };
 }
 
-
 #[inline]
 pub fn r_scause() -> usize {
     read_csr!("scause")
@@ -48,7 +47,6 @@ pub fn r_scause() -> usize {
 pub fn r_stval() -> usize {
     read_csr!("stval")
 }
-
 
 #[inline]
 pub fn r_sepc() -> usize {
@@ -120,5 +118,3 @@ pub fn r_time() -> usize {
 pub fn r_satp() -> usize {
     read_csr!("satp")
 }
-
-

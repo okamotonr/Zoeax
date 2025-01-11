@@ -1,4 +1,4 @@
-use super::{RawCapability, CapabilityType, Capability};
+use super::{Capability, CapabilityType, RawCapability};
 use crate::object::Endpoint;
 use crate::vm::KernelVAddress;
 
@@ -17,10 +17,9 @@ impl Capability for EndPointCap {
 
     fn init_object<'x>(&mut self) {
         let addr = KernelVAddress::from(self.0.get_address());
-        let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr); 
+        let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr);
         unsafe {
             *ptr = Self::KernelObject::new();
         }
     }
 }
-

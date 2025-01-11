@@ -1,5 +1,5 @@
 use core::arch::asm;
-#[repr(usize)] 
+#[repr(usize)]
 pub enum SysNo {
     PutChar = PUTCHAR,
     Sleep = SLEEP,
@@ -27,7 +27,11 @@ impl Default for Message {
 
 impl Message {
     pub fn new() -> Self {
-        Self {tag: 0, src: 0, data: [0; 1024]}
+        Self {
+            tag: 0,
+            src: 0,
+            data: [0; 1024],
+        }
     }
 }
 
@@ -48,7 +52,6 @@ unsafe fn syscall(sysno: SysNo, arg0: usize, arg1: usize, arg2: usize, arg3: usi
 }
 
 pub fn put_char(char: char) {
-
     unsafe {
         syscall(SysNo::PutChar, char as usize, 0, 0, 0);
     }
@@ -71,5 +74,4 @@ pub fn recieve(rcv: &mut Message) {
         let rm = rcv as *mut Message as usize;
         syscall(SysNo::Recv, rm, 0, 0, 0);
     }
-
 }

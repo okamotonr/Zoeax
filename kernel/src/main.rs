@@ -4,10 +4,10 @@
 
 use core::{panic::PanicInfo, ptr};
 
-use kernel::handler::return_to_user;
-use kernel::println;
-use kernel::init::init_kernel;
 use core::arch::global_asm;
+use kernel::handler::return_to_user;
+use kernel::init::init_kernel;
+use kernel::println;
 
 use common::elf::*;
 extern "C" {
@@ -40,7 +40,12 @@ static SHELL: &[u8] = &ALIGNED.bytes;
 static PONG: &[u8] = &ALIGNED_PONG.bytes;
 
 #[export_name = "_kernel_main"]
-extern "C" fn kernel_main(hartid: usize, _dtb_addr: usize, free_ram_phys: usize, free_ram_end_phys: usize) -> ! {
+extern "C" fn kernel_main(
+    hartid: usize,
+    _dtb_addr: usize,
+    free_ram_phys: usize,
+    free_ram_end_phys: usize,
+) -> ! {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
@@ -49,12 +54,14 @@ extern "C" fn kernel_main(hartid: usize, _dtb_addr: usize, free_ram_phys: usize,
     println!("cpu id is {}", hartid);
     let elf_header = (SHELL as *const [u8]).cast::<Elf64Hdr>();
 
-    init_kernel(elf_header, free_ram_phys, free_ram_end_phys, &raw const __stack_top as usize);
+    init_kernel(
+        elf_header,
+        free_ram_phys,
+        free_ram_end_phys,
+        &raw const __stack_top as usize,
+    );
     println!("return to user");
-    unsafe {
-        return_to_user()
-    }
-
+    unsafe { return_to_user() }
 }
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {

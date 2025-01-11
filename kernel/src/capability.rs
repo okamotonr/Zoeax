@@ -1,5 +1,7 @@
 use crate::{
-    common::{Err, KernelResult}, address::PhysAddr, vm::KernelVAddress
+    address::PhysAddr,
+    common::{Err, KernelResult},
+    vm::KernelVAddress,
 };
 
 use core::mem;
@@ -8,9 +10,9 @@ use core::ops::{Deref, DerefMut};
 pub mod cnode;
 pub mod endpoint;
 pub mod notification;
+pub mod page_table;
 pub mod tcb;
 pub mod untyped;
-pub mod page_table;
 
 const CAP_TYPE_BIT: usize = 0x1f << 59;
 const PADDING_BIT: usize = 0x7ff << 48;
@@ -87,7 +89,7 @@ pub enum CapabilityType {
     Notification = 9,
     // Arch
     PageTable = 2,
-    Page = 4
+    Page = 4,
 }
 
 impl CapabilityType {

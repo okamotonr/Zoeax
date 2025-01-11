@@ -1,8 +1,4 @@
-use crate::{
-    println,
-    uart::putchar,
-};
-
+use crate::{println, uart::putchar};
 
 use common::syscall::{PUTCHAR, RECV, SEND, SLEEP};
 
@@ -25,4 +21,3 @@ pub fn handle_syscall(a0: usize, a1: usize, _a2: usize, _a3: usize, syscall_n: u
         }
     }
 }
-

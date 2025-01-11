@@ -1,12 +1,19 @@
-use core::{arch::{naked_asm, asm}, mem::offset_of};
-
-use crate::{
-    object::Registers, println, riscv::{r_scause, r_sepc, r_stval}, scheduler::get_current_tcb, syscall::handle_syscall, timer::set_timer
+use core::{
+    arch::{asm, naked_asm},
+    mem::offset_of,
 };
 
+use crate::{
+    object::Registers,
+    println,
+    riscv::{r_scause, r_sepc, r_stval},
+    scheduler::get_current_tcb,
+    syscall::handle_syscall,
+    timer::set_timer,
+};
 
 // I wanna use enum;
-/// Interrupts, 
+/// Interrupts,
 const SUPERVISORSOFTWARE: usize = 1;
 const SUPREVISORTIMER: usize = 5;
 const SUPREVISOREXTERNAL: usize = 9;
@@ -207,7 +214,7 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     let user_pc = r_sepc();
 
     if (scause >> (usize::BITS - 1)) == 1 {
-    //  interrupt
+        //  interrupt
         match code {
             SUPREVISORTIMER => {
                 set_timer(10000);
@@ -217,19 +224,19 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
                     "supervisor software scause={:x}, stval={:x}, sepc={:x}",
                     scause, stval, user_pc
                 )
-            },
+            }
             SUPREVISOREXTERNAL => {
                 panic!(
                     "supervisor external scause={:x}, stval={:x}, sepc={:x}",
                     code, stval, user_pc
                 )
-            },
+            }
             COUNTER_OVERFLOW => {
                 panic!(
                     "counter overflow scause={:x}, stval={:x}, sepc={:x}",
                     code, stval, user_pc
                 )
-            },
+            }
             _ => {
                 panic!(
                     "unexpected interrupt scause={:x}, stval={:x}, sepc={:x}",
@@ -240,69 +247,87 @@ extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     } else {
         match code {
             ECALLUSER => {
-                handle_syscall(trap_frame.a0, trap_frame.a1, trap_frame.a2, trap_frame.a3, trap_frame.a4);
+                handle_syscall(
+                    trap_frame.a0,
+                    trap_frame.a1,
+                    trap_frame.a2,
+                    trap_frame.a3,
+                    trap_frame.a4,
+                );
                 // increment pc
                 trap_frame.pc += 4;
             }
             IMISSALIGNED => {
                 panic!(
                     "inst missaligned scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             IACCESSFAULT => {
                 panic!(
                     "inst access fault scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             ILEAGALI => {
                 panic!(
                     "inst ileagal scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             BREAKPOINT => {
                 panic!(
                     "break point scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             LMISSALIGNED => {
                 panic!(
                     "load missaligned scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             LACCESSFAULT => {
                 panic!(
                     "load access fault scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             SAMISSALIGNED => {
                 panic!(
                     "store/amo missaligned scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             SAACCESSFAULT => {
                 panic!(
                     "store/amo access fault scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             ECALLSUPERVIOSR => {
                 panic!(
                     "ecall from supervisor scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             IPAGEFAULT => {
                 panic!(
                     "inst page fault scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             LPAGEFAULT => {
                 panic!(
                     "load page fault scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             SAPAGEFAULT => {
                 panic!(
                     "store/amo page fault, scause={:x}, stval={:x}, sepc={:x}",
-                    scause, stval, user_pc);
+                    scause, stval, user_pc
+                );
             }
             _ => {
                 panic!(

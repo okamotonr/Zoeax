@@ -6,14 +6,14 @@ use super::tcb::{ThreadControlBlock, ThreadInfo};
 
 pub struct Notification {
     notify_bit: Option<NonZeroU64>,
-    wait_queue: LinkedList<ThreadInfo>
+    wait_queue: LinkedList<ThreadInfo>,
 }
 
 impl Notification {
     pub fn new() -> Self {
         Notification {
             notify_bit: None,
-            wait_queue: LinkedList::new()
+            wait_queue: LinkedList::new(),
         }
     }
 
@@ -54,7 +54,7 @@ impl Default for Notification {
     }
 }
 
-fn wake_up_thread<T>(_:&mut ListItem<T>) {
+fn wake_up_thread<T>(_: &mut ListItem<T>) {
     // 1, change thread state to Runnable
     // 2, put into runqueu
     todo!()

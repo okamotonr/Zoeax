@@ -1,6 +1,8 @@
-use common::elf::{ProgramType, ProgramFlags, Elf64Phdr, Elf64Hdr};
 use super::pm::BumpAllocator;
+use common::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
 
+use crate::address::VirtAddr;
+use crate::address::PAGE_SIZE;
 use crate::capability::cnode::CNodeCap;
 use crate::capability::page_table::PageCap;
 use crate::capability::page_table::PageTableCap;
@@ -9,8 +11,6 @@ use crate::capability::untyped::UntypedCap;
 use crate::capability::Capability;
 use crate::capability::RawCapability;
 use crate::common::{align_up, Err};
-use crate::address::VirtAddr;
-use crate::address::PAGE_SIZE;
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::PageTable;
@@ -69,8 +69,9 @@ impl<'a> RootServerMemory<'a> {
         T: Capability,
     {
         // easiest way to care align.
-        let start_address = bump_allocator.allocate_pages(
-            align_up(T::get_object_size(user_size), PAGE_SIZE) / PAGE_SIZE).into();
+        let start_address = bump_allocator
+            .allocate_pages(align_up(T::get_object_size(user_size), PAGE_SIZE) / PAGE_SIZE)
+            .into();
         let cnode_ptr = <KernelVAddress as Into<*mut T::KernelObject>>::into(start_address);
         unsafe { cnode_ptr.as_uninit_mut().unwrap() }
     }
@@ -97,7 +98,6 @@ impl<'a> RootServerMemory<'a> {
         bootstage_mbr: &mut BootStateManager,
     ) -> PageTableCap {
         let root_page_table = self.vspace.write(PageTable::new());
-
 
         root_page_table.copy_global_mapping();
         let mut cap = PageTableCap::init((root_page_table as *const PageTable).into(), 0);

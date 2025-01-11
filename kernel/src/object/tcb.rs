@@ -1,9 +1,9 @@
-use common::list::ListItem;
+use crate::capability::page_table::PageTableCap;
+use crate::capability::Capability;
 use crate::common::KernelResult;
 use crate::object::PageTable;
 use crate::println;
-use crate::capability::page_table::PageTableCap;
-use crate::capability::Capability;
+use common::list::ListItem;
 
 use crate::scheduler::SCHEDULER;
 use core::ops::{Index, IndexMut};
@@ -142,7 +142,7 @@ impl ThreadInfo {
             root_cnode: CNodeEntry::null(),
             vspace: CNodeEntry::null(),
             registers: Registers::null(),
-            msg_buffer: 0
+            msg_buffer: 0,
         }
     }
 
@@ -150,14 +150,12 @@ impl ThreadInfo {
         if let Err(e) = self.activate_vspace_inner() {
             println!("{e:?}");
             PageTable::activate_kernel_table();
-        } 
+        }
     }
 
     unsafe fn activate_vspace_inner(&self) -> KernelResult<()> {
         let mut pt_cap = PageTableCap::try_from_raw(self.vspace.cap())?;
-        unsafe {
-            pt_cap.activate()
-        }
+        unsafe { pt_cap.activate() }
     }
 }
 

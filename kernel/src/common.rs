@@ -30,8 +30,7 @@ pub enum Err {
     VaddressAlreadyMapped,
     PageTableAlreadyMapped,
     PageAlreadyMapped,
-    PageTableNotMappedYet
+    PageTableNotMappedYet,
 }
 
 pub type KernelResult<T> = Result<T, Err>;
-

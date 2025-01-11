@@ -4,15 +4,22 @@ use core::ptr;
 /// Allocated Page will never be reclaimed
 pub struct BumpAllocator {
     start_addr: PhysAddr,
-    end_addr: PhysAddr
+    end_addr: PhysAddr,
 }
 
 impl BumpAllocator {
     pub unsafe fn new(free_ram_phys: usize, free_ram_end_phys: usize) -> Self {
         assert!(free_ram_phys < free_ram_end_phys);
 
-        ptr::write_bytes(free_ram_phys as *mut u8, 0, free_ram_end_phys - free_ram_phys);
-        Self {start_addr: free_ram_phys.into(), end_addr: free_ram_end_phys.into()}
+        ptr::write_bytes(
+            free_ram_phys as *mut u8,
+            0,
+            free_ram_end_phys - free_ram_phys,
+        );
+        Self {
+            start_addr: free_ram_phys.into(),
+            end_addr: free_ram_end_phys.into(),
+        }
     }
 
     pub fn allocate_page(&mut self) -> PhysAddr {

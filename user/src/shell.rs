@@ -3,4 +3,3 @@
 pub fn main() {
     panic!();
 }
-

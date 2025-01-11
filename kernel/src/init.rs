@@ -1,24 +1,27 @@
 use common::elf::Elf64Hdr;
 
-mod root_server;
 mod pm;
+mod root_server;
 mod vm;
 
-use pm::BumpAllocator;
-use vm::kernel_vm_init;
-use root_server::init_root_server;
-use crate::scheduler::CPU_VAR;
-use crate::riscv::{w_sscratch, w_stvec, w_sie, r_sie, SIE_SEIE, SIE_STIE, SIE_SSIE};
 use crate::handler::trap_entry;
 use crate::println;
+use crate::riscv::{r_sie, w_sie, w_sscratch, w_stvec, SIE_SEIE, SIE_SSIE, SIE_STIE};
+use crate::scheduler::CPU_VAR;
 use crate::timer::set_timer;
+use pm::BumpAllocator;
+use root_server::init_root_server;
+use vm::kernel_vm_init;
 
-pub fn init_kernel(elf_header: *const Elf64Hdr, free_ram_phys: usize, free_ram_end_phys: usize, stack_top: usize) {
+pub fn init_kernel(
+    elf_header: *const Elf64Hdr,
+    free_ram_phys: usize,
+    free_ram_end_phys: usize,
+    stack_top: usize,
+) {
     println!("initialising kernel");
     w_stvec(trap_entry as usize);
-    let bump_allocator = unsafe {
-        BumpAllocator::new(free_ram_phys, free_ram_end_phys)
-    };
+    let bump_allocator = unsafe { BumpAllocator::new(free_ram_phys, free_ram_end_phys) };
     unsafe { kernel_vm_init(free_ram_end_phys) };
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
     init_root_server(bump_allocator, elf_header);

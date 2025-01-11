@@ -79,4 +79,3 @@ impl VirtAddr {
 pub static mut KERNEL_VM_ROOT: [usize; 512] = [0; 512];
 #[link_section = "__lv2table"]
 pub static mut LV2TABLE: [usize; 512] = [0; 512];
-

@@ -1,8 +1,8 @@
-use crate::object::{ThreadInfo, ThreadControlBlock};
+use crate::object::{ThreadControlBlock, ThreadInfo};
 use crate::println;
+use crate::riscv::{r_sstatus, w_sstatus, wfi, SSTATUS_SIE, SSTATUS_SPIE, SSTATUS_SPP};
 use common::list::{LinkedList, ListItem};
 use core::ptr;
-use crate::riscv::{r_sstatus, w_sstatus, wfi, SSTATUS_SIE, SSTATUS_SPIE, SSTATUS_SPP};
 
 // TODO: use once_cell
 pub static mut IDLE_THREAD: ThreadControlBlock = ThreadControlBlock::new(ThreadInfo::idle_init());
@@ -91,9 +91,5 @@ fn idle() -> ! {
 }
 
 pub fn get_current_tcb<'a>() -> &'a ThreadControlBlock {
-    unsafe {
-        & *CURRENT_PROC
-    }
+    unsafe { &*CURRENT_PROC }
 }
-
-

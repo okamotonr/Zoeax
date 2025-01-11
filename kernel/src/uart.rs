@@ -10,11 +10,11 @@ pub struct Uart;
 
 impl fmt::Write for Uart {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-       for ch in s.as_bytes() {
-           putchar(*ch)
-       } 
+        for ch in s.as_bytes() {
+            putchar(*ch)
+        }
 
-       Ok(())
+        Ok(())
     }
 }
 
@@ -35,4 +35,3 @@ macro_rules! println {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
-
