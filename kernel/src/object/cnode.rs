@@ -23,10 +23,12 @@ impl ManagementDB {
         self.set_node(next, true)
     }
 
+    #[allow(dead_code)]
     pub fn get_prev(&mut self) -> Option<&mut CNodeEntry> {
         self.get_node(false)
     }
 
+    #[allow(dead_code)]
     pub fn set_prev(&mut self, prev: &mut CNodeEntry) {
         self.set_node(prev, false)
     }
@@ -47,8 +49,7 @@ impl ManagementDB {
 
     unsafe fn get_entry(&mut self) -> *mut CNodeEntry {
         let offset = mem::offset_of!(CNodeEntry, mdb);
-        let parent = (self as *mut ManagementDB).byte_sub(offset).cast::<CNodeEntry>();
-        parent
+        (self as *mut ManagementDB).byte_sub(offset).cast::<CNodeEntry>()
     }
 
     fn set_node(&mut self, node: &mut CNodeEntry, is_next: bool) {
@@ -115,7 +116,7 @@ impl CNodeEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CNode;
 
 impl CNode {
@@ -146,3 +147,4 @@ impl CNode {
         }
     }
 }
+

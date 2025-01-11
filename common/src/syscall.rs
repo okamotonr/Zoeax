@@ -1,4 +1,4 @@
-use core::{arch::asm, usize};
+use core::arch::asm;
 #[repr(usize)] 
 pub enum SysNo {
     PutChar = PUTCHAR,
@@ -17,6 +17,12 @@ pub struct Message {
     pub tag: isize,
     pub src: usize, // proccess id, who send this message.
     pub data: [u8; 1024],
+}
+
+impl Default for Message {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Message {

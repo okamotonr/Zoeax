@@ -1,5 +1,5 @@
 use crate::{
-    common::{Err, KernelResult}, address::PhysAddr, println, vm::KernelVAddress
+    common::{Err, KernelResult}, address::PhysAddr, vm::KernelVAddress
 };
 
 use core::mem;
@@ -32,11 +32,7 @@ impl RawCapability {
     }
 
     pub fn is_null(&self) -> bool {
-        if let Ok(CapabilityType::Null) = self.get_cap_type() {
-            true
-        } else {
-            false
-        }
+        matches!(self.get_cap_type(), Ok(CapabilityType::Null))
     }
 }
 
@@ -55,7 +51,7 @@ impl DerefMut for RawCapability {
 
 impl RawCapability {
     pub fn get_cap_type(&self) -> KernelResult<CapabilityType> {
-        CapabilityType::try_from_u8(((&self[1] & CAP_TYPE_BIT) >> 59) as u8)
+        CapabilityType::try_from_u8(((self[1] & CAP_TYPE_BIT) >> 59) as u8)
     }
 
     pub fn set_cap_dep_val(&mut self, val: usize) {
@@ -114,7 +110,7 @@ pub trait Capability
 where
     Self: Sized,
 {
-    type KernelObject<'x>;
+    type KernelObject;
     const CAP_TYPE: CapabilityType;
 
     fn init(addr: KernelVAddress, user_size: usize) -> Self {
@@ -139,13 +135,13 @@ where
     fn create_cap_dep_val(_addr: KernelVAddress, _user_size: usize) -> usize {
         0
     }
-    fn get_object_size<'a>(_user_size: usize) -> usize {
-        mem::size_of::<Self::KernelObject<'a>>()
+    fn get_object_size(_user_size: usize) -> usize {
+        mem::size_of::<Self::KernelObject>()
     }
     fn can_be_retyped_from_device_memory() -> bool {
         false
     }
     fn new(raw_cap: RawCapability) -> Self;
     fn get_raw_cap(&self) -> RawCapability;
-    fn init_object(&mut self) -> ();
+    fn init_object(&mut self);
 }

@@ -68,6 +68,12 @@ impl Endpoint {
     }
 }
 
+impl Default for Endpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn wake_up_thread<T>(_:&mut ListItem<T>) {
     // 1, change thread state to Runnable
     // 2, put into runqueu

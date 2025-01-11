@@ -13,9 +13,9 @@ impl TCBCap {
         }
     }
 
-    pub fn get_tcb<'x>(&mut self) -> &mut ThreadControlBlock {
+    pub fn get_tcb(&mut self) -> &mut ThreadControlBlock {
         let addr = KernelVAddress::from(self.0.get_address());
-        let ptr = <KernelVAddress as Into<*mut <TCBCap as Capability>::KernelObject<'x>>>::into(addr); 
+        let ptr = <KernelVAddress as Into<*mut <TCBCap as Capability>::KernelObject>>::into(addr); 
         unsafe {
             ptr.as_mut().unwrap()
         }
@@ -34,7 +34,7 @@ impl TCBCap {
 
 impl Capability for TCBCap {
     const CAP_TYPE: CapabilityType = CapabilityType::TCB;
-    type KernelObject<'x> = ThreadControlBlock;
+    type KernelObject = ThreadControlBlock;
     fn new(raw_cap: RawCapability) -> Self {
         Self(raw_cap)
     }
@@ -42,9 +42,9 @@ impl Capability for TCBCap {
         self.0
     }
 
-    fn init_object<'x>(&mut self) -> () {
+    fn init_object(&mut self) {
         let addr = KernelVAddress::from(self.0.get_address());
-        let ptr = <KernelVAddress as Into<*mut Self::KernelObject<'x>>>::into(addr); 
+        let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr); 
         unsafe {
             *ptr = ThreadControlBlock::new(ThreadInfo::default());
         }

@@ -1,4 +1,4 @@
-use core::{arch::{naked_asm, asm}, usize, mem::offset_of};
+use core::{arch::{naked_asm, asm}, mem::offset_of};
 
 use crate::{
     object::Registers, println, riscv::{r_scause, r_sepc, r_stval}, scheduler::get_current_tcb, syscall::handle_syscall, timer::set_timer
@@ -202,11 +202,11 @@ pub extern "C" fn trap_entry() {
 #[no_mangle]
 extern "C" fn handle_trap(trap_frame: &mut TrapFrame) {
     let scause = r_scause();
-    let code = scause & !(1 << usize::BITS - 1);
+    let code = scause & !(1 << (usize::BITS - 1));
     let stval = r_stval();
     let user_pc = r_sepc();
 
-    if (scause >> usize::BITS - 1) == 1 {
+    if (scause >> (usize::BITS - 1)) == 1 {
     //  interrupt
         match code {
             SUPREVISORTIMER => {

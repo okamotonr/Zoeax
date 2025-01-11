@@ -17,7 +17,7 @@ impl Notification {
         }
     }
 
-    fn set_notify(&mut self, notify_bit: u64) -> () {
+    fn set_notify(&mut self, notify_bit: u64) {
         self.notify_bit = NonZeroU64::new(notify_bit)
     }
 
@@ -45,6 +45,12 @@ impl Notification {
             block_thread(thread);
             self.wait_queue.push(thread)
         }
+    }
+}
+
+impl Default for Notification {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

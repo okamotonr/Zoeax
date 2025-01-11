@@ -6,7 +6,7 @@ pub struct SBIRet {
     pub value: u64
 }
 
-
+#[allow(clippy::too_many_arguments)]
 pub fn sbi_call(arg0: i64, arg1: i64, arg2: i64, arg3: i64, arg4: i64, arg5: i64, fid: i64, eid: i64) -> SBIRet {
     let mut error;
     let mut value;

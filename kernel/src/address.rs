@@ -1,4 +1,4 @@
-use core::{fmt, marker::PhantomData, ops, ptr};
+use core::{fmt, marker::PhantomData, ops};
 use crate::common::KernelResult;
 use core::arch::naked_asm;
 
@@ -9,6 +9,7 @@ extern "C" {
 
 pub const PAGE_SIZE: usize = 4096;
 
+#[allow(dead_code)]
 pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResult<()> {
     // TODO:
     //if dst < PAGE_SIZE.into() || dst > kernel_base.into() {
@@ -21,6 +22,7 @@ pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResu
     Ok(())
 }
 
+#[allow(dead_code)]
 pub unsafe fn copy_from_user<T: Sized>(addr: VirtAddr, dst: *mut T) -> KernelResult<()> {
     // TODO:
     // if addr < PAGE_SIZE.into() || addr > kernel_base.into() {
@@ -120,15 +122,15 @@ impl<T, S> From<*mut S> for Address<T> {
     }
 } 
 
-impl<T, S> Into<*const S> for Address<T> {
-    fn into(self) -> *const S {
-        self.addr as *const S
+impl<T, S> From<Address<T>> for *const S {
+    fn from(value: Address<T>) -> Self {
+        value.addr as *const S
     }
 }
 
-impl<T, S> Into<*mut S> for Address<T> {
-    fn into(self) -> *mut S {
-        self.addr as *mut S
+impl<T, S> From<Address<T>> for *mut S {
+    fn from(value: Address<T>) -> Self {
+        value.addr as *mut S
     }
 }
 

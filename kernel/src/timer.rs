@@ -1,4 +1,3 @@
-use crate::println;
 use crate::riscv::r_time;
 use crate::sbi::{sbi_call, SBIRet};
 

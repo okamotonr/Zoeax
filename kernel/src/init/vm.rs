@@ -1,7 +1,7 @@
 use crate::address::{PhysAddr, VirtAddr};
 use crate::object::PageTable;
 use crate::vm::{KERNEL_VM_ROOT, LV2TABLE, KernelVAddress, KERNEL_CODE_PFX, SATP_SV48};
-use crate::common::{align_down};
+use crate::common::align_down;
 use crate::println;
 
 use core::ptr;
@@ -9,7 +9,7 @@ use core::arch::asm;
 
 // so dirty...
 fn pte(paddr: PhysAddr, leaf: bool) -> usize {
-    let ppn = (paddr.addr >> 12);
+    let ppn = paddr.addr >> 12;
     let bottom_10 = if leaf {
         //    swdaguxwrv
         0b0011101111
@@ -17,7 +17,7 @@ fn pte(paddr: PhysAddr, leaf: bool) -> usize {
         //    swdaguxwrv
         0b0000000001
     };
-    ppn << 10 | bottom_10
+    (ppn << 10) | bottom_10
 }
 
 extern "C" {

@@ -37,6 +37,6 @@ pub fn main() {
     }
     send(1, &message);
 
-    loop {}
+    panic!()
 }
 

@@ -22,6 +22,12 @@ impl<T> ListItem<T> {
 
 }
 
+impl<T> Default for LinkedList<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> LinkedList<T> {
     pub const fn new() -> Self {
         LinkedList {

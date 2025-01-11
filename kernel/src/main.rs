@@ -2,8 +2,7 @@
 #![no_main]
 #![feature(naked_functions)]
 
-use core::{arch::naked_asm, cmp::min, panic::PanicInfo, ptr};
-use core::arch::asm;
+use core::{panic::PanicInfo, ptr};
 
 use kernel::handler::return_to_user;
 use kernel::println;
@@ -25,20 +24,20 @@ pub struct AlignedTo<Align, Bytes: ?Sized> {
     pub bytes: Bytes,
 }
 
-static ALIGNED: &'static AlignedTo<u8, [u8]> = &AlignedTo {
+static ALIGNED: &AlignedTo<u8, [u8]> = &AlignedTo {
     _align: [],
     bytes: *include_bytes!("../shell"),
 };
 
-static ALIGNED_PONG: &'static AlignedTo<u8, [u8]> = &AlignedTo {
+static ALIGNED_PONG: &AlignedTo<u8, [u8]> = &AlignedTo {
     _align: [],
     bytes: *include_bytes!("../pong"),
 };
 
 #[no_mangle]
-static SHELL: &'static [u8] = &ALIGNED.bytes;
+static SHELL: &[u8] = &ALIGNED.bytes;
 #[no_mangle]
-static PONG: &'static [u8] = &ALIGNED_PONG.bytes;
+static PONG: &[u8] = &ALIGNED_PONG.bytes;
 
 #[export_name = "_kernel_main"]
 extern "C" fn kernel_main(hartid: usize, _dtb_addr: usize, free_ram_phys: usize, free_ram_end_phys: usize) -> ! {

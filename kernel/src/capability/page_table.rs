@@ -2,7 +2,6 @@ use crate::common::Err;
 use crate::address::PAGE_SIZE;
 use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
-use crate::print;
 use crate::println;
 use crate::{
     capability::{Capability, CapabilityType, RawCapability},
@@ -30,23 +29,24 @@ impl PageTableCap {
         Ok(level)
     }
 
-    pub fn get_pagetable(&self) -> &mut PageTable {
+    pub fn get_pagetable(&mut self) -> &mut PageTable {
         let address = self.0.get_address();
         let ptr: *mut PageTable = KernelVAddress::from(address).into();
         unsafe { ptr.as_mut().unwrap() }
     }
 
-    pub unsafe fn activate(&self) -> KernelResult<()> {
+    pub unsafe fn activate(&mut self) -> KernelResult<()> {
         self.is_mapped().then_some(()).ok_or(Err::PageTableNotMappedYet)?;
         let page_table = self.get_pagetable();
         println!("call activation");
         unsafe {
-            Ok(page_table.activate())
+            page_table.activate();
         }
+        Ok(())
     }
 
     fn set_mapped(&mut self, vaddr: VirtAddr) {
-        self.0[0] |= 0x1 << 48 | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff)
+        self.0[0] |= (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff)
     }
 
     pub fn root_map(&mut self) -> KernelResult<()> {
@@ -56,11 +56,18 @@ impl PageTableCap {
         let vaddr = self.get_pagetable();
         let addr = VirtAddr::from(vaddr as *const PageTable);
         println!("{addr:?}");
-        Ok(self.set_mapped(addr))
+        self.set_mapped(addr);
+        Ok(())
     }
 
     fn is_mapped(&self) -> bool {
         ((self.0[0] >> 48) & 0x1) == 1
+    }
+}
+
+impl Default for PageTable {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -95,7 +102,7 @@ impl PageCap {
     }
 
     fn set_mapped(&mut self, vaddr: VirtAddr) {
-        self.0[0] |= (0x1 << 48 | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff))
+        self.0[0] |= (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff)
     }
 
     fn is_mapped(&self) -> bool {
@@ -108,7 +115,7 @@ impl PageCap {
 
 impl Capability for PageTableCap {
     const CAP_TYPE: CapabilityType = CapabilityType::PageTable;
-    type KernelObject<'x> = PageTable;
+    type KernelObject = PageTable;
     fn get_raw_cap(&self) -> RawCapability {
         self.0
     }
@@ -117,7 +124,7 @@ impl Capability for PageTableCap {
         Self(raw_cap)
     }
 
-    fn init_object(&mut self) -> () {
+    fn init_object(&mut self) {
         todo!()
     }
     fn get_object_size<'a>(_user_size: usize) -> usize {
@@ -127,7 +134,7 @@ impl Capability for PageTableCap {
 
 impl Capability for PageCap {
     const CAP_TYPE: CapabilityType = CapabilityType::Page;
-    type KernelObject<'x> = Page;
+    type KernelObject = Page;
     fn get_raw_cap(&self) -> RawCapability {
         self.0
     }
@@ -136,7 +143,7 @@ impl Capability for PageCap {
         Self(raw_cap)
     }
 
-    fn init_object(&mut self) -> () {
+    fn init_object(&mut self) {
         todo!()
     }
 

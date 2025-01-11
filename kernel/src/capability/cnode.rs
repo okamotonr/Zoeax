@@ -13,7 +13,7 @@ use core::mem;
 pub struct CNodeCap(RawCapability);
 impl Capability for CNodeCap {
     const CAP_TYPE: CapabilityType = CapabilityType::CNode;
-    type KernelObject<'x> = CNode;
+    type KernelObject = CNode;
     fn new(raw_cap: RawCapability) -> Self {
         Self(raw_cap)
     }
@@ -28,15 +28,14 @@ impl Capability for CNodeCap {
         user_size * mem::size_of::<CNodeEntry>()
     }
     
-    fn init_object(&mut self) -> () {
-        ()
+    fn init_object(&mut self) {
     }
 }
 
 impl CNodeCap {
+    #[allow(unused_variables)]
     pub fn insert_cap(&mut self, src_slot: &mut CNodeEntry, new_cap: RawCapability, index: usize) -> KernelResult<()> {
         todo!();
-        Ok(())
     }
 
     pub fn get_cnode(&mut self, num: usize, offset: usize) -> KernelResult<&mut CNode> {

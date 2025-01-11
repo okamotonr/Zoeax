@@ -97,14 +97,18 @@ impl Page {
         let (level, entry) = parent.walk(vaddr);
         if level != 0 {
             Err(Err::PageTableNotMappedYet)
+        } else if entry.is_valid() {
+            Err(Err::VaddressAlreadyMapped)
         } else {
-            if entry.is_valid() {
-                Err(Err::VaddressAlreadyMapped)
-            } else {
-                entry.write(KernelVAddress::from(self as *const _), flags | PAGE_V);
-                Ok(())
-            }
+            entry.write(KernelVAddress::from(self as *const _), flags | PAGE_V);
+            Ok(())
         }
+    }
+}
+
+impl Default for Page {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

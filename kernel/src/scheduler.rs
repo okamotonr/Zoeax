@@ -30,6 +30,7 @@ pub struct CpuVar {
     pub sptop: usize,
 }
 
+#[derive(Default)]
 pub struct Scheduler {
     runqueue: LinkedList<ThreadInfo>,
 }
@@ -50,6 +51,8 @@ impl Scheduler {
     }
 }
 
+// TODO: remove this attribute
+#[allow(static_mut_refs)]
 pub unsafe fn schedule() {
     let next = if let Some(next) = SCHEDULER.sched() {
         println!("get next");
@@ -71,9 +74,9 @@ pub unsafe fn schedule() {
 
 pub fn create_idle_thread() {
     unsafe {
-        (*IDLE_THREAD).registers.sepc = idle as usize;
-        (*IDLE_THREAD).registers.sstatus = SSTATUS_SPP | SSTATUS_SPIE;
-        (*IDLE_THREAD).registers.sp = &raw const __stack_top as usize;
+        IDLE_THREAD.registers.sepc = idle as usize;
+        IDLE_THREAD.registers.sstatus = SSTATUS_SPP | SSTATUS_SPIE;
+        IDLE_THREAD.registers.sp = &raw const __stack_top as usize;
         CURRENT_PROC = &raw mut IDLE_THREAD;
     }
 }

@@ -25,18 +25,20 @@ pub struct Elf64Hdr {
 }
 
 impl Elf64Hdr {
-    pub fn get_sheader(&self, elf_header_addr: *const usize, idx: u16) -> Option<*const Elf64Shdr> {
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn get_sheader(&self, elf_header_addr: *const usize, idx: u16) -> Option<*const Elf64Shdr> {
         if self.e_shnum <= idx {
             None
         } else {
             unsafe {
-                let base_addr = elf_header_addr.add(self.e_shoff).cast::<Elf64Shdr>();
+                let base_addr = elf_header_addr.byte_add(self.e_shoff).cast::<Elf64Shdr>();
                 Some(base_addr.add(idx as usize))
             }
         }
     }
 
-    pub fn get_pheader(&self, elf_header_addr: *const usize, idx: u16) -> Option<*const Elf64Phdr> {
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn get_pheader(&self, elf_header_addr: *const usize, idx: u16) -> Option<*const Elf64Phdr> {
         if self.e_phnum <= idx {
             None
         } else {

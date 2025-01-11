@@ -2,7 +2,7 @@ use common::list::ListItem;
 use crate::common::KernelResult;
 use crate::object::PageTable;
 use crate::println;
-use crate::{capability::page_table::PageTableCap, vm::KernelVAddress};
+use crate::capability::page_table::PageTableCap;
 use crate::capability::Capability;
 
 use crate::scheduler::SCHEDULER;
@@ -13,23 +13,19 @@ use super::cnode::CNodeEntry;
 pub type ThreadControlBlock = ListItem<ThreadInfo>;
 
 // Because type alias cannot impl method
+#[allow(static_mut_refs)]
 pub fn resume(thread: &mut ThreadControlBlock) {
     thread.resume();
     unsafe { SCHEDULER.push(thread) }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Default)]
 pub enum ThreadState {
+    #[default]
     Inactive,
     Runnable,
     Blocked,
     Idle,
-}
-
-impl Default for ThreadState {
-    fn default() -> Self {
-        ThreadState::Inactive
-    }
 }
 
 #[repr(C)]
@@ -125,7 +121,7 @@ pub struct ThreadInfo {
 }
 
 impl ThreadInfo {
-    pub fn set_msg(&mut self, msg_buffer: usize) {}
+    pub fn set_msg(&mut self, _msg_buffer: usize) {}
     pub fn resume(&mut self) {
         self.status = ThreadState::Runnable;
     }
@@ -158,7 +154,7 @@ impl ThreadInfo {
     }
 
     unsafe fn activate_vspace_inner(&self) -> KernelResult<()> {
-        let pt_cap = PageTableCap::try_from_raw(self.vspace.cap())?;
+        let mut pt_cap = PageTableCap::try_from_raw(self.vspace.cap())?;
         unsafe {
             pt_cap.activate()
         }

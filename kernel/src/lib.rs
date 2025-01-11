@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(naked_functions)]
 #![feature(ptr_as_uninit)]
+#![allow(clippy::missing_safety_doc)]
 
 pub mod sbi;
 pub mod uart;
