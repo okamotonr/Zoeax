@@ -23,7 +23,6 @@ page table entry
  *
  */
 
-use core::arch::asm;
 // use crate::memlayout::{ACLINT_SSWI_PADDR, CLINT, CLINT_SIZE, PLIC, PLIC_SIZE, UART0};
 use crate::address::{Address, PhysAddr, VirtAddr};
 /* 64bit arch*/
@@ -51,28 +50,28 @@ impl From<PhysAddr> for KernelVAddress {
     }
 }
 
-impl Into<PhysAddr> for KernelVAddress {
-    fn into(self) -> PhysAddr {
-        PhysAddr::new(self.addr & !KERNEL_V_ADDR_PFX)
+impl From<KernelVAddress> for PhysAddr {
+    fn from(value: KernelVAddress) -> Self {
+        PhysAddr::new(value.addr & !KERNEL_V_ADDR_PFX)
     }
 }
 
-impl Into<VirtAddr> for KernelVAddress {
-    fn into(self) -> VirtAddr {
-        VirtAddr::new(self.addr)
+impl From<VirtAddr> for PhysAddr {
+    fn from(value: VirtAddr) -> Self {
+        PhysAddr::new(value.addr)
     }
 }
 
-impl Into<PhysAddr> for VirtAddr {
-    fn into(self) -> PhysAddr {
-        PhysAddr::new(self.addr)
+impl From<KernelVAddress> for VirtAddr {
+    fn from(value: KernelVAddress) -> Self {
+        VirtAddr::new(value.addr)
     }
 }
 
 impl VirtAddr {
     #[inline]
     pub fn get_vpn(&self, idx: usize) -> usize {
-        self.addr >> (12 + idx * 9) & 0x1ff
+        (self.addr >> (12 + idx * 9)) & 0x1ff
     }
 }
 
@@ -80,4 +79,3 @@ impl VirtAddr {
 pub static mut KERNEL_VM_ROOT: [usize; 512] = [0; 512];
 #[link_section = "__lv2table"]
 pub static mut LV2TABLE: [usize; 512] = [0; 512];
-

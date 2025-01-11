@@ -1,0 +1,53 @@
+name: Rust Continuous-Integration
+
+on: [push, pull_request]
+
+jobs:
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Add component
+        run: |
+          rustup set profile minimal
+          rustup install nightly
+          rustup target add riscv64gc-unknown-none-elf
+          rustup override set nightly
+          rustup component add rustfmt
+      - name: Cargo fmt
+        run: cargo fmt --all --check
+
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Add component
+        run: |
+          rustup set profile minimal
+          rustup install nightly
+          rustup target add riscv64gc-unknown-none-elf
+          rustup override set nightly
+          cp stub.elf kernel/rootserver
+      - name: Cargo check
+        run: cargo check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Add component
+        run: |
+          rustup set profile minimal
+          rustup install nightly
+          rustup target add riscv64gc-unknown-none-elf
+          rustup override set nightly
+          rustup component add clippy
+          cp stub.elf kernel/rootserver
+      - name: Cargo clippy
+        run: cargo clippy -- -D warnings

@@ -1,5 +1,5 @@
+use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
-use core::ops::{DerefMut, Deref};
 
 // TODO: Double LinkedList
 pub struct ListItem<T> {
@@ -14,12 +14,14 @@ pub struct LinkedList<T> {
 
 impl<T> ListItem<T> {
     pub const fn new(value: T) -> Self {
-        ListItem {
-            value,
-            next: None,
-        }
+        ListItem { value, next: None }
     }
+}
 
+impl<T> Default for LinkedList<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T> LinkedList<T> {
@@ -31,15 +33,10 @@ impl<T> LinkedList<T> {
     }
 
     pub fn push(&mut self, item: &mut ListItem<T>) {
-        let ptr = unsafe {
-            NonNull::new_unchecked(item as *mut ListItem<T>)
-        };
+        let ptr = unsafe { NonNull::new_unchecked(item as *mut ListItem<T>) };
         if let Some(prev_last) = &mut self.last.replace(ptr) {
-            unsafe {
-                prev_last.as_mut().next = Some(ptr)
-            }
-        }
-        else  {
+            unsafe { prev_last.as_mut().next = Some(ptr) }
+        } else {
             self.head = Some(ptr)
         }
     }
@@ -49,24 +46,23 @@ impl<T> LinkedList<T> {
     }
 
     pub fn pop<'a, 'b>(&'b mut self) -> Option<&'a mut ListItem<T>>
-    where 'a : 'b {
+    where
+        'a: 'b,
+    {
         let result = self.head.take();
-        let next = result.and_then(|mut ptr| unsafe {
-            ptr.as_mut().next
-        });
+        let next = result.and_then(|mut ptr| unsafe { ptr.as_mut().next });
         if next.is_none() {
             self.last = None;
         }
 
         self.head = next;
-        result.map(|ptr| unsafe {&mut *ptr.as_ptr()})
+        result.map(|ptr| unsafe { &mut *ptr.as_ptr() })
     }
-
 }
 
 impl<T> Deref for ListItem<T> {
     type Target = T;
-    
+
     fn deref(&self) -> &Self::Target {
         &self.value
     }
@@ -80,5 +76,4 @@ impl<T> DerefMut for ListItem<T> {
 
 #[cfg(test)]
 #[macro_use]
-mod test {
-}
+mod test {}

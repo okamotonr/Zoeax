@@ -1,6 +1,6 @@
 use common::list::{LinkedList, ListItem};
 
-use super::tcb::{ThreadInfo, ThreadControlBlock};
+use super::tcb::{ThreadControlBlock, ThreadInfo};
 
 // TODO: More efficiency
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -12,18 +12,21 @@ pub enum EndpointState {
 
 pub struct Endpoint {
     ep_state: EndpointState,
-    queue: LinkedList<ThreadInfo>
+    queue: LinkedList<ThreadInfo>,
 }
 
 impl Endpoint {
     pub fn new() -> Self {
         Endpoint {
             ep_state: EndpointState::Idel,
-            queue: LinkedList::new()
+            queue: LinkedList::new(),
         }
     }
 
-    fn pop_from_queue<'a>(&mut self, ep_state: EndpointState) -> Option<&'a mut ThreadControlBlock> {
+    fn pop_from_queue<'a>(
+        &mut self,
+        ep_state: EndpointState,
+    ) -> Option<&'a mut ThreadControlBlock> {
         if self.is_idle() {
             self.ep_state = ep_state
         }
@@ -31,9 +34,7 @@ impl Endpoint {
         if self.ep_state == ep_state {
             None
         } else {
-            let ret = {
-                self.queue.pop()
-            };
+            let ret = { self.queue.pop() };
             if self.queue.is_empty() {
                 self.ep_state = EndpointState::Idel;
             }
@@ -68,7 +69,13 @@ impl Endpoint {
     }
 }
 
-fn wake_up_thread<T>(_:&mut ListItem<T>) {
+impl Default for Endpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn wake_up_thread<T>(_: &mut ListItem<T>) {
     // 1, change thread state to Runnable
     // 2, put into runqueu
     todo!()

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // Physical memory layout
 
 // qemu -machine virt is set up like this,
@@ -29,11 +30,11 @@ pub const CLINT_SIZE: usize = 0x10000;
 //const CLINT_MTIMECMP(hartid) (CLINT + 0x4000 + 8 * (hartid))
 pub const CLINT_MTIME: usize = CLINT + 0xBFF8; // cycles since boot.
 pub const ACLINT_SSWI_PADDR: usize = 0x2f00000;
-                                               //
+//
 // qemu puts platform-level interrupt controller (PLIC) here.
 pub const PLIC: usize = 0x0c000000;
 pub const PLIC_SIZE: usize = 0x400000; // PLICのMMIO領域のサイズ
-pub const PLIC_PRIORITY: usize = PLIC + 0x0;
+pub const PLIC_PRIORITY: usize = PLIC;
 pub const PLIC_PENDING: usize = PLIC + 0x1000;
 // const PLIC_MENABLE(hart) (PLIC + 0x2000 + (hart) * 0x100)
 // const PLIC_SENABLE(hart) (PLIC + 0x2080 + (hart) * 0x100)
@@ -41,4 +42,3 @@ pub const PLIC_PENDING: usize = PLIC + 0x1000;
 // const PLIC_SPRIORITY(hart) (PLIC + 0x201000 + (hart) * 0x2000)
 // const PLIC_MCLAIM(hart) (PLIC + 0x200004 + (hart) * 0x2000)
 // const PLIC_SCLAIM(hart) (PLIC + 0x201004 + (hart) * 0x2000)
-

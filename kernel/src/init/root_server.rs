@@ -1,6 +1,8 @@
-use common::elf::*;
 use super::pm::BumpAllocator;
+use common::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
 
+use crate::address::VirtAddr;
+use crate::address::PAGE_SIZE;
 use crate::capability::cnode::CNodeCap;
 use crate::capability::page_table::PageCap;
 use crate::capability::page_table::PageTableCap;
@@ -9,8 +11,6 @@ use crate::capability::untyped::UntypedCap;
 use crate::capability::Capability;
 use crate::capability::RawCapability;
 use crate::common::{align_up, Err};
-use crate::address::VirtAddr;
-use crate::address::PAGE_SIZE;
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::PageTable;
@@ -61,17 +61,18 @@ struct RootServerMemory<'a> {
 }
 
 impl<'a> RootServerMemory<'a> {
-    fn alloc_obj<'x, T>(
+    fn alloc_obj<T>(
         bump_allocator: &mut BumpAllocator,
         user_size: usize,
-    ) -> &'a mut MaybeUninit<T::KernelObject<'x>>
+    ) -> &'a mut MaybeUninit<T::KernelObject>
     where
         T: Capability,
     {
         // easiest way to care align.
-        let start_address = bump_allocator.allocate_pages(
-            align_up(T::get_object_size(user_size), PAGE_SIZE) / PAGE_SIZE).into();
-        let cnode_ptr = <KernelVAddress as Into<*mut T::KernelObject<'x>>>::into(start_address);
+        let start_address = bump_allocator
+            .allocate_pages(align_up(T::get_object_size(user_size), PAGE_SIZE) / PAGE_SIZE)
+            .into();
+        let cnode_ptr = <KernelVAddress as Into<*mut T::KernelObject>>::into(start_address);
         unsafe { cnode_ptr.as_uninit_mut().unwrap() }
     }
 
@@ -97,7 +98,6 @@ impl<'a> RootServerMemory<'a> {
         bootstage_mbr: &mut BootStateManager,
     ) -> PageTableCap {
         let root_page_table = self.vspace.write(PageTable::new());
-
 
         root_page_table.copy_global_mapping();
         let mut cap = PageTableCap::init((root_page_table as *const PageTable).into(), 0);
@@ -189,7 +189,7 @@ unsafe fn allocate_p_segment(
     bootstage_mbr: &mut BootStateManager,
     p_header: *const Elf64Phdr,
     p_start_addr: *const u8,
-) -> () {
+) {
     if !((*p_header).p_type == ProgramType::Load) {
         return;
     }
@@ -215,7 +215,7 @@ unsafe fn allocate_p_segment(
                 }
             }
         };
-        if !(file_sz_rem == 0) {
+        if file_sz_rem != 0 {
             let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
             let copy_dst = page_cap.get_address().addr as *mut u8;
             let copy_size = min(PAGE_SIZE, file_sz_rem);
@@ -250,7 +250,7 @@ fn map_page_tables(
 
 #[inline]
 fn get_flags(flags: u32) -> usize {
-    let ret = if ProgramFlags::is_executable(flags) {
+    (if ProgramFlags::is_executable(flags) {
         PAGE_X
     } else {
         0
@@ -262,8 +262,7 @@ fn get_flags(flags: u32) -> usize {
         PAGE_R
     } else {
         0
-    };
-    ret
+    })
 }
 
 pub fn init_root_server(mut bump_allocator: BumpAllocator, elf_header: *const Elf64Hdr) {
@@ -284,7 +283,7 @@ fn create_initial_thread(
     root_server_mem: &mut RootServerMemory,
     mut bootstage_mbr: BootStateManager,
     elf_header: *const Elf64Hdr,
-) -> () {
+) {
     // 8, call return_to_user(after returning user, to clear stack)
     // 1, create root cnode and insert self cap into self(root cnode)
     let mut root_cnode_cap = root_server_mem.create_root_cnode();

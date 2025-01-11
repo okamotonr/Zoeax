@@ -1,5 +1,4 @@
 use core::marker::PhantomData;
-use core::mem::align_of_val;
 
 use crate::capability::Err;
 use crate::capability::PhysAddr;
@@ -25,7 +24,7 @@ pub struct UntypedCap(RawCapability);
 
 impl Capability for UntypedCap {
     const CAP_TYPE: CapabilityType = CapabilityType::Untyped;
-    type KernelObject<'x> = Untyped;
+    type KernelObject = Untyped;
 
     fn new(raw_cap: RawCapability) -> Self {
         Self(raw_cap)
@@ -39,7 +38,7 @@ impl Capability for UntypedCap {
     }
 
     fn get_object_size(user_size: usize) -> usize {
-        return user_size;
+        user_size
     }
 
     fn get_raw_cap(&self) -> RawCapability {
@@ -49,9 +48,7 @@ impl Capability for UntypedCap {
     fn can_be_retyped_from_device_memory() -> bool {
         true
     }
-    fn init_object(&mut self) -> () {
-        ()
-    }
+    fn init_object(&mut self) {}
 }
 
 const ADDRESS_LENGTH: usize = 48; // sv48
@@ -88,8 +85,10 @@ impl UntypedCap {
         Ok(cap_generator)
     }
 
+    #[allow(unreachable_code)]
+    #[allow(clippy::too_many_arguments)]
     pub fn decode_invocation(
-        inv_label: usize,
+        _inv_label: usize,
         length: usize,
         src_slot: &mut CNodeEntry,
         dest_cnode_cap: &mut CNodeCap,
@@ -101,53 +100,24 @@ impl UntypedCap {
         let dest_cnode = dest_cnode_cap.get_writable(num, dest_offset)?;
         let mut untyped_cap = UntypedCap::try_from_raw(src_slot.cap())?;
         match new_type {
-            CapabilityType::TCB => untyped_cap._invocation::<TCBCap>(
-                length,
-                src_slot,
-                dest_cnode,
-                user_size,
-                num,
-            ),
-            CapabilityType::CNode => untyped_cap._invocation::<CNodeCap>(
-                length,
-                src_slot,
-                dest_cnode,
-                user_size,
-                num,
-            ),
-            CapabilityType::EndPoint => untyped_cap._invocation::<EndPointCap>(
-                length,
-                src_slot,
-                dest_cnode,
-                user_size,
-                num,
-            ),
-            CapabilityType::Notification => untyped_cap._invocation::<NotificationCap>(
-                length,
-                src_slot,
-                dest_cnode,
-                user_size,
-                num,
-            ),
+            CapabilityType::TCB => {
+                untyped_cap._invocation::<TCBCap>(length, src_slot, dest_cnode, user_size, num)
+            }
+            CapabilityType::CNode => {
+                untyped_cap._invocation::<CNodeCap>(length, src_slot, dest_cnode, user_size, num)
+            }
+            CapabilityType::EndPoint => {
+                untyped_cap._invocation::<EndPointCap>(length, src_slot, dest_cnode, user_size, num)
+            }
+            CapabilityType::Notification => untyped_cap
+                ._invocation::<NotificationCap>(length, src_slot, dest_cnode, user_size, num),
             CapabilityType::PageTable => {
                 todo!();
-                untyped_cap._invocation::<EndPointCap>(
-                    length,
-                    src_slot,
-                    dest_cnode,
-                    user_size,
-                    num,
-                )
-            },
+                untyped_cap._invocation::<EndPointCap>(length, src_slot, dest_cnode, user_size, num)
+            }
             CapabilityType::Page => {
                 todo!();
-                untyped_cap._invocation::<EndPointCap>(
-                    length,
-                    src_slot,
-                    dest_cnode,
-                    user_size,
-                    num,
-                )
+                untyped_cap._invocation::<EndPointCap>(length, src_slot, dest_cnode, user_size, num)
             }
             _ => Err(Err::UnknownCapType),
         }
@@ -155,13 +125,13 @@ impl UntypedCap {
 
     fn _invocation<T: Capability>(
         &mut self,
-        length: usize,
+        _length: usize,
         src_slot: &mut CNodeEntry,
         dest_cnode: &mut CNode,
         user_size: usize,
         num: usize,
     ) -> KernelResult<()> {
-        let cap_gen = self.retype::<T>(user_size, num)?.into_iter();
+        let cap_gen = self.retype::<T>(user_size, num)?;
         for (i, mut cap) in cap_gen.enumerate() {
             cap.init_object();
             dest_cnode.insert_cap(src_slot, cap.get_raw_cap(), i);
@@ -171,7 +141,7 @@ impl UntypedCap {
     }
 
     pub fn get_free_index(&self) -> KernelVAddress {
-        let physadd = PhysAddr::new((&self.0[0] >> (64 - ADDRESS_LENGTH)) as usize);
+        let physadd = PhysAddr::new(self.0[0] >> (64 - ADDRESS_LENGTH));
         physadd.into()
     }
 
@@ -184,7 +154,7 @@ impl UntypedCap {
     }
 
     pub fn mark_is_device(&mut self) {
-        self.0[1] = self.0[1] & 0x3f
+        self.0[1] &= 0x3f
     }
 }
 

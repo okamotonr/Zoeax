@@ -1,7 +1,7 @@
 use common::syscall::put_char;
-use common::syscall::sleep;
-use common::syscall::send;
 use common::syscall::recieve;
+use common::syscall::send;
+use common::syscall::sleep;
 use common::syscall::Message;
 
 #[no_mangle]
@@ -15,13 +15,13 @@ pub fn main() {
     recieve(&mut message);
     let msg = "pong: get message\n";
     for c in msg.bytes() {
-         put_char(c as char);
+        put_char(c as char);
     }
     for c in "pong: ".bytes() {
-         put_char(c as char);
+        put_char(c as char);
     }
     for c in message.data {
-          put_char(c as char);
+        put_char(c as char);
     }
 
     sleep(100);
@@ -37,6 +37,5 @@ pub fn main() {
     }
     send(1, &message);
 
-    loop {}
+    panic!()
 }
-

@@ -1,14 +1,6 @@
-use crate::{
-    common::{Err, KernelResult},
-    address::{copy_from_user, copy_to_user, VirtAddr},
-    println,
-    scheduler::{CURRENT_PROC, SCHEDULER},
-    uart::putchar,
-};
+use crate::{println, uart::putchar};
 
-use core::ptr;
-
-use common::syscall::{Message, PUTCHAR, RECV, SEND, SLEEP};
+use common::syscall::{PUTCHAR, RECV, SEND, SLEEP};
 
 pub fn handle_syscall(a0: usize, a1: usize, _a2: usize, _a3: usize, syscall_n: usize) {
     match syscall_n {
@@ -29,4 +21,3 @@ pub fn handle_syscall(a0: usize, a1: usize, _a2: usize, _a3: usize, syscall_n: u
         }
     }
 }
-

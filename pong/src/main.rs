@@ -16,11 +16,11 @@ extern "C" {
 extern "C" fn start() {
     unsafe {
         naked_asm!(
-            "la sp, {stack_top}",
-            "call main",
-            "call exit",
-            stack_top = sym __stack_top
-            )
+        "la sp, {stack_top}",
+        "call main",
+        "call exit",
+        stack_top = sym __stack_top
+        )
     }
 }
 

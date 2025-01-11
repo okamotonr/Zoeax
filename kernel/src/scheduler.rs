@@ -1,8 +1,8 @@
-use crate::object::{ThreadInfo, ThreadControlBlock};
+use crate::object::{ThreadControlBlock, ThreadInfo};
 use crate::println;
+use crate::riscv::{r_sstatus, w_sstatus, wfi, SSTATUS_SIE, SSTATUS_SPIE, SSTATUS_SPP};
 use common::list::{LinkedList, ListItem};
 use core::ptr;
-use crate::riscv::{r_sstatus, w_sstatus, wfi, SSTATUS_SIE, SSTATUS_SPIE, SSTATUS_SPP};
 
 // TODO: use once_cell
 pub static mut IDLE_THREAD: ThreadControlBlock = ThreadControlBlock::new(ThreadInfo::idle_init());
@@ -30,6 +30,7 @@ pub struct CpuVar {
     pub sptop: usize,
 }
 
+#[derive(Default)]
 pub struct Scheduler {
     runqueue: LinkedList<ThreadInfo>,
 }
@@ -50,6 +51,8 @@ impl Scheduler {
     }
 }
 
+// TODO: remove this attribute
+#[allow(static_mut_refs)]
 pub unsafe fn schedule() {
     let next = if let Some(next) = SCHEDULER.sched() {
         println!("get next");
@@ -71,9 +74,9 @@ pub unsafe fn schedule() {
 
 pub fn create_idle_thread() {
     unsafe {
-        (*IDLE_THREAD).registers.sepc = idle as usize;
-        (*IDLE_THREAD).registers.sstatus = SSTATUS_SPP | SSTATUS_SPIE;
-        (*IDLE_THREAD).registers.sp = &raw const __stack_top as usize;
+        IDLE_THREAD.registers.sepc = idle as usize;
+        IDLE_THREAD.registers.sstatus = SSTATUS_SPP | SSTATUS_SPIE;
+        IDLE_THREAD.registers.sp = &raw const __stack_top as usize;
         CURRENT_PROC = &raw mut IDLE_THREAD;
     }
 }
@@ -88,9 +91,5 @@ fn idle() -> ! {
 }
 
 pub fn get_current_tcb<'a>() -> &'a ThreadControlBlock {
-    unsafe {
-        & *CURRENT_PROC
-    }
+    unsafe { &*CURRENT_PROC }
 }
-
-

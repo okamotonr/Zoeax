@@ -1,6 +1,5 @@
 use std::env;
 fn main() {
-
     let build_root = env::var("CARGO_MANIFEST_DIR").unwrap();
     println!("cargo:rerun-if-changed={:}/src/kernel.ld", build_root);
     println!("cargo::rustc-link-arg=-T{:}/src/kernel.ld", build_root);

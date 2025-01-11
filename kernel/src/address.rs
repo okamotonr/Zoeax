@@ -1,6 +1,6 @@
-use core::{fmt, marker::PhantomData, ops, ptr};
 use crate::common::KernelResult;
 use core::arch::naked_asm;
+use core::{fmt, marker::PhantomData, ops};
 
 extern "C" {
     pub static __free_ram: u8;
@@ -9,6 +9,7 @@ extern "C" {
 
 pub const PAGE_SIZE: usize = 4096;
 
+#[allow(dead_code)]
 pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResult<()> {
     // TODO:
     //if dst < PAGE_SIZE.into() || dst > kernel_base.into() {
@@ -21,6 +22,7 @@ pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResu
     Ok(())
 }
 
+#[allow(dead_code)]
 pub unsafe fn copy_from_user<T: Sized>(addr: VirtAddr, dst: *mut T) -> KernelResult<()> {
     // TODO:
     // if addr < PAGE_SIZE.into() || addr > kernel_base.into() {
@@ -56,15 +58,15 @@ extern "C" fn mem_copy_to_user<T>(dst: *mut T, src: *const T, len: usize) {
     unsafe {
         naked_asm!(
             //".global riscv32_usercopy2",
-            "beqz a2, 2f",        // a2 (コピー長) がゼロならラベル「2」にジャンプ
+            "beqz a2, 2f", // a2 (コピー長) がゼロならラベル「2」にジャンプ
             "1:",
-            "lb a3, 0(a1)",       // a1レジスタの指すアドレス (カーネルポインタ) から1バイト読み込む
+            "lb a3, 0(a1)", // a1レジスタの指すアドレス (カーネルポインタ) から1バイト読み込む
             //"riscv32_usercopy2:",
-            "sb a3, 0(a0)",       // a0レジスタの指すアドレス (ユーザーポインタ) に1バイト書き込む
-            "addi a0, a0, 1",     // a0レジスタ (ユーザーポインタ) を1バイト進める
-            "addi a1, a1, 1",     // a1レジスタ (カーネルポインタ) を1バイト進める
-            "addi a2, a2, -1",    // a2レジスタの値を1減らす
-            "bnez a2, 1b",        // a2レジスタの値がゼロでなければラベル「1」にジャンプ
+            "sb a3, 0(a0)", // a0レジスタの指すアドレス (ユーザーポインタ) に1バイト書き込む
+            "addi a0, a0, 1", // a0レジスタ (ユーザーポインタ) を1バイト進める
+            "addi a1, a1, 1", // a1レジスタ (カーネルポインタ) を1バイト進める
+            "addi a2, a2, -1", // a2レジスタの値を1減らす
+            "bnez a2, 1b",  // a2レジスタの値がゼロでなければラベル「1」にジャンプ
             "2:",
             "ret"
         )
@@ -75,12 +77,15 @@ extern "C" fn mem_copy_to_user<T>(dst: *mut T, src: *const T, len: usize) {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Address<T> {
     pub addr: usize,
-    _phantom: PhantomData<fn() -> T>
+    _phantom: PhantomData<fn() -> T>,
 }
 
 impl<T> Address<T> {
     pub const fn new(addr: usize) -> Self {
-        Self { addr, _phantom: PhantomData }
+        Self {
+            addr,
+            _phantom: PhantomData,
+        }
     }
 
     pub fn add(self, val: usize) -> Self {
@@ -112,36 +117,44 @@ impl<T, S> From<*const S> for Address<T> {
     fn from(value: *const S) -> Self {
         Self::new(value as usize)
     }
-} 
+}
 
 impl<T, S> From<*mut S> for Address<T> {
     fn from(value: *mut S) -> Self {
         Self::new(value as usize)
     }
-} 
+}
 
-impl<T, S> Into<*const S> for Address<T> {
-    fn into(self) -> *const S {
-        self.addr as *const S
+impl<T, S> From<Address<T>> for *const S {
+    fn from(value: Address<T>) -> Self {
+        value.addr as *const S
     }
 }
 
-impl<T, S> Into<*mut S> for Address<T> {
-    fn into(self) -> *mut S {
-        self.addr as *mut S
+impl<T, S> From<Address<T>> for *mut S {
+    fn from(value: Address<T>) -> Self {
+        value.addr as *mut S
     }
 }
 
 impl<T> fmt::Debug for Address<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Address {{0x{:x}, {}}}:", self.addr, core::any::type_name::<T>())
+        write!(
+            f,
+            "Address {{0x{:x}, {}}}:",
+            self.addr,
+            core::any::type_name::<T>()
+        )
     }
 }
 
 impl<T> ops::Add for Address<T> {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        Self { addr: self.addr + rhs.addr, _phantom: PhantomData }
+        Self {
+            addr: self.addr + rhs.addr,
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -177,4 +190,3 @@ impl From<PhysAddr> for VirtAddr {
         Self::new(value.addr)
     }
 }
-

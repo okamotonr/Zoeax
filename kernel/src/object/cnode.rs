@@ -1,4 +1,6 @@
-use crate::{capability::RawCapability, common::KernelResult, address::PhysAddr, vm::KernelVAddress};
+use crate::{
+    address::PhysAddr, capability::RawCapability, common::KernelResult, vm::KernelVAddress,
+};
 use core::mem;
 
 /*
@@ -23,45 +25,44 @@ impl ManagementDB {
         self.set_node(next, true)
     }
 
+    #[allow(dead_code)]
     pub fn get_prev(&mut self) -> Option<&mut CNodeEntry> {
         self.get_node(false)
     }
 
+    #[allow(dead_code)]
     pub fn set_prev(&mut self, prev: &mut CNodeEntry) {
         self.set_node(prev, false)
     }
 
     fn get_node(&mut self, is_next: bool) -> Option<&mut CNodeEntry> {
-        let index = if is_next {1} else {0};
+        let index = if is_next { 1 } else { 0 };
         let address = (self.0[index] >> 16) as *const CNodeEntry;
         if address.is_null() {
             None
         } else {
-            let k_address: *mut CNodeEntry  = KernelVAddress::from(PhysAddr::from(address)).into();
-            unsafe {
-                k_address.as_mut()
-            }
+            let k_address: *mut CNodeEntry = KernelVAddress::from(PhysAddr::from(address)).into();
+            unsafe { k_address.as_mut() }
         }
-
     }
 
     unsafe fn get_entry(&mut self) -> *mut CNodeEntry {
         let offset = mem::offset_of!(CNodeEntry, mdb);
-        let parent = (self as *mut ManagementDB).byte_sub(offset).cast::<CNodeEntry>();
-        parent
+        (self as *mut ManagementDB)
+            .byte_sub(offset)
+            .cast::<CNodeEntry>()
     }
 
     fn set_node(&mut self, node: &mut CNodeEntry, is_next: bool) {
         self._set_node(is_next, node);
-        let parent = unsafe {self.get_entry().as_mut().unwrap()};
+        let parent = unsafe { self.get_entry().as_mut().unwrap() };
         node.mdb._set_node(!is_next, parent);
     }
 
     fn _set_node(&mut self, is_next: bool, node: &CNodeEntry) {
-        let index = if is_next {1} else {0};
+        let index = if is_next { 1 } else { 0 };
         self.0[index] &= 0xffff;
         self.0[index] |= (node as *const CNodeEntry as usize) << 16;
-
     }
 }
 
@@ -115,7 +116,7 @@ impl CNodeEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CNode;
 
 impl CNode {
