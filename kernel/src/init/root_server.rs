@@ -1,8 +1,8 @@
 use super::pm::BumpAllocator;
 use common::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
 
-use crate::address::VirtAddr;
 use crate::address::KernelVAddress;
+use crate::address::VirtAddr;
 use crate::address::PAGE_SIZE;
 use crate::capability::cnode::CNodeCap;
 use crate::capability::page_table::PageCap;
@@ -12,12 +12,12 @@ use crate::capability::untyped::UntypedCap;
 use crate::capability::Capability;
 use crate::capability::RawCapability;
 use crate::common::{align_up, Err};
+use crate::object::page_table::{PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
 use crate::object::ThreadInfo;
-use crate::object::page_table::{PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use crate::println;
 
 use crate::riscv::SSTATUS_SPIE;

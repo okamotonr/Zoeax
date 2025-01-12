@@ -1,6 +1,6 @@
 use super::{Capability, CapabilityType, RawCapability};
-use crate::object::Endpoint;
 use crate::address::KernelVAddress;
+use crate::object::Endpoint;
 
 pub struct EndPointCap(RawCapability);
 

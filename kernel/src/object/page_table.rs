@@ -24,14 +24,17 @@ page table entry
  */
 
 use crate::{
-    address::{PhysAddr, VirtAddr, PAGE_SIZE, KernelVAddress},
+    address::{KernelVAddress, PhysAddr, VirtAddr, PAGE_SIZE},
     common::{Err, KernelResult},
-    println,
     memlayout::KERNEL_CODE_PFX,
+    println,
 };
 
-use core::{arch::asm, ops::{Deref, DerefMut}};
 use core::ptr;
+use core::{
+    arch::asm,
+    ops::{Deref, DerefMut},
+};
 
 pub const SATP_SV48: usize = 9 << 60;
 pub const PAGE_V: usize = 1 << 0;
@@ -40,10 +43,9 @@ pub const PAGE_W: usize = 1 << 2;
 pub const PAGE_X: usize = 1 << 3;
 pub const PAGE_U: usize = 1 << 4;
 
-
 // TODO: use once cell
 pub static mut KERNEL_VM_ROOT: PageTable = PageTable::new();
-pub static mut LV2TABLE: PageTable = PageTable::new(); 
+pub static mut LV2TABLE: PageTable = PageTable::new();
 
 // page table lv1(bottom) has 512 * 4kb page = 2048kb
 // page table lv2(middle) has 512 * lv1 table = 512 * 2048kb

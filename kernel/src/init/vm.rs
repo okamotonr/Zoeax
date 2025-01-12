@@ -1,9 +1,9 @@
-use crate::address::{PhysAddr, VirtAddr, KernelVAddress};
+use crate::address::{KernelVAddress, PhysAddr, VirtAddr};
 use crate::common::align_down;
-use crate::object::PageTable;
-use crate::object::page_table::{KERNEL_VM_ROOT, LV2TABLE};
-use crate::println;
 use crate::memlayout::KERNEL_CODE_PFX;
+use crate::object::page_table::{KERNEL_VM_ROOT, LV2TABLE};
+use crate::object::PageTable;
+use crate::println;
 
 use core::ptr;
 

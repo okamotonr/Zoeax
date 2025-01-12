@@ -225,4 +225,3 @@ impl VirtAddr {
         (self.addr >> (12 + idx * 9)) & 0x1ff
     }
 }
-

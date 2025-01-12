@@ -4,7 +4,7 @@ use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
 use crate::println;
 use crate::{
-    address::{VirtAddr, KernelVAddress},
+    address::{KernelVAddress, VirtAddr},
     capability::{Capability, CapabilityType, RawCapability},
     common::KernelResult,
 };

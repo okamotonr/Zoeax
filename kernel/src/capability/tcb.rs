@@ -1,6 +1,6 @@
+use crate::address::KernelVAddress;
 use crate::capability::{Capability, CapabilityType, RawCapability};
 use crate::object::{resume, ThreadControlBlock, ThreadInfo};
-use crate::address::KernelVAddress;
 
 pub struct TCBCap(RawCapability);
 

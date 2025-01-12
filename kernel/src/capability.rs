@@ -1,5 +1,5 @@
 use crate::{
-    address::{PhysAddr, KernelVAddress},
+    address::{KernelVAddress, PhysAddr},
     common::{Err, KernelResult},
 };
 
