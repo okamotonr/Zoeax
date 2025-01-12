@@ -16,4 +16,3 @@ pub mod scheduler;
 pub mod syscall;
 pub mod timer;
 pub mod uart;
-pub mod vm;

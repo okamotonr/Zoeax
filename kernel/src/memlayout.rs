@@ -42,3 +42,6 @@ pub const PLIC_PENDING: usize = PLIC + 0x1000;
 // const PLIC_SPRIORITY(hart) (PLIC + 0x201000 + (hart) * 0x2000)
 // const PLIC_MCLAIM(hart) (PLIC + 0x200004 + (hart) * 0x2000)
 // const PLIC_SCLAIM(hart) (PLIC + 0x201004 + (hart) * 0x2000)
+//
+// TODO: get from linker script or
+pub const KERNEL_CODE_PFX: usize = 0xffffffff00000000;

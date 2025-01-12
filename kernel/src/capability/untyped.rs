@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
 
+use crate::address::KernelVAddress;
 use crate::capability::Err;
 use crate::capability::PhysAddr;
 use crate::capability::{Capability, CapabilityType, RawCapability};
@@ -7,7 +8,6 @@ use crate::common::KernelResult;
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::Untyped;
-use crate::vm::KernelVAddress;
 
 use super::cnode::CNodeCap;
 use super::endpoint::EndPointCap;
