@@ -47,12 +47,7 @@ extern "C" fn kernel_main(
     println!("cpu id is {}", hartid);
     let elf_header = (ROOTSERVER as *const [u8]).cast::<Elf64Hdr>();
 
-    init_kernel(
-        elf_header,
-        free_ram_phys,
-        free_ram_end_phys,
-        &raw const __stack_top as usize,
-    );
+    init_kernel(elf_header, free_ram_phys, free_ram_end_phys);
     println!("return to user");
     unsafe { return_to_user() }
 }

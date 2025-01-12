@@ -1,4 +1,4 @@
-use crate::object::{ThreadControlBlock, ThreadInfo};
+use crate::object::{Registers, ThreadControlBlock, ThreadInfo};
 use crate::println;
 use crate::riscv::{r_sstatus, w_sstatus, wfi, SSTATUS_SIE, SSTATUS_SPIE, SSTATUS_SPP};
 use common::list::{LinkedList, ListItem};
@@ -11,23 +11,22 @@ pub static mut IDLE_THREAD: ThreadControlBlock = ThreadControlBlock::new(ThreadI
 pub static mut CURRENT_PROC: *mut ThreadControlBlock = ptr::null_mut();
 pub const TICK_HZ: usize = 1000;
 pub const TASK_QUANTUM: usize = 20 * (TICK_HZ / 1000); // 20 ms;
+
 pub static mut CPU_VAR: CpuVar = CpuVar {
-    sscratch: 0,
     sptop: 0,
+    sscratch: 0,
+    cur_reg_base: ptr::null_mut(),
 };
 
 // TODO: use unsafe_cell
 pub static mut SCHEDULER: Scheduler = Scheduler::new();
 
-extern "C" {
-    static __stack_top: u8;
-}
-
 #[repr(C)]
 #[derive(Debug)]
 pub struct CpuVar {
-    pub sscratch: usize,
     pub sptop: usize,
+    pub sscratch: usize,
+    pub cur_reg_base: *mut Registers,
 }
 
 #[derive(Default)]
@@ -72,12 +71,14 @@ pub unsafe fn schedule() {
     CURRENT_PROC = next;
 }
 
-pub fn create_idle_thread() {
+pub fn create_idle_thread(stack_top: usize) {
     unsafe {
         IDLE_THREAD.registers.sepc = idle as usize;
         IDLE_THREAD.registers.sstatus = SSTATUS_SPP | SSTATUS_SPIE;
-        IDLE_THREAD.registers.sp = &raw const __stack_top as usize;
+        IDLE_THREAD.registers.sp = stack_top;
         CURRENT_PROC = &raw mut IDLE_THREAD;
+        CPU_VAR.cur_reg_base = &raw mut IDLE_THREAD.registers;
+        CPU_VAR.sptop = stack_top;
     }
 }
 
@@ -92,4 +93,12 @@ fn idle() -> ! {
 
 pub fn get_current_tcb<'a>() -> &'a ThreadControlBlock {
     unsafe { &*CURRENT_PROC }
+}
+
+pub fn get_current_tcb_mut<'a>() -> &'a mut ThreadControlBlock {
+    unsafe { &mut *CURRENT_PROC }
+}
+
+pub unsafe fn set_registers_in_cpu_var(registers: *mut Registers) {
+    unsafe { CPU_VAR.cur_reg_base = registers }
 }

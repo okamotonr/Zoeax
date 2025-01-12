@@ -34,6 +34,10 @@ const ROOT_TCB_IDX: usize = 1;
 const ROOT_CNODE_IDX: usize = 2;
 const ROOT_VSPACE_IDX: usize = 3;
 
+extern "C" {
+    static __stack_top: u8;
+}
+
 impl CNode {
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
         println!("{:?}", cap.get_cap_type());
@@ -290,7 +294,7 @@ fn create_initial_thread(
     let mut vspace_cap =
         root_server_mem.create_address_space(&mut root_cnode_cap, elf_header, &mut bootstage_mbr);
     // 3, create idle thread
-    create_idle_thread();
+    create_idle_thread(&raw const __stack_top as usize);
     // 4, create root server tcb,
     let entry_point = unsafe { (*elf_header).e_entry };
     let mut root_tcb =
