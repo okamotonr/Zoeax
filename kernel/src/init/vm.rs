@@ -1,23 +1,20 @@
-use crate::address::{PhysAddr, VirtAddr};
+use crate::address::{PhysAddr, VirtAddr, KernelVAddress};
 use crate::common::align_down;
 use crate::object::PageTable;
+use crate::object::page_table::{KERNEL_VM_ROOT, LV2TABLE};
 use crate::println;
-use crate::vm::{KernelVAddress, KERNEL_CODE_PFX, KERNEL_VM_ROOT, LV2TABLE, SATP_SV48};
+use crate::memlayout::KERNEL_CODE_PFX;
 
-use core::arch::asm;
 use core::ptr;
 
-// so dirty...
-fn pte(paddr: PhysAddr, leaf: bool) -> usize {
-    let ppn = paddr.addr >> 12;
-    let bottom_10 = if leaf {
+fn flag(leaf: bool) -> usize {
+    if leaf {
         //    swdaguxwrv
         0b0011101111
     } else {
         //    swdaguxwrv
         0b0000000001
-    };
-    (ppn << 10) | bottom_10
+    }
 }
 
 extern "C" {
@@ -43,11 +40,14 @@ pub unsafe fn kernel_vm_init(free_ram_end_phys: usize) {
         let paddr: PhysAddr = paddr.into();
         let vaddr: VirtAddr = KernelVAddress::from(paddr).into();
         let vpn = vaddr.get_vpn(3);
-        KERNEL_VM_ROOT[vpn] = pte(paddr, true);
+        let pte = &mut KERNEL_VM_ROOT[vpn];
+        pte.write(paddr, flag(true));
     }
     let vpn = VirtAddr::from(kerenel_txt).get_vpn(3);
     let lv2_addr = PhysAddr::from(&raw const LV2TABLE);
-    KERNEL_VM_ROOT[vpn] = pte(lv2_addr.bit_and(!KERNEL_CODE_PFX), false);
+    let pte = &mut KERNEL_VM_ROOT[vpn];
+    pte.write(lv2_addr.bit_and(!KERNEL_CODE_PFX), flag(false));
+
     // mapping elf;
     let step = 2_usize.pow(9 + 9 + 12);
     let elf_v_start = align_down(kerenel_txt, step);
@@ -55,18 +55,10 @@ pub unsafe fn kernel_vm_init(free_ram_end_phys: usize) {
         let vaddr: VirtAddr = vaddr.into();
         let paddr: PhysAddr = vaddr.bit_and(!KERNEL_CODE_PFX).into();
         let vpn = vaddr.get_vpn(2);
-        LV2TABLE[vpn] = pte(paddr, true)
+        let pte = &mut LV2TABLE[vpn];
+        pte.write(paddr, flag(true));
     }
 
-    {
-        let address = &raw const KERNEL_VM_ROOT as *const PageTable as usize;
-        let address = address & !KERNEL_CODE_PFX;
-        asm!(
-            "sfence.vma x0, x0",
-            "csrw satp, {satp}",
-            "sfence.vma x0, x0",
-            satp = in(reg) (SATP_SV48 | (address >> 12))
-        )
-    }
+    PageTable::activate_kernel_table();
     println!("root vm activation finished");
 }

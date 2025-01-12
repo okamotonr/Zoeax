@@ -7,7 +7,7 @@ use crate::common::KernelResult;
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::Untyped;
-use crate::vm::KernelVAddress;
+use crate::address::KernelVAddress;
 
 use super::cnode::CNodeCap;
 use super::endpoint::EndPointCap;

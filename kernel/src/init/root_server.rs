@@ -2,6 +2,7 @@ use super::pm::BumpAllocator;
 use common::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
 
 use crate::address::VirtAddr;
+use crate::address::KernelVAddress;
 use crate::address::PAGE_SIZE;
 use crate::capability::cnode::CNodeCap;
 use crate::capability::page_table::PageCap;
@@ -16,14 +17,13 @@ use crate::object::CNodeEntry;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
 use crate::object::ThreadInfo;
+use crate::object::page_table::{PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use crate::println;
 
 use crate::riscv::SSTATUS_SPIE;
 use crate::riscv::SSTATUS_SUM;
 use crate::scheduler::create_idle_thread;
 use crate::scheduler::schedule;
-use crate::vm::KernelVAddress;
-use crate::vm::{PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use core::cmp::min;
 use core::mem::MaybeUninit;
 use core::ptr;
@@ -34,7 +34,6 @@ const ROOT_TCB_IDX: usize = 1;
 const ROOT_CNODE_IDX: usize = 2;
 const ROOT_VSPACE_IDX: usize = 3;
 
-// Only initalization
 impl CNode {
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
         println!("{:?}", cap.get_cap_type());

@@ -49,9 +49,6 @@ SECTIONS {
         *(.data .data.*);
         . = ALIGN(16);
         *(.sdata .sdata.*);
-        . = ALIGN(4096);
-        __kernel_vm_root = .;
-        __kernel_lv2_table = .;
     }
 
     .bss : AT(ADDR(.bss) - _KOFF){

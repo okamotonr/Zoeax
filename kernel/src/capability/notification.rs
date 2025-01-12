@@ -1,6 +1,6 @@
 use super::{Capability, CapabilityType, RawCapability};
 use crate::object::Notification;
-use crate::vm::KernelVAddress;
+use crate::address::KernelVAddress;
 
 pub struct NotificationCap(RawCapability);
 

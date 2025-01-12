@@ -8,6 +8,7 @@ extern "C" {
 }
 
 pub const PAGE_SIZE: usize = 4096;
+pub const KERNEL_V_ADDR_PFX: usize = 0xffff800000000000;
 
 #[allow(dead_code)]
 pub unsafe fn copy_to_user<T: Sized>(src: VirtAddr, dst: VirtAddr) -> KernelResult<()> {
@@ -181,12 +182,47 @@ impl<T> ops::SubAssign for Address<T> {
 pub struct Physical;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Virtual;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct KVirtual;
 
 pub type PhysAddr = Address<Physical>;
 pub type VirtAddr = Address<Virtual>;
+pub type KernelVAddress = Address<KVirtual>;
 
 impl From<PhysAddr> for VirtAddr {
     fn from(value: PhysAddr) -> Self {
         Self::new(value.addr)
     }
 }
+
+impl From<PhysAddr> for KernelVAddress {
+    fn from(value: PhysAddr) -> Self {
+        Self::new(value.addr | KERNEL_V_ADDR_PFX)
+    }
+}
+
+impl From<KernelVAddress> for PhysAddr {
+    fn from(value: KernelVAddress) -> Self {
+        PhysAddr::new(value.addr & !KERNEL_V_ADDR_PFX)
+    }
+}
+
+impl From<VirtAddr> for PhysAddr {
+    fn from(value: VirtAddr) -> Self {
+        PhysAddr::new(value.addr)
+    }
+}
+
+impl From<KernelVAddress> for VirtAddr {
+    fn from(value: KernelVAddress) -> Self {
+        VirtAddr::new(value.addr)
+    }
+}
+
+impl VirtAddr {
+    #[inline]
+    pub fn get_vpn(&self, idx: usize) -> usize {
+        (self.addr >> (12 + idx * 9)) & 0x1ff
+    }
+}
+

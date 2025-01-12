@@ -1,7 +1,6 @@
 use crate::{
-    address::PhysAddr,
+    address::{PhysAddr, KernelVAddress},
     common::{Err, KernelResult},
-    vm::KernelVAddress,
 };
 
 use core::mem;

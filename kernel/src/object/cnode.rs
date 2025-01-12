@@ -1,5 +1,5 @@
 use crate::{
-    address::PhysAddr, capability::RawCapability, common::KernelResult, vm::KernelVAddress,
+    address::{PhysAddr, KernelVAddress}, capability::RawCapability, common::KernelResult,
 };
 use core::mem;
 
