@@ -163,17 +163,12 @@ impl PTE {
     pub fn write<A: Into<PhysAddr>>(&mut self, addr: A, flags: usize) {
         let phys: PhysAddr = addr.into();
         let addr = phys.addr;
-        println!("walk");
-        println!("{:x}", addr);
-        println!("{:x}", addr >> 12);
         self.0 = ((addr >> 12) << 10) | flags;
-        println!("{:x}", self.0);
     }
 
     pub fn as_page_table(&mut self) -> &mut PageTable {
         let phys_addr = PhysAddr::from((self.0 << 2) & !0xfff);
         let raw: *mut PageTable = KernelVAddress::from(phys_addr).into();
-        println!("{:?}", raw);
         unsafe { &mut *raw }
     }
 }

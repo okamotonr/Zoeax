@@ -1,3 +1,6 @@
+use core::fmt;
+
+use crate::address::PhysAddr;
 use crate::address::PAGE_SIZE;
 use crate::common::Err;
 use crate::object::page_table::Page;
@@ -64,11 +67,24 @@ impl PageTableCap {
     fn is_mapped(&self) -> bool {
         ((self.0[0] >> 48) & 0x1) == 1
     }
+
+    fn get_mapped_address(&self) -> PhysAddr {
+        (self.0[0] & !(0xffff << 48)).into()
+    }
 }
 
 impl Default for PageTable {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Debug for PageTableCap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let raw_cap = self.get_raw_cap();
+        let is_mapped = self.is_mapped();
+        let mapped_address = self.get_mapped_address();
+        write!(f, "{raw_cap:?}\nis_mapped {is_mapped:?}\nmapped_address {mapped_address:?}")
     }
 }
 

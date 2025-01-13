@@ -3,7 +3,7 @@ use crate::{
     common::{Err, KernelResult},
 };
 
-use core::mem;
+use core::{fmt, mem};
 use core::ops::{Deref, DerefMut};
 
 pub mod cnode;
@@ -18,7 +18,7 @@ const PADDING_BIT: usize = 0x7ff << 48;
 const ADDRESS_BIT: usize = !(CAP_TYPE_BIT | PADDING_BIT);
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct RawCapability([usize; 2]);
 
 /*
@@ -77,6 +77,12 @@ impl RawCapability {
     }
 }
 
+impl fmt::Debug for RawCapability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "captype: {:?}, address: {:?}", self.get_cap_type(), self.get_address())
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum CapabilityType {
@@ -107,6 +113,7 @@ impl CapabilityType {
     }
 }
 
+// TODO: Change of capability should change raw_cap in slot.
 pub trait Capability
 where
     Self: Sized,

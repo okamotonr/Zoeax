@@ -1,7 +1,9 @@
 use crate::address::KernelVAddress;
 use crate::capability::{Capability, CapabilityType, RawCapability};
 use crate::object::{resume, ThreadControlBlock, ThreadInfo};
+use core::mem;
 
+#[derive(Debug)]
 pub struct TCBCap(RawCapability);
 
 impl TCBCap {
@@ -45,5 +47,9 @@ impl Capability for TCBCap {
         unsafe {
             *ptr = ThreadControlBlock::new(ThreadInfo::default());
         }
+    }
+
+    fn get_object_size(_user_size: usize) -> usize {
+        mem::size_of::<Self::KernelObject>()
     }
 }

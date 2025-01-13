@@ -2,40 +2,25 @@ use core::arch::asm;
 #[repr(usize)]
 pub enum SysNo {
     PutChar = PUTCHAR,
-    Sleep = SLEEP,
-    Send = SEND,
-    Recv = RECV,
+    Call = CALL
 }
 
 pub const PUTCHAR: usize = 0;
+pub const CALL: usize = 1;
+
 pub const SLEEP: usize = 1;
 pub const SEND: usize = 2;
 pub const RECV: usize = 3;
 
-#[derive(Clone, Copy, Debug)]
-pub struct Message {
-    pub tag: isize,
-    pub src: usize, // proccess id, who send this message.
-    pub data: [u8; 1024],
-}
+/// inv label
+pub const UNTYPED_RETYPE: usize = 1;
+pub const TCB_CONFIGURE: usize = 2;
 
-impl Default for Message {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// TODO: same kernel::capability::CapabilityType
+pub const TYPE_TCB: usize = 3;
 
-impl Message {
-    pub fn new() -> Self {
-        Self {
-            tag: 0,
-            src: 0,
-            data: [0; 1024],
-        }
-    }
-}
 
-unsafe fn syscall(sysno: SysNo, arg0: usize, arg1: usize, arg2: usize, arg3: usize) -> isize {
+unsafe fn syscall(arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize, arg6: usize, sysno: SysNo) -> isize {
     let mut result: isize;
 
     asm!(
@@ -44,34 +29,24 @@ unsafe fn syscall(sysno: SysNo, arg0: usize, arg1: usize, arg2: usize, arg3: usi
         in("a1") arg1,
         in("a2") arg2,
         in("a3") arg3,
-        in("a4") sysno as usize,
+        in("a4") arg4,
+        in("a5") arg5,
+        in("a6") arg6,
+        in("a7") sysno as usize,
         lateout("a0") result,
     );
 
     result
 }
 
-pub fn put_char(char: char) {
+pub fn put_char(char: u8) {
     unsafe {
-        syscall(SysNo::PutChar, char as usize, 0, 0, 0);
+        syscall(char as usize, 0, 0, 0, 0, 0, 0, SysNo::PutChar);
     }
 }
 
-pub fn sleep(ms_time: usize) {
+pub fn untyped_retype(src_ptr: usize, dest_ptr: usize, user_size: usize, num: usize, cap_type: usize) {
     unsafe {
-        syscall(SysNo::Sleep, ms_time, 0, 0, 0);
-    }
-}
-
-pub fn send(dst: usize, sm: &Message) {
-    unsafe {
-        let sm = sm as *const Message as usize;
-        syscall(SysNo::Send, dst, sm, 0, 0);
-    }
-}
-pub fn recieve(rcv: &mut Message) {
-    unsafe {
-        let rm = rcv as *mut Message as usize;
-        syscall(SysNo::Recv, rm, 0, 0, 0);
+        syscall(src_ptr, UNTYPED_RETYPE, dest_ptr, user_size, num, cap_type, 0, SysNo::Call);
     }
 }

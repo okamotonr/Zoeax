@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(naked_functions)]
 #![feature(ptr_as_uninit)]
+#![feature(min_specialization)]
 #![allow(clippy::missing_safety_doc)]
 
 mod address;

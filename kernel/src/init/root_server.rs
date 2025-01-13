@@ -39,8 +39,9 @@ extern "C" {
 }
 
 impl CNode {
+    // todo: broken
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        println!("{:?}", cap.get_cap_type());
+        println!("in write slot of cnode: {:?}", cap);
         let root = (self as *mut Self).cast::<CNodeEntry>();
         let entry = CNodeEntry::new_with_rawcap(cap);
         unsafe { *root.add(index) = entry }
@@ -49,11 +50,10 @@ impl CNode {
 
 impl CNodeCap {
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        println!("{:?}", self.get_raw_cap().get_address());
-        println!("{:?}", self.get_raw_cap().get_cap_type());
+        println!("{index}");
         let cnode = self.get_cnode(1, index).unwrap();
-        println!("{:p}", cnode);
-        cnode.write_slot(cap, index);
+        println!("this is cnode :{:p}", cnode);
+        cnode.write_slot(cap, 0);
     }
 }
 
@@ -105,7 +105,6 @@ impl<'a> RootServerMemory<'a> {
         root_page_table.copy_global_mapping();
         let mut cap = PageTableCap::init((root_page_table as *const PageTable).into(), 0);
         cap.root_map().unwrap();
-        println!("Here");
         cnode_cap.write_slot(cap.get_raw_cap(), ROOT_VSPACE_IDX);
         unsafe {
             for idx in 0..(*elf_header).e_phnum {
@@ -305,6 +304,7 @@ fn create_initial_thread(
     let untyped_cap = bootstage_mbr.into_untyped();
     root_cnode_cap.write_slot(untyped_cap.get_raw_cap(), untyped_cap_idx);
     // 7, set initial thread into current thread
+    root_tcb.set_registers(&[(10, untyped_cap_idx)]);
     root_tcb.make_runnable();
     println!("root process initialization finished");
 }
