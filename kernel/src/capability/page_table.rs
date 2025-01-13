@@ -59,7 +59,6 @@ impl PageTableCap {
             .ok_or(Err::PageTableAlreadyMapped)?;
         let vaddr = self.get_pagetable();
         let addr = VirtAddr::from(vaddr as *const PageTable);
-        println!("{addr:?}");
         self.set_mapped(addr);
         Ok(())
     }

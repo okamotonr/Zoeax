@@ -27,7 +27,6 @@ use crate::{
     address::{KernelVAddress, PhysAddr, VirtAddr, PAGE_SIZE},
     common::{Err, KernelResult},
     memlayout::KERNEL_CODE_PFX,
-    println,
 };
 
 use core::ptr;
@@ -87,7 +86,6 @@ impl PageTable {
 
     pub unsafe fn activate(&self) {
         let addr: PhysAddr = KernelVAddress::from(self as *const Self).into();
-        println!("{:?}", addr);
         asm!(
             "sfence.vma x0, x0",
             "csrw satp, {satp}",

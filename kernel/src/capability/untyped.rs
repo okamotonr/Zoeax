@@ -1,7 +1,6 @@
 use core::fmt;
 use core::mem;
 use core::marker::PhantomData;
-use crate::println;
 
 use crate::address::KernelVAddress;
 use crate::capability::page_table::PageCap;
@@ -90,7 +89,6 @@ impl UntypedCap {
         let block_size = self.block_size();
         let object_size = num * T::get_object_size(user_size);
         let align = mem::align_of::<T::KernelObject>();
-        println!("object_size is {}, align is {align}", object_size);
 
         // 2, whether memory is enough or not
         let free_bytes = self.get_free_bytes();
@@ -105,7 +103,6 @@ impl UntypedCap {
         if is_device {
             self.mark_is_device()
         }
-        println!("{:?}", self);
         Ok(cap_generator)
     }
 
@@ -118,7 +115,6 @@ impl UntypedCap {
         new_type: CapabilityType,
     ) -> KernelResult<()> {
         let mut untyped_cap = UntypedCap::try_from_raw(src_slot.cap())?;
-        println!("{:?}", untyped_cap);
         match new_type {
             CapabilityType::TCB => {
                 untyped_cap._invocation::<TCBCap>(src_slot, dest_cnode, user_size, num)

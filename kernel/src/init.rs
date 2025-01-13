@@ -21,6 +21,6 @@ pub fn init_kernel(elf_header: *const Elf64Hdr, free_ram_phys: usize, free_ram_e
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
     init_root_server(bump_allocator, elf_header);
     w_sscratch(&raw const CPU_VAR as usize);
-    set_timer(100000);
+    //set_timer(100000);
     println!("initialization finished");
 }

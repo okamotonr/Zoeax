@@ -187,7 +187,7 @@ fn handle_trap() -> ! {
     } else {
         match code {
             ECALLUSER => {
-                let syscall_n = get_current_tcb().registers.a4;
+                let syscall_n = get_current_tcb().registers.a7;
                 handle_syscall(syscall_n);
             }
             IMISSALIGNED => {

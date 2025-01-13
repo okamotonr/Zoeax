@@ -2,11 +2,13 @@ use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
 
 // TODO: Double LinkedList
+#[derive(Debug)]
 pub struct ListItem<T> {
     value: T,
     next: Option<NonNull<Self>>,
 }
 
+#[derive(Debug)]
 pub struct LinkedList<T> {
     head: Option<NonNull<ListItem<T>>>,
     last: Option<NonNull<ListItem<T>>>,

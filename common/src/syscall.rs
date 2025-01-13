@@ -15,18 +15,20 @@ pub const RECV: usize = 3;
 /// inv label
 pub const UNTYPED_RETYPE: usize = 1;
 pub const TCB_CONFIGURE: usize = 2;
+pub const TCB_WRITE_REG: usize = 3;
+pub const TCB_RESUME: usize = 4;
 
 // TODO: same kernel::capability::CapabilityType
 pub const TYPE_TCB: usize = 3;
 
 
-unsafe fn syscall(arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize, arg6: usize, sysno: SysNo) -> isize {
+unsafe fn syscall(src_ptr: usize, inv_label: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize, arg6: usize, sysno: SysNo) -> isize {
     let mut result: isize;
 
     asm!(
         "ecall",
-        in("a0") arg0,
-        in("a1") arg1,
+        in("a0") src_ptr,
+        in("a1") inv_label,
         in("a2") arg2,
         in("a3") arg3,
         in("a4") arg4,
@@ -48,5 +50,11 @@ pub fn put_char(char: u8) {
 pub fn untyped_retype(src_ptr: usize, dest_ptr: usize, user_size: usize, num: usize, cap_type: usize) {
     unsafe {
         syscall(src_ptr, UNTYPED_RETYPE, dest_ptr, user_size, num, cap_type, 0, SysNo::Call);
+    }
+}
+
+pub fn write_reg(src_ptr: usize, is_ip: bool, value: usize) {
+    unsafe {
+        syscall(src_ptr, TCB_WRITE_REG, is_ip as usize, value, 0, 0, 0, SysNo::Call);
     }
 }

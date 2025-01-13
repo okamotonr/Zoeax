@@ -41,7 +41,6 @@ extern "C" {
 impl CNode {
     // todo: broken
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        println!("in write slot of cnode: {:?}", cap);
         let root = (self as *mut Self).cast::<CNodeEntry>();
         let entry = CNodeEntry::new_with_rawcap(cap);
         unsafe { *root.add(index) = entry }
@@ -50,9 +49,7 @@ impl CNode {
 
 impl CNodeCap {
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        println!("{index}");
         let cnode = self.get_cnode(1, index).unwrap();
-        println!("this is cnode :{:p}", cnode);
         cnode.write_slot(cap, 0);
     }
 }
@@ -178,6 +175,7 @@ impl BootStateManager {
         ret
     }
 
+    // TODO: return [UntypedCap]
     pub fn into_untyped(self) -> UntypedCap {
         let (start_address, end_address) = self.bump_allocator.end_allocation();
         let block_size = (end_address - start_address).into();
