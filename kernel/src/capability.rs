@@ -1,6 +1,6 @@
 use crate::{
     address::{KernelVAddress, PhysAddr},
-    common::{Err, KernelResult},
+    common::{ErrKind, KernelResult},
     object::CNodeEntry,
 };
 
@@ -114,7 +114,7 @@ impl CapabilityType {
             9 => Ok(Self::Notification),
             2 => Ok(Self::PageTable),
             4 => Ok(Self::Page),
-            _ => Err(Err::UnknownCapType),
+            _ => Err((ErrKind::UnknownCapType).into()),
         }
     }
 }
@@ -138,7 +138,7 @@ where
         if cap_type == Self::CAP_TYPE {
             Ok(Self::new(raw_cap))
         } else {
-            Err(Err::UnexpectedCapType)
+            Err((ErrKind::UnexpectedCapType).into())
         }
     }
     fn create_raw_cap(addr: KernelVAddress) -> RawCapability {
@@ -156,7 +156,7 @@ where
         false
     }
     fn derive(&self, _src_slot: &CNodeEntry) -> KernelResult<Self> {
-        Err(Err::CanNotDerivable)
+        Err((ErrKind::CanNotDerivable).into())
     }
     fn new(raw_cap: RawCapability) -> Self;
     fn get_raw_cap(&self) -> RawCapability;

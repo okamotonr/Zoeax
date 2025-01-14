@@ -11,7 +11,7 @@ use crate::capability::tcb::TCBCap;
 use crate::capability::untyped::UntypedCap;
 use crate::capability::Capability;
 use crate::capability::RawCapability;
-use crate::common::{align_up, Err};
+use crate::common::{align_up, ErrKind};
 use crate::object::page_table::{PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use crate::object::CNode;
 use crate::object::CNodeEntry;
@@ -203,12 +203,12 @@ unsafe fn allocate_p_segment(
         let mut page_cap = PageCap::init(page_addr, 0);
         let vaddr_n = vaddr.add(PAGE_SIZE * page_idx);
         if let Err(e) = page_cap.map(root_table_cap, vaddr_n, flags) {
-            match e {
-                Err::PageTableNotMappedYet => {
+            match e.e_kind {
+                ErrKind::PageTableNotMappedYet => {
                     map_page_tables(cnode_cap, bootstage_mbr, root_table_cap, vaddr_n);
                     page_cap.map(root_table_cap, vaddr_n, flags).unwrap();
                 }
-                Err::VaddressAlreadyMapped => {
+                ErrKind::VaddressAlreadyMapped => {
                     panic!("Should never occur")
                 }
                 _ => {

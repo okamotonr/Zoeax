@@ -1,6 +1,6 @@
 use super::{Capability, CapabilityType, RawCapability};
 use crate::address::KernelVAddress;
-use crate::common::{Err, KernelResult};
+use crate::common::{ErrKind, KernelResult};
 use crate::object::{CNode, CNodeEntry};
 
 use core::mem;
@@ -49,7 +49,7 @@ impl CNodeCap {
     pub fn get_cnode(&mut self, num: usize, offset: usize) -> KernelResult<&mut CNode> {
         (self.get_entry_num() >= num + offset)
             .then_some(())
-            .ok_or(Err::NoEnoughSlot)?;
+            .ok_or(ErrKind::NoEnoughSlot)?;
         let ptr: KernelVAddress = self.0.get_address().into();
         let ptr: *mut CNodeEntry = ptr.into();
         unsafe {
@@ -62,7 +62,7 @@ impl CNodeCap {
         let cnode = self.get_cnode(num, offset)?;
         for i in 0..num {
             let entry = cnode.lookup_entry_mut(i)?;
-            (!entry.is_null()).then_some(()).ok_or(Err::NotEntrySlot)?;
+            (!entry.is_null()).then_some(()).ok_or(ErrKind::NotEntrySlot)?;
         }
         Ok(cnode)
     }
@@ -76,7 +76,7 @@ impl CNodeCap {
         // TODO: check src and dst is acceptable
         (!((dst..dst + num).contains(&src)))
             .then_some(())
-            .ok_or(Err::InvalidOperation)?;
+            .ok_or(ErrKind::InvalidOperation)?;
         let ptr: KernelVAddress = self.0.get_address().into();
         let ptr: *mut CNodeEntry = ptr.into();
         unsafe {

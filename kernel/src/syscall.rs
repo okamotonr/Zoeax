@@ -1,6 +1,6 @@
 use crate::{
     capability::{cnode::CNodeCap, tcb::TCBCap, untyped::UntypedCap, Capability, CapabilityType},
-    common::{Err, KernelResult},
+    common::{ErrKind, KernelResult},
     println,
     scheduler::{get_current_tcb, get_current_tcb_mut},
     uart::putchar,
@@ -73,6 +73,6 @@ fn handle_cap_invocation() -> KernelResult<()> {
             println!("{:?}", tcb_cap.get_tcb());
             Ok(())
         }
-        _ => Err(Err::UnknownInvocation),
+        _ => Err((ErrKind::UnknownInvocation).into()),
     }
 }

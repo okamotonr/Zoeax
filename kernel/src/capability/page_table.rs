@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::address::PhysAddr;
 use crate::address::PAGE_SIZE;
-use crate::common::Err;
+use crate::common::ErrKind;
 use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
 use crate::{
@@ -22,7 +22,7 @@ impl PageTableCap {
     pub fn map(&mut self, root_table: &mut Self, vaddr: VirtAddr) -> KernelResult<usize> {
         (!self.is_mapped())
             .then_some(())
-            .ok_or(Err::PageTableAlreadyMapped)?;
+            .ok_or(ErrKind::PageTableAlreadyMapped)?;
         let parent_table = root_table.get_pagetable();
         let table = self.get_pagetable();
         let level = table.map(parent_table, vaddr)?;
@@ -39,7 +39,7 @@ impl PageTableCap {
     pub unsafe fn activate(&mut self) -> KernelResult<()> {
         self.is_mapped()
             .then_some(())
-            .ok_or(Err::PageTableNotMappedYet)?;
+            .ok_or(ErrKind::PageTableNotMappedYet)?;
         let page_table = self.get_pagetable();
         unsafe {
             page_table.activate();
@@ -54,7 +54,7 @@ impl PageTableCap {
     pub fn root_map(&mut self) -> KernelResult<()> {
         (!self.is_mapped())
             .then_some(())
-            .ok_or(Err::PageTableAlreadyMapped)?;
+            .ok_or(ErrKind::PageTableAlreadyMapped)?;
         let vaddr = self.get_pagetable();
         let addr = VirtAddr::from(vaddr as *const PageTable);
         self.set_mapped(addr);
@@ -104,7 +104,7 @@ impl PageCap {
     ) -> KernelResult<()> {
         (!self.is_mapped())
             .then_some(())
-            .ok_or(Err::PageAlreadyMapped)?;
+            .ok_or(ErrKind::PageAlreadyMapped)?;
         let parent_table = root_table.get_pagetable();
         let page = self.get_page();
         page.map(parent_table, vaddr, flags)?;
@@ -150,7 +150,7 @@ impl Capability for PageTableCap {
     fn derive(&self, _src_slot: &crate::object::CNodeEntry) -> KernelResult<Self> {
         self.is_mapped()
             .then_some(())
-            .ok_or(Err::PageTableNotMappedYet)?;
+            .ok_or(ErrKind::PageTableNotMappedYet)?;
         Ok(Self::new(self.get_raw_cap()))
     }
 }
