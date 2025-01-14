@@ -32,7 +32,7 @@ pub enum Err {
     PageAlreadyMapped,
     PageTableNotMappedYet,
     UnknownInvocation,
-    CanNotDerivable
+    CanNotDerivable,
 }
 
 pub type KernelResult<T> = Result<T, Err>;

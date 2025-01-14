@@ -1,10 +1,11 @@
 use crate::{
     address::{KernelVAddress, PhysAddr},
-    common::{Err, KernelResult}, object::CNodeEntry,
+    common::{Err, KernelResult},
+    object::CNodeEntry,
 };
 
-use core::{fmt, mem};
 use core::ops::{Deref, DerefMut};
+use core::{fmt, mem};
 
 pub mod cnode;
 pub mod endpoint;
@@ -79,7 +80,12 @@ impl RawCapability {
 
 impl fmt::Debug for RawCapability {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "captype: {:?}, address: {:?}", self.get_cap_type(), self.get_address())
+        write!(
+            f,
+            "captype: {:?}, address: {:?}",
+            self.get_cap_type(),
+            self.get_address()
+        )
     }
 }
 

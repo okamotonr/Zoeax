@@ -271,9 +271,9 @@ fn handle_trap() -> ! {
             }
         }
     }
-    unsafe { 
+    unsafe {
         schedule();
-        return_to_user() 
+        return_to_user()
     }
 }
 

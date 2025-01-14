@@ -4,7 +4,6 @@ mod notification;
 pub mod page_table;
 mod tcb;
 
-
 pub use crate::object::cnode::{CNode, CNodeEntry};
 pub use crate::object::endpoint::Endpoint;
 pub use crate::object::notification::Notification;
@@ -24,4 +23,3 @@ pub trait KObject {
 //         mem::size_of::<T>()
 //     }
 // }
-

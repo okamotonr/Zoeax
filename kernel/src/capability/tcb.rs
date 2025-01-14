@@ -40,7 +40,7 @@ impl TCBCap {
         self.get_tcb().set_root_cspace(cspace_new, src);
         Ok(())
     }
-    
+
     pub fn set_vspace(&mut self, src: &mut CNodeEntry) -> KernelResult<()> {
         let vspace = PageTableCap::try_from_raw(src.cap())?;
         let vspace_new = vspace.derive(src)?;

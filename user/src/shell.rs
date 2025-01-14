@@ -1,10 +1,9 @@
 use common::println;
-use common::syscall::{configure_tcb, untyped_retype, TYPE_TCB};
-use common::syscall::write_reg;
 use common::syscall::resume_tcb;
+use common::syscall::write_reg;
+use common::syscall::{configure_tcb, untyped_retype, TYPE_TCB};
 
 pub static mut STACK: [u8; 512] = [0; 512];
-
 
 #[no_mangle]
 pub fn main(untyped_cnode_idx: usize) {

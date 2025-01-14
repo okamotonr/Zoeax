@@ -107,10 +107,9 @@ pub fn get_current_tcb_mut<'a>() -> &'a mut ThreadControlBlock {
     unsafe { &mut *CURRENT_PROC }
 }
 
+#[allow(static_mut_refs)]
 pub fn require_schedule() {
-    unsafe {
-        SCHEDULER.requested = true
-    }
+    unsafe { SCHEDULER.requested = true }
 }
 
 pub fn timer_tick() {

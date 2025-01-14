@@ -1,5 +1,5 @@
-use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
 use crate::capability::Capability;
+use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
 use crate::common::KernelResult;
 use crate::object::PageTable;
 use crate::println;

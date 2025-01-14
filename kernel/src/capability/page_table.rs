@@ -82,7 +82,10 @@ impl fmt::Debug for PageTableCap {
         let raw_cap = self.get_raw_cap();
         let is_mapped = self.is_mapped();
         let mapped_address = self.get_mapped_address();
-        write!(f, "{raw_cap:?}\nis_mapped {is_mapped:?}\nmapped_address {mapped_address:?}")
+        write!(
+            f,
+            "{raw_cap:?}\nis_mapped {is_mapped:?}\nmapped_address {mapped_address:?}"
+        )
     }
 }
 
@@ -146,7 +149,9 @@ impl Capability for PageTableCap {
         PAGE_SIZE // page size, bytes
     }
     fn derive(&self, _src_slot: &crate::object::CNodeEntry) -> KernelResult<Self> {
-        self.is_mapped().then_some(()).ok_or(Err::PageTableNotMappedYet)?;
+        self.is_mapped()
+            .then_some(())
+            .ok_or(Err::PageTableNotMappedYet)?;
         Ok(Self::new(self.get_raw_cap()))
     }
 }

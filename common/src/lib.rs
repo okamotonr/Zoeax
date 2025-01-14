@@ -8,7 +8,6 @@ pub mod elf;
 pub mod list;
 pub mod syscall;
 
-
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::_print(format_args!($($arg)*)));
@@ -22,7 +21,7 @@ impl fmt::Write for SyscallWriter {
             let ch = *ch;
             put_char(ch);
         }
-    Ok(())
+        Ok(())
     }
 }
 
@@ -32,7 +31,6 @@ pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
     writer.write_fmt(args).unwrap();
 }
-
 
 #[macro_export]
 macro_rules! println {

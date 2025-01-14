@@ -67,18 +67,20 @@ impl CNodeCap {
         Ok(cnode)
     }
 
-    pub fn get_src_and_dest(&mut self, src: usize, dst: usize, num: usize) -> KernelResult<(&mut CNodeEntry, &mut CNode)> {
+    pub fn get_src_and_dest(
+        &mut self,
+        src: usize,
+        dst: usize,
+        num: usize,
+    ) -> KernelResult<(&mut CNodeEntry, &mut CNode)> {
         // TODO: check src and dst is acceptable
         let ptr: KernelVAddress = self.0.get_address().into();
         let ptr: *mut CNodeEntry = ptr.into();
         unsafe {
             let src = ptr.add(src);
             let dst = ptr.add(dst);
-            Ok((
-                    &mut *src, &mut *(dst as *mut CNode)
-            ))
+            Ok((&mut *src, &mut *(dst as *mut CNode)))
         }
-
     }
 
     fn get_entry_num(&self) -> usize {

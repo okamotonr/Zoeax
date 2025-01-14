@@ -1,6 +1,6 @@
 use core::fmt;
-use core::mem;
 use core::marker::PhantomData;
+use core::mem;
 
 use crate::address::KernelVAddress;
 use crate::capability::page_table::PageCap;
@@ -8,8 +8,8 @@ use crate::capability::page_table::PageTableCap;
 use crate::capability::Err;
 use crate::capability::PhysAddr;
 use crate::capability::{Capability, CapabilityType, RawCapability};
-use crate::common::KernelResult;
 use crate::common::align_up;
+use crate::common::KernelResult;
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::Untyped;
@@ -125,8 +125,9 @@ impl UntypedCap {
             CapabilityType::EndPoint => {
                 untyped_cap._invocation::<EndPointCap>(src_slot, dest_cnode, user_size, num)
             }
-            CapabilityType::Notification => untyped_cap
-                ._invocation::<NotificationCap>(src_slot, dest_cnode, user_size, num),
+            CapabilityType::Notification => {
+                untyped_cap._invocation::<NotificationCap>(src_slot, dest_cnode, user_size, num)
+            }
             CapabilityType::PageTable => {
                 untyped_cap._invocation::<PageTableCap>(src_slot, dest_cnode, user_size, num)
             }
