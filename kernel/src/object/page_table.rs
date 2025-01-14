@@ -25,7 +25,8 @@ page table entry
 
 use crate::{
     address::{KernelVAddress, PhysAddr, VirtAddr, PAGE_SIZE},
-    common::{Err, KernelResult},
+    common::{ErrKind, KernelResult},
+    kerr,
     memlayout::KERNEL_CODE_PFX,
 };
 
@@ -61,7 +62,7 @@ impl PageTable {
     pub fn map(&self, parent: &mut Self, vaddr: VirtAddr) -> KernelResult<usize> {
         let (level, entry) = parent.walk(vaddr);
         if level == 0 {
-            Err(Err::VaddressAlreadyMapped)
+            Err(kerr!(ErrKind::VaddressAlreadyMapped))
         } else {
             entry.write(KernelVAddress::from(self as *const _), PAGE_V);
             Ok(level - 1)
@@ -140,9 +141,9 @@ impl Page {
     pub fn map(&self, parent: &mut PageTable, vaddr: VirtAddr, flags: usize) -> KernelResult<()> {
         let (level, entry) = parent.walk(vaddr);
         if level != 0 {
-            Err(Err::PageTableNotMappedYet)
+            Err(kerr!(ErrKind::PageTableNotMappedYet))
         } else if entry.is_valid() {
-            Err(Err::VaddressAlreadyMapped)
+            Err(kerr!(ErrKind::VaddressAlreadyMapped))
         } else {
             entry.write(KernelVAddress::from(self as *const _), flags | PAGE_V);
             Ok(())

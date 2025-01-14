@@ -5,11 +5,9 @@ use core::mem;
 use crate::address::KernelVAddress;
 use crate::capability::page_table::PageCap;
 use crate::capability::page_table::PageTableCap;
-use crate::capability::Err;
 use crate::capability::PhysAddr;
 use crate::capability::{Capability, CapabilityType, RawCapability};
-use crate::common::align_up;
-use crate::common::KernelResult;
+use crate::common::{align_up, ErrKind, KernelResult};
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::Untyped;
@@ -18,6 +16,7 @@ use super::cnode::CNodeCap;
 use super::endpoint::EndPointCap;
 use super::notification::NotificationCap;
 use super::tcb::TCBCap;
+use crate::kerr;
 
 /*
  * RawCapability[0]
@@ -82,7 +81,7 @@ impl UntypedCap {
         if is_device {
             Self::can_be_retyped_from_device_memory()
                 .then_some(())
-                .ok_or(Err::CanNotNewFromDeviceMemory)?
+                .ok_or(kerr!(ErrKind::CanNotNewFromDeviceMemory))?
         }
         let block_size = self.block_size();
         let object_size = num * T::get_object_size(user_size);
@@ -90,7 +89,9 @@ impl UntypedCap {
 
         // 2, whether memory is enough or not
         let free_bytes = self.get_free_bytes();
-        free_bytes.checked_sub(object_size).ok_or(Err::NoMemory)?;
+        free_bytes
+            .checked_sub(object_size)
+            .ok_or(kerr!(ErrKind::NoMemory))?;
         // 3, create given type capabilities
         let free_idx_aligned = align_up(self.get_free_index().into(), align).into();
         let cap_generator = CapGenerator::<T>::new(num, free_idx_aligned, object_size);
@@ -132,7 +133,7 @@ impl UntypedCap {
             CapabilityType::Page => {
                 untyped_cap._invocation::<PageCap>(src_slot, dest_cnode, user_size, num)
             }
-            _ => Err(Err::UnknownCapType),
+            _ => Err(kerr!(ErrKind::UnknownCapType)),
         }
     }
 

@@ -1,7 +1,7 @@
 use crate::{
     capability::{cnode::CNodeCap, tcb::TCBCap, untyped::UntypedCap, Capability, CapabilityType},
-    common::{Err, KernelResult},
-    println,
+    common::{ErrKind, KernelResult},
+    kerr, println,
     scheduler::{get_current_tcb, get_current_tcb_mut},
     uart::putchar,
 };
@@ -26,7 +26,7 @@ pub fn handle_syscall(syscall_n: usize) {
 fn handle_cap_invocation() -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
     // change registers with result of invocation.
-    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.cap()).unwrap();
+    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.cap())?;
     let cap_ptr = current_tcb.registers.a0;
     let inv_label = current_tcb.registers.a1;
     println!("handle cap invocation");
@@ -35,11 +35,10 @@ fn handle_cap_invocation() -> KernelResult<()> {
             let dest_cnode_ptr = current_tcb.registers.a2;
             let user_size = current_tcb.registers.a3;
             let num = current_tcb.registers.a4;
-            let new_type = CapabilityType::try_from_u8(current_tcb.registers.a5 as u8).unwrap();
-            let (src_entry, dest_cnode) = root_cnode
-                .get_src_and_dest(cap_ptr, dest_cnode_ptr, num)
-                .unwrap();
-            UntypedCap::invoke_retype(src_entry, dest_cnode, user_size, num, new_type).unwrap();
+            let new_type = CapabilityType::try_from_u8(current_tcb.registers.a5 as u8)?;
+            let (src_entry, dest_cnode) =
+                root_cnode.get_src_and_dest(cap_ptr, dest_cnode_ptr, num)?;
+            UntypedCap::invoke_retype(src_entry, dest_cnode, user_size, num, new_type)?;
             Ok(())
         }
         TCB_CONFIGURE => {
@@ -73,6 +72,6 @@ fn handle_cap_invocation() -> KernelResult<()> {
             println!("{:?}", tcb_cap.get_tcb());
             Ok(())
         }
-        _ => Err(Err::UnknownInvocation),
+        _ => Err(kerr!(ErrKind::UnknownInvocation)),
     }
 }
