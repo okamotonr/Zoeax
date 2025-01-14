@@ -1,6 +1,6 @@
 use crate::{
     address::{KernelVAddress, PhysAddr},
-    common::{Err, KernelResult},
+    common::{Err, KernelResult}, object::CNodeEntry,
 };
 
 use core::{fmt, mem};
@@ -148,6 +148,9 @@ where
     }
     fn can_be_retyped_from_device_memory() -> bool {
         false
+    }
+    fn derive(&self, _src_slot: &CNodeEntry) -> KernelResult<Self> {
+        Err(Err::CanNotDerivable)
     }
     fn new(raw_cap: RawCapability) -> Self;
     fn get_raw_cap(&self) -> RawCapability;

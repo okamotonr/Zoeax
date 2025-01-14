@@ -159,12 +159,12 @@ impl ThreadInfo {
     }
 
     pub fn set_root_cspace(&mut self, cspace_cap: CNodeCap, parent: &mut CNodeEntry) {
-        assert!(self.root_cnode.is_null());
+        assert!(self.root_cnode.is_null(), "{:?}", self.root_cnode);
         self.root_cnode.insert(parent, cspace_cap.get_raw_cap());
     }
 
     pub fn set_root_vspace(&mut self, vspace_cap: PageTableCap, parent: &mut CNodeEntry) {
-        assert!(self.root_cnode.is_null());
+        assert!(self.vspace.is_null(), "{:?}", self.vspace);
         self.vspace.insert(parent, vspace_cap.get_raw_cap());
     }
 }

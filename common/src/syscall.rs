@@ -58,3 +58,9 @@ pub fn write_reg(src_ptr: usize, is_ip: bool, value: usize) {
         syscall(src_ptr, TCB_WRITE_REG, is_ip as usize, value, 0, 0, 0, SysNo::Call);
     }
 }
+
+pub fn configure_tcb(src_ptr: usize, cnode_ptr: usize, vspace_ptr: usize) {
+    unsafe {
+        syscall(src_ptr, TCB_CONFIGURE, cnode_ptr, vspace_ptr, 0, 0, 0, SysNo::Call);
+    }
+}

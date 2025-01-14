@@ -43,7 +43,13 @@ fn handle_cap_invocation() -> KernelResult<()> {
             Ok(())
         }
         TCB_CONFIGURE => {
-            todo!()
+            let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
+            let cspace_slot = root_cnode.lookup_entry_mut(current_tcb.registers.a2)?;
+            tcb_cap.set_cspace(cspace_slot)?;
+            let vspace = root_cnode.lookup_entry_mut(current_tcb.registers.a3)?;
+            tcb_cap.set_vspace(vspace)?;
+            println!("{:?}", tcb_cap.get_tcb());
+            Ok(())
         }
         TCB_WRITE_REG => {
             // TODO: currently only support sp and ip, because it is enough to run no arg function.
@@ -54,7 +60,7 @@ fn handle_cap_invocation() -> KernelResult<()> {
                 34 // sepc
             };
             let value = current_tcb.registers.a3;
-            let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry(cap_ptr)?.cap())?;
+            let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
             tcb_cap.set_registers(&[(reg_id, value)]);
             println!("{:?}", tcb_cap);
             println!("{:?}", tcb_cap.get_tcb());

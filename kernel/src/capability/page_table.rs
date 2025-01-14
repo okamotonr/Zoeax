@@ -146,6 +146,10 @@ impl Capability for PageTableCap {
     fn get_object_size<'a>(_user_size: usize) -> usize {
         PAGE_SIZE // page size, bytes
     }
+    fn derive(&self, _src_slot: &crate::object::CNodeEntry) -> KernelResult<Self> {
+        self.is_mapped().then_some(()).ok_or(Err::PageTableNotMappedYet)?;
+        Ok(Self::new(self.get_raw_cap()))
+    }
 }
 
 impl Capability for PageCap {

@@ -27,6 +27,10 @@ impl Capability for CNodeCap {
     fn get_object_size<'a>(user_size: usize) -> usize {
         user_size * mem::size_of::<CNodeEntry>()
     }
+    fn derive(&self, _src_slot: &CNodeEntry) -> KernelResult<Self> {
+        // unchecked
+        Ok(Self::new(self.get_raw_cap()))
+    }
 
     fn init_object(&mut self) {}
 }
@@ -57,7 +61,7 @@ impl CNodeCap {
     pub fn get_writable(&mut self, num: usize, offset: usize) -> KernelResult<&mut CNode> {
         let cnode = self.get_cnode(num, offset)?;
         for i in 0..num {
-            let entry = cnode.lookup_entry(i)?;
+            let entry = cnode.lookup_entry_mut(i)?;
             (!entry.is_null()).then_some(()).ok_or(Err::NotEntrySlot)?;
         }
         Ok(cnode)
@@ -77,13 +81,12 @@ impl CNodeCap {
 
     }
 
-
     fn get_entry_num(&self) -> usize {
         self.radix()
     }
 
-    pub fn lookup_entry(&mut self, index: usize) -> KernelResult<&mut CNodeEntry> {
-        self.get_cnode(1, index)?.lookup_entry(0)
+    pub fn lookup_entry_mut(&mut self, index: usize) -> KernelResult<&mut CNodeEntry> {
+        self.get_cnode(1, index)?.lookup_entry_mut(0)
     }
 
     fn radix(&self) -> usize {

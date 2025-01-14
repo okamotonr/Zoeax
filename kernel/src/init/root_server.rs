@@ -131,10 +131,10 @@ impl<'a> RootServerMemory<'a> {
         // insert cnode_cap into tcb cnode_cap
         let raw_cap = cnode_cap.get_raw_cap();
         tcb.root_cnode
-            .insert(cnode_cap.lookup_entry(ROOT_CNODE_IDX).unwrap(), raw_cap);
+            .insert(cnode_cap.lookup_entry_mut(ROOT_CNODE_IDX).unwrap(), raw_cap);
         // insert vspace cap into tcb vspace
         tcb.vspace.insert(
-            cnode_cap.lookup_entry(ROOT_VSPACE_IDX).unwrap(),
+            cnode_cap.lookup_entry_mut(ROOT_VSPACE_IDX).unwrap(),
             vspace_cap.get_raw_cap(),
         );
 

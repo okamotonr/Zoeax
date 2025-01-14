@@ -126,7 +126,7 @@ impl CNode {
         Self
     }
 
-    pub fn lookup_entry(&mut self, index: usize) -> KernelResult<&mut CNodeEntry> {
+    pub fn lookup_entry_mut(&mut self, index: usize) -> KernelResult<&mut CNodeEntry> {
         let root = (self as *mut Self).cast::<CNodeEntry>();
         unsafe {
             let ret = root.add(index);
