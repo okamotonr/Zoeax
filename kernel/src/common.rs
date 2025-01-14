@@ -40,19 +40,29 @@ pub enum ErrKind {
 
 pub type KernelResult<T> = Result<T, KernelError>;
 
-// thiserror no_std...
+//TODO: thiserror and anyhow
 #[derive(Debug)]
 pub struct KernelError {
     pub e_kind: ErrKind,
     pub e_val: u16,
-    // #[cfg(debug_assertions)]
-    // e_place: EPlace,
+    #[cfg(debug_assertions)]
+    pub e_place: EPlace,
 }
 
-impl From<ErrKind> for KernelError {
-    fn from(value: ErrKind) -> Self {
-        Self {e_kind: value, e_val: 0}
-    }
+#[macro_export]
+macro_rules! kerr {
+    ($ekind:expr) => {
+        $crate::common::KernelError {
+            e_kind: $ekind,
+            e_val: 0,
+            #[cfg(debug_assertions)]
+            e_place: $crate::common::EPlace {
+                e_line: line!(),
+                e_column: column!(),
+                e_file: file!(),
+            },
+        }
+    };
 }
 
 impl fmt::Display for KernelError {
@@ -62,11 +72,11 @@ impl fmt::Display for KernelError {
 }
 
 impl Error for KernelError {}
-//
-// #[cfg(debug_assertions)]
-// #[derive(Debug)]
-// pub struct EPlace {
-//     e_line: u32,
-//     e_column: u32,
-//     e_file: &'static str
-// }
+
+#[cfg(debug_assertions)]
+#[derive(Debug)]
+pub struct EPlace {
+    pub e_line: u32,
+    pub e_column: u32,
+    pub e_file: &'static str,
+}
