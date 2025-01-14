@@ -1,8 +1,10 @@
+use core::fmt;
+
+use crate::address::PhysAddr;
 use crate::address::PAGE_SIZE;
 use crate::common::Err;
 use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
-use crate::println;
 use crate::{
     address::{KernelVAddress, VirtAddr},
     capability::{Capability, CapabilityType, RawCapability},
@@ -39,7 +41,6 @@ impl PageTableCap {
             .then_some(())
             .ok_or(Err::PageTableNotMappedYet)?;
         let page_table = self.get_pagetable();
-        println!("call activation");
         unsafe {
             page_table.activate();
         }
@@ -56,7 +57,6 @@ impl PageTableCap {
             .ok_or(Err::PageTableAlreadyMapped)?;
         let vaddr = self.get_pagetable();
         let addr = VirtAddr::from(vaddr as *const PageTable);
-        println!("{addr:?}");
         self.set_mapped(addr);
         Ok(())
     }
@@ -64,11 +64,27 @@ impl PageTableCap {
     fn is_mapped(&self) -> bool {
         ((self.0[0] >> 48) & 0x1) == 1
     }
+
+    fn get_mapped_address(&self) -> PhysAddr {
+        (self.0[0] & !(0xffff << 48)).into()
+    }
 }
 
 impl Default for PageTable {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Debug for PageTableCap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let raw_cap = self.get_raw_cap();
+        let is_mapped = self.is_mapped();
+        let mapped_address = self.get_mapped_address();
+        write!(
+            f,
+            "{raw_cap:?}\nis_mapped {is_mapped:?}\nmapped_address {mapped_address:?}"
+        )
     }
 }
 
@@ -130,6 +146,12 @@ impl Capability for PageTableCap {
     }
     fn get_object_size<'a>(_user_size: usize) -> usize {
         PAGE_SIZE // page size, bytes
+    }
+    fn derive(&self, _src_slot: &crate::object::CNodeEntry) -> KernelResult<Self> {
+        self.is_mapped()
+            .then_some(())
+            .ok_or(Err::PageTableNotMappedYet)?;
+        Ok(Self::new(self.get_raw_cap()))
     }
 }
 

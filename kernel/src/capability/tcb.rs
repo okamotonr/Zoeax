@@ -1,7 +1,13 @@
 use crate::address::KernelVAddress;
 use crate::capability::{Capability, CapabilityType, RawCapability};
-use crate::object::{resume, ThreadControlBlock, ThreadInfo};
+use crate::common::KernelResult;
+use crate::object::{resume, CNodeEntry, ThreadControlBlock, ThreadInfo};
+use core::mem;
 
+use super::cnode::CNodeCap;
+use super::page_table::PageTableCap;
+
+#[derive(Debug)]
 pub struct TCBCap(RawCapability);
 
 impl TCBCap {
@@ -27,6 +33,20 @@ impl TCBCap {
         let tcb = self.get_tcb();
         tcb.suspend()
     }
+
+    pub fn set_cspace(&mut self, src: &mut CNodeEntry) -> KernelResult<()> {
+        let cspace_src = CNodeCap::try_from_raw(src.cap())?;
+        let cspace_new = cspace_src.derive(src)?;
+        self.get_tcb().set_root_cspace(cspace_new, src);
+        Ok(())
+    }
+
+    pub fn set_vspace(&mut self, src: &mut CNodeEntry) -> KernelResult<()> {
+        let vspace = PageTableCap::try_from_raw(src.cap())?;
+        let vspace_new = vspace.derive(src)?;
+        self.get_tcb().set_root_vspace(vspace_new, src);
+        Ok(())
+    }
 }
 
 impl Capability for TCBCap {
@@ -45,5 +65,9 @@ impl Capability for TCBCap {
         unsafe {
             *ptr = ThreadControlBlock::new(ThreadInfo::default());
         }
+    }
+
+    fn get_object_size(_user_size: usize) -> usize {
+        mem::size_of::<Self::KernelObject>()
     }
 }

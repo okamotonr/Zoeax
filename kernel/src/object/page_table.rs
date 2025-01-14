@@ -27,7 +27,6 @@ use crate::{
     address::{KernelVAddress, PhysAddr, VirtAddr, PAGE_SIZE},
     common::{Err, KernelResult},
     memlayout::KERNEL_CODE_PFX,
-    println,
 };
 
 use core::ptr;
@@ -87,7 +86,6 @@ impl PageTable {
 
     pub unsafe fn activate(&self) {
         let addr: PhysAddr = KernelVAddress::from(self as *const Self).into();
-        println!("{:?}", addr);
         asm!(
             "sfence.vma x0, x0",
             "csrw satp, {satp}",
@@ -163,17 +161,12 @@ impl PTE {
     pub fn write<A: Into<PhysAddr>>(&mut self, addr: A, flags: usize) {
         let phys: PhysAddr = addr.into();
         let addr = phys.addr;
-        println!("walk");
-        println!("{:x}", addr);
-        println!("{:x}", addr >> 12);
         self.0 = ((addr >> 12) << 10) | flags;
-        println!("{:x}", self.0);
     }
 
     pub fn as_page_table(&mut self) -> &mut PageTable {
         let phys_addr = PhysAddr::from((self.0 << 2) & !0xfff);
         let raw: *mut PageTable = KernelVAddress::from(phys_addr).into();
-        println!("{:?}", raw);
         unsafe { &mut *raw }
     }
 }

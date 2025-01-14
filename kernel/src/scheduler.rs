@@ -32,12 +32,14 @@ pub struct CpuVar {
 #[derive(Default)]
 pub struct Scheduler {
     runqueue: LinkedList<ThreadInfo>,
+    requested: bool,
 }
 
 impl Scheduler {
     pub const fn new() -> Self {
         Self {
             runqueue: LinkedList::new(),
+            requested: false,
         }
     }
 
@@ -53,8 +55,10 @@ impl Scheduler {
 // TODO: remove this attribute
 #[allow(static_mut_refs)]
 pub unsafe fn schedule() {
+    if !SCHEDULER.requested {
+        return;
+    }
     let next = if let Some(next) = SCHEDULER.sched() {
-        println!("get next");
         next.set_timeout(TASK_QUANTUM);
         if (*CURRENT_PROC).is_runnable() {
             SCHEDULER.push(CURRENT_PROC.as_mut().unwrap());
@@ -68,7 +72,11 @@ pub unsafe fn schedule() {
     };
     // change page table
     (*next).activate_vspace();
+    unsafe {
+        CPU_VAR.cur_reg_base = &raw mut (*next).registers;
+    }
     CURRENT_PROC = next;
+    SCHEDULER.requested = false;
 }
 
 pub fn create_idle_thread(stack_top: usize) {
@@ -99,6 +107,19 @@ pub fn get_current_tcb_mut<'a>() -> &'a mut ThreadControlBlock {
     unsafe { &mut *CURRENT_PROC }
 }
 
-pub unsafe fn set_registers_in_cpu_var(registers: *mut Registers) {
-    unsafe { CPU_VAR.cur_reg_base = registers }
+#[allow(static_mut_refs)]
+pub fn require_schedule() {
+    unsafe { SCHEDULER.requested = true }
+}
+
+pub fn timer_tick() {
+    unsafe {
+        if CURRENT_PROC == &raw mut IDLE_THREAD {
+            return;
+        }
+        (*CURRENT_PROC).time_slice -= 1;
+        if (*CURRENT_PROC).time_slice == 0 {
+            require_schedule()
+        }
+    }
 }

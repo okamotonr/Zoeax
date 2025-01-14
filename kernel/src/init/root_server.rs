@@ -23,6 +23,7 @@ use crate::println;
 use crate::riscv::SSTATUS_SPIE;
 use crate::riscv::SSTATUS_SUM;
 use crate::scheduler::create_idle_thread;
+use crate::scheduler::require_schedule;
 use crate::scheduler::schedule;
 use core::cmp::min;
 use core::mem::MaybeUninit;
@@ -39,8 +40,8 @@ extern "C" {
 }
 
 impl CNode {
+    // todo: broken
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        println!("{:?}", cap.get_cap_type());
         let root = (self as *mut Self).cast::<CNodeEntry>();
         let entry = CNodeEntry::new_with_rawcap(cap);
         unsafe { *root.add(index) = entry }
@@ -49,11 +50,8 @@ impl CNode {
 
 impl CNodeCap {
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        println!("{:?}", self.get_raw_cap().get_address());
-        println!("{:?}", self.get_raw_cap().get_cap_type());
         let cnode = self.get_cnode(1, index).unwrap();
-        println!("{:p}", cnode);
-        cnode.write_slot(cap, index);
+        cnode.write_slot(cap, 0);
     }
 }
 
@@ -105,7 +103,6 @@ impl<'a> RootServerMemory<'a> {
         root_page_table.copy_global_mapping();
         let mut cap = PageTableCap::init((root_page_table as *const PageTable).into(), 0);
         cap.root_map().unwrap();
-        println!("Here");
         cnode_cap.write_slot(cap.get_raw_cap(), ROOT_VSPACE_IDX);
         unsafe {
             for idx in 0..(*elf_header).e_phnum {
@@ -135,10 +132,10 @@ impl<'a> RootServerMemory<'a> {
         // insert cnode_cap into tcb cnode_cap
         let raw_cap = cnode_cap.get_raw_cap();
         tcb.root_cnode
-            .insert(cnode_cap.lookup_entry(ROOT_CNODE_IDX).unwrap(), raw_cap);
+            .insert(cnode_cap.lookup_entry_mut(ROOT_CNODE_IDX).unwrap(), raw_cap);
         // insert vspace cap into tcb vspace
         tcb.vspace.insert(
-            cnode_cap.lookup_entry(ROOT_VSPACE_IDX).unwrap(),
+            cnode_cap.lookup_entry_mut(ROOT_VSPACE_IDX).unwrap(),
             vspace_cap.get_raw_cap(),
         );
 
@@ -179,6 +176,7 @@ impl BootStateManager {
         ret
     }
 
+    // TODO: return [UntypedCap]
     pub fn into_untyped(self) -> UntypedCap {
         let (start_address, end_address) = self.bump_allocator.end_allocation();
         let block_size = (end_address - start_address).into();
@@ -277,6 +275,7 @@ pub fn init_root_server(mut bump_allocator: BumpAllocator, elf_header: *const El
     );
     create_initial_thread(&mut root_server_mem, bootstage_mbr, elf_header);
 
+    require_schedule();
     unsafe {
         schedule();
     }
@@ -305,6 +304,7 @@ fn create_initial_thread(
     let untyped_cap = bootstage_mbr.into_untyped();
     root_cnode_cap.write_slot(untyped_cap.get_raw_cap(), untyped_cap_idx);
     // 7, set initial thread into current thread
+    root_tcb.set_registers(&[(10, untyped_cap_idx)]);
     root_tcb.make_runnable();
     println!("root process initialization finished");
 }

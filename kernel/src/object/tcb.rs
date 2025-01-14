@@ -1,5 +1,5 @@
-use crate::capability::page_table::PageTableCap;
 use crate::capability::Capability;
+use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
 use crate::common::KernelResult;
 use crate::object::PageTable;
 use crate::println;
@@ -156,6 +156,16 @@ impl ThreadInfo {
     unsafe fn activate_vspace_inner(&self) -> KernelResult<()> {
         let mut pt_cap = PageTableCap::try_from_raw(self.vspace.cap())?;
         unsafe { pt_cap.activate() }
+    }
+
+    pub fn set_root_cspace(&mut self, cspace_cap: CNodeCap, parent: &mut CNodeEntry) {
+        assert!(self.root_cnode.is_null(), "{:?}", self.root_cnode);
+        self.root_cnode.insert(parent, cspace_cap.get_raw_cap());
+    }
+
+    pub fn set_root_vspace(&mut self, vspace_cap: PageTableCap, parent: &mut CNodeEntry) {
+        assert!(self.vspace.is_null(), "{:?}", self.vspace);
+        self.vspace.insert(parent, vspace_cap.get_raw_cap());
     }
 }
 

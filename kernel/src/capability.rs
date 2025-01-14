@@ -1,10 +1,11 @@
 use crate::{
     address::{KernelVAddress, PhysAddr},
     common::{Err, KernelResult},
+    object::CNodeEntry,
 };
 
-use core::mem;
 use core::ops::{Deref, DerefMut};
+use core::{fmt, mem};
 
 pub mod cnode;
 pub mod endpoint;
@@ -18,7 +19,7 @@ const PADDING_BIT: usize = 0x7ff << 48;
 const ADDRESS_BIT: usize = !(CAP_TYPE_BIT | PADDING_BIT);
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct RawCapability([usize; 2]);
 
 /*
@@ -77,6 +78,17 @@ impl RawCapability {
     }
 }
 
+impl fmt::Debug for RawCapability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "captype: {:?}, address: {:?}",
+            self.get_cap_type(),
+            self.get_address()
+        )
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum CapabilityType {
@@ -107,6 +119,7 @@ impl CapabilityType {
     }
 }
 
+// TODO: Change of capability should change raw_cap in slot.
 pub trait Capability
 where
     Self: Sized,
@@ -141,6 +154,9 @@ where
     }
     fn can_be_retyped_from_device_memory() -> bool {
         false
+    }
+    fn derive(&self, _src_slot: &CNodeEntry) -> KernelResult<Self> {
+        Err(Err::CanNotDerivable)
     }
     fn new(raw_cap: RawCapability) -> Self;
     fn get_raw_cap(&self) -> RawCapability;
