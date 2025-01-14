@@ -39,7 +39,7 @@ impl Capability for UntypedCap {
         let user_size = user_size.ilog2();
         let addr: PhysAddr = addr.into();
         let val: usize =
-            (<PhysAddr as Into<usize>>::into(addr) << 16) | is_device << 6 | user_size as usize;
+            (<PhysAddr as Into<usize>>::into(addr) << 16) | (is_device << 6) | user_size as usize;
 
         val
     }
@@ -70,8 +70,6 @@ impl fmt::Debug for UntypedCap {
         )
     }
 }
-
-const ADDRESS_LENGTH: usize = 48; // sv48
 
 impl UntypedCap {
     pub fn retype<T: Capability>(

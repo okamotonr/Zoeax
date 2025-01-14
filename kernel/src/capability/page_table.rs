@@ -5,7 +5,6 @@ use crate::address::PAGE_SIZE;
 use crate::common::Err;
 use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
-use crate::println;
 use crate::{
     address::{KernelVAddress, VirtAddr},
     capability::{Capability, CapabilityType, RawCapability},

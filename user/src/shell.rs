@@ -18,10 +18,10 @@ pub fn main(untyped_cnode_idx: usize) {
     configure_tcb(tcb_idx, root_cnode_idx, root_vspace_idx);
     resume_tcb(tcb_idx);
     println!("hoge");
-    loop {}
+    panic!()
 }
 
 fn children() {
     println!("hello from children");
-    loop {}
+    panic!()
 }

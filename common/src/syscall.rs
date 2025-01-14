@@ -21,6 +21,7 @@ pub const TCB_RESUME: usize = 4;
 // TODO: same kernel::capability::CapabilityType
 pub const TYPE_TCB: usize = 3;
 
+#[allow(clippy::too_many_arguments)]
 unsafe fn syscall(
     src_ptr: usize,
     inv_label: usize,

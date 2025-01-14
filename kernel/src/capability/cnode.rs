@@ -74,6 +74,9 @@ impl CNodeCap {
         num: usize,
     ) -> KernelResult<(&mut CNodeEntry, &mut CNode)> {
         // TODO: check src and dst is acceptable
+        (!((dst..dst + num).contains(&src)))
+            .then_some(())
+            .ok_or(Err::InvalidOperation)?;
         let ptr: KernelVAddress = self.0.get_address().into();
         let ptr: *mut CNodeEntry = ptr.into();
         unsafe {
