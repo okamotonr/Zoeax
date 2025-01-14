@@ -23,6 +23,7 @@ use crate::println;
 use crate::riscv::SSTATUS_SPIE;
 use crate::riscv::SSTATUS_SUM;
 use crate::scheduler::create_idle_thread;
+use crate::scheduler::require_schedule;
 use crate::scheduler::schedule;
 use core::cmp::min;
 use core::mem::MaybeUninit;
@@ -274,6 +275,7 @@ pub fn init_root_server(mut bump_allocator: BumpAllocator, elf_header: *const El
     );
     create_initial_thread(&mut root_server_mem, bootstage_mbr, elf_header);
 
+    require_schedule();
     unsafe {
         schedule();
     }

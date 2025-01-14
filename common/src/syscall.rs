@@ -64,3 +64,9 @@ pub fn configure_tcb(src_ptr: usize, cnode_ptr: usize, vspace_ptr: usize) {
         syscall(src_ptr, TCB_CONFIGURE, cnode_ptr, vspace_ptr, 0, 0, 0, SysNo::Call);
     }
 }
+
+pub fn resume_tcb(src_ptr: usize) {
+    unsafe {
+        syscall(src_ptr, TCB_RESUME, 0, 0, 0, 0, 0, SysNo::Call);
+    }
+}

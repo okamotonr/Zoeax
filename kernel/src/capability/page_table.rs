@@ -42,7 +42,6 @@ impl PageTableCap {
             .then_some(())
             .ok_or(Err::PageTableNotMappedYet)?;
         let page_table = self.get_pagetable();
-        println!("call activation");
         unsafe {
             page_table.activate();
         }

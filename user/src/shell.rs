@@ -1,6 +1,7 @@
 use common::println;
 use common::syscall::{configure_tcb, untyped_retype, TYPE_TCB};
 use common::syscall::write_reg;
+use common::syscall::resume_tcb;
 
 pub static mut STACK: [u8; 512] = [0; 512];
 
@@ -16,10 +17,12 @@ pub fn main(untyped_cnode_idx: usize) {
     write_reg(tcb_idx, false, &raw mut STACK as usize);
     write_reg(tcb_idx, true, children as usize);
     configure_tcb(tcb_idx, root_cnode_idx, root_vspace_idx);
+    resume_tcb(tcb_idx);
     println!("hoge");
-    panic!();
+    loop {}
 }
 
 fn children() {
-    println!("hello from children")
+    println!("hello from children");
+    loop {}
 }

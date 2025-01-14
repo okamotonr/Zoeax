@@ -6,7 +6,7 @@ use core::{
 use crate::{
     object::Registers,
     riscv::{r_scause, r_sepc, r_stval},
-    scheduler::{get_current_tcb, get_current_tcb_mut, set_registers_in_cpu_var, CpuVar},
+    scheduler::{get_current_tcb, get_current_tcb_mut, schedule, timer_tick, CpuVar},
     syscall::handle_syscall,
     timer::set_timer,
 };
@@ -157,6 +157,7 @@ fn handle_trap() -> ! {
         //  interrupt
         match code {
             SUPREVISORTIMER => {
+                timer_tick();
                 set_timer(10000);
             }
             SUPERVISORSOFTWARE => {
@@ -270,14 +271,16 @@ fn handle_trap() -> ! {
             }
         }
     }
-    unsafe { return_to_user() }
+    unsafe { 
+        schedule();
+        return_to_user() 
+    }
 }
 
 #[no_mangle]
 pub unsafe fn return_to_user() -> ! {
     let tcb = get_current_tcb_mut();
     let address = &raw mut tcb.registers;
-    set_registers_in_cpu_var(address);
 
     asm!(
         // restore registers

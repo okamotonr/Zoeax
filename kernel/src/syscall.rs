@@ -6,7 +6,7 @@ use crate::{
     uart::putchar,
 };
 
-use common::syscall::{CALL, PUTCHAR, TCB_CONFIGURE, UNTYPED_RETYPE, TCB_WRITE_REG};
+use common::syscall::{CALL, PUTCHAR, TCB_CONFIGURE, TCB_RESUME, TCB_WRITE_REG, UNTYPED_RETYPE};
 
 pub fn handle_syscall(syscall_n: usize) {
     match syscall_n {
@@ -43,6 +43,8 @@ fn handle_cap_invocation() -> KernelResult<()> {
             Ok(())
         }
         TCB_CONFIGURE => {
+            // TODO: lookup entry first to be able to rollback
+            // TODO: we have to do something to make rust ownership be calm down.
             let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
             let cspace_slot = root_cnode.lookup_entry_mut(current_tcb.registers.a2)?;
             tcb_cap.set_cspace(cspace_slot)?;
@@ -62,7 +64,12 @@ fn handle_cap_invocation() -> KernelResult<()> {
             let value = current_tcb.registers.a3;
             let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
             tcb_cap.set_registers(&[(reg_id, value)]);
-            println!("{:?}", tcb_cap);
+            println!("{:?}", tcb_cap.get_tcb());
+            Ok(())
+        }
+        TCB_RESUME => {
+            let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
+            tcb_cap.make_runnable();
             println!("{:?}", tcb_cap.get_tcb());
             Ok(())
         }
