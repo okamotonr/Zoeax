@@ -2,7 +2,6 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
 
-use crate::println;
 use crate::address::KernelVAddress;
 use crate::capability::page_table::PageCap;
 use crate::capability::page_table::PageTableCap;
@@ -12,6 +11,7 @@ use crate::common::{align_up, ErrKind, KernelResult};
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::Untyped;
+use crate::println;
 
 use super::cnode::CNodeCap;
 use super::endpoint::EndPointCap;

@@ -1,8 +1,19 @@
 use crate::{
-    capability::{cnode::CNodeCap, notification::NotificationCap, tcb::TCBCap, untyped::UntypedCap, Capability, CapabilityType}, common::{ErrKind, KernelResult}, kerr, object::Registers, scheduler::{get_current_tcb, get_current_tcb_mut, require_schedule}, uart::putchar
+    capability::{
+        cnode::CNodeCap, notification::NotificationCap, tcb::TCBCap, untyped::UntypedCap,
+        Capability, CapabilityType,
+    },
+    common::{ErrKind, KernelResult},
+    kerr,
+    object::Registers,
+    scheduler::{get_current_tcb_mut, require_schedule},
+    uart::putchar,
 };
 
-use common::syscall::{CALL, NOTIFY_WAIT, NOTIFY_SEND, PUTCHAR, SEND, RECV, TCB_CONFIGURE, TCB_RESUME, TCB_WRITE_REG, UNTYPED_RETYPE};
+use common::syscall::{
+    CALL, NOTIFY_SEND, NOTIFY_WAIT, PUTCHAR, RECV, SEND, TCB_CONFIGURE, TCB_RESUME, TCB_WRITE_REG,
+    UNTYPED_RETYPE,
+};
 
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
     reg.sepc += 4;
@@ -56,10 +67,10 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             // TODO: currently only support sp and ip, because it is enough to run no arg function.
             // is_stack
             let reg_id = match reg.a2 {
-                0 => 2, // stack pointer
+                0 => 2,  // stack pointer
                 1 => 34, // sepc
                 2 => 10, // a0
-                _ => panic!("cannot set reg {:x}", reg.a2)
+                _ => panic!("cannot set reg {:x}", reg.a2),
             };
             let value = reg.a3;
             let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
@@ -82,8 +93,8 @@ fn handle_send_invocation(reg: &mut Registers) -> KernelResult<()> {
     let inv_label = reg.a1;
     match inv_label {
         NOTIFY_SEND => {
-            let mut notify_cap = NotificationCap::try_from_raw(root_cnode.
-                lookup_entry_mut(cap_ptr)?.cap())?;
+            let mut notify_cap =
+                NotificationCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
             notify_cap.send();
             Ok(())
         }
@@ -98,8 +109,8 @@ fn handle_recieve_invocation(reg: &mut Registers) -> KernelResult<()> {
     let inv_label = reg.a1;
     match inv_label {
         NOTIFY_WAIT => {
-            let mut notify_cap = NotificationCap::try_from_raw(root_cnode.
-                lookup_entry_mut(cap_ptr)?.cap())?;
+            let mut notify_cap =
+                NotificationCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
             if notify_cap.wait(current_tcb) {
                 require_schedule()
             }

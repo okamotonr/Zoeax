@@ -1,8 +1,8 @@
 use core::num::NonZeroU64;
 
-use common::{list::{LinkedList, ListItem}};
+use common::list::LinkedList;
 
-use super::tcb::{ThreadControlBlock, ThreadInfo, resume};
+use super::tcb::{resume, ThreadControlBlock, ThreadInfo};
 
 pub struct Notification {
     notify_bit: Option<NonZeroU64>,
@@ -56,15 +56,14 @@ impl Default for Notification {
 }
 
 fn wake_up_thread(tcb: &mut ThreadControlBlock) {
-    assert!(tcb.next.is_none());
+    assert!(tcb.next_is_none());
     resume(tcb);
 }
 
 fn block_thread(tcb: &mut ThreadControlBlock) {
     // 1, change thread state block
-    assert!(tcb.next.is_none());
+    assert!(tcb.next_is_none());
     tcb.suspend();
     // 2, remove tcb from runqueue
     // currently tcb which will be blocked was poped out from runqueue because it is running thread.
-
 }

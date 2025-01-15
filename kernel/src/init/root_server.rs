@@ -126,7 +126,7 @@ impl<'a> RootServerMemory<'a> {
             .tcb
             .write(ThreadControlBlock::new(ThreadInfo::default()));
         // TODO: per arch
-        tcb.registers.sstatus = SSTATUS_SUM;
+        tcb.registers.sstatus = SSTATUS_SUM | SSTATUS_SPIE;
         tcb.registers.sepc = entry_point.into();
 
         // insert cnode_cap into tcb cnode_cap

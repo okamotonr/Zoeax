@@ -5,7 +5,7 @@ use crate::object::{Notification, ThreadControlBlock};
 
 pub struct NotificationCap(RawCapability);
 
-/* 
+/*
  * RawCapability[1]
  *  | cap_type | can recieve | can reply | padding | address or none |
  * 64    5           1            1          9            48        0
@@ -50,16 +50,18 @@ impl NotificationCap {
 
     fn get_notify(&mut self) -> &mut Notification {
         let addr = KernelVAddress::from(self.0.get_address());
-        let ptr = <KernelVAddress as Into<*mut <NotificationCap as Capability>::KernelObject>>::into(addr);
-        unsafe {&mut *ptr}
+        let ptr =
+            <KernelVAddress as Into<*mut <NotificationCap as Capability>::KernelObject>>::into(
+                addr,
+            );
+        unsafe { &mut *ptr }
     }
 
     fn get_batch(&self) -> u64 {
         self.0[0] as u64
     }
 
-    pub fn set_badge(&mut self, val: u64) -> KernelResult<()> {
+    pub fn set_badge(&mut self, _val: u64) -> KernelResult<()> {
         todo!()
     }
-
 }

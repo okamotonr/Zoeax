@@ -21,6 +21,7 @@ pub fn resume(thread: &mut ThreadControlBlock) {
     unsafe { SCHEDULER.push(thread) }
 }
 
+#[allow(dead_code)]
 pub fn suspend(_thread: &mut ThreadControlBlock) {
     // TODO: Impl Double linked list
     // 1, check self status is Runnable.
@@ -130,20 +131,17 @@ pub struct ThreadInfo {
     pub registers: Registers,
     pub msg_buffer: usize,
     #[cfg(debug_assertions)]
-    pub tid: usize
+    pub tid: usize,
 }
 
 impl ThreadInfo {
     pub fn new() -> Self {
         let mut ret = Self::default();
         if cfg!(debug_assertions) {
-            let tid = unsafe { 
+            let tid = unsafe {
                 TCBIDX += 1;
                 TCBIDX
             };
-            unsafe {
-                println!("TCBIDX is {TCBIDX}");
-            }
             ret.tid = tid;
         }
         ret
@@ -163,7 +161,6 @@ impl ThreadInfo {
     }
 
     pub const fn idle_init() -> Self {
-
         Self {
             status: ThreadState::Idle,
             time_slice: 0,

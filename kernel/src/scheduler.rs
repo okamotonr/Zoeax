@@ -126,7 +126,5 @@ pub fn timer_tick() {
 }
 
 pub fn get_current_reg<'a>() -> &'a mut Registers {
-    unsafe {
-        &mut  *(CPU_VAR.cur_reg_base)
-    }
+    unsafe { &mut *(CPU_VAR.cur_reg_base) }
 }

@@ -3,8 +3,8 @@ use common::syscall::recv_signal;
 use common::syscall::resume_tcb;
 use common::syscall::send_signal;
 use common::syscall::write_reg;
-use common::syscall::{configure_tcb, untyped_retype, TYPE_TCB};
 use common::syscall::TYPE_NOTIFY;
+use common::syscall::{configure_tcb, untyped_retype, TYPE_TCB};
 
 pub static mut STACK: [usize; 512] = [0; 512];
 
@@ -21,8 +21,7 @@ pub fn main(untyped_cnode_idx: usize) {
 
     let sp_val = unsafe {
         let stack_bottom = &mut STACK[511];
-        let sp_val = stack_bottom as *mut usize as usize;
-        sp_val
+        stack_bottom as *mut usize as usize
     };
     write_reg(tcb_idx, 0, sp_val);
     write_reg(tcb_idx, 1, children as usize);
@@ -36,6 +35,7 @@ pub fn main(untyped_cnode_idx: usize) {
     panic!()
 }
 
+#[allow(clippy::empty_loop)]
 fn children(a0: usize) {
     println!("children: hello from children");
     println!("children: a0 is {a0}");

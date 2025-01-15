@@ -82,16 +82,7 @@ pub fn untyped_retype(
 
 pub fn write_reg(src_ptr: usize, is_ip: usize, value: usize) {
     unsafe {
-        syscall(
-            src_ptr,
-            TCB_WRITE_REG,
-            is_ip,
-            value,
-            0,
-            0,
-            0,
-            SysNo::Call,
-        );
+        syscall(src_ptr, TCB_WRITE_REG, is_ip, value, 0, 0, 0, SysNo::Call);
     }
 }
 

@@ -5,7 +5,7 @@ use core::ptr::NonNull;
 #[derive(Debug)]
 pub struct ListItem<T> {
     value: T,
-    pub next: Option<NonNull<Self>>,
+    next: Option<NonNull<Self>>,
 }
 
 #[derive(Debug)]
@@ -17,6 +17,10 @@ pub struct LinkedList<T> {
 impl<T> ListItem<T> {
     pub const fn new(value: T) -> Self {
         ListItem { value, next: None }
+    }
+
+    pub fn next_is_none(&self) -> bool {
+        self.next.is_none()
     }
 }
 
