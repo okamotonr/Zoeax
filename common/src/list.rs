@@ -5,7 +5,7 @@ use core::ptr::NonNull;
 #[derive(Debug)]
 pub struct ListItem<T> {
     value: T,
-    next: Option<NonNull<Self>>,
+    pub next: Option<NonNull<Self>>,
 }
 
 #[derive(Debug)]

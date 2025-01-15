@@ -2,6 +2,7 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
 
+use crate::println;
 use crate::address::KernelVAddress;
 use crate::capability::page_table::PageCap;
 use crate::capability::page_table::PageTableCap;
@@ -146,6 +147,7 @@ impl UntypedCap {
     ) -> KernelResult<()> {
         let cap_gen = self.retype::<T>(user_size, num)?;
         for (i, mut cap) in cap_gen.enumerate() {
+            println!("init object");
             cap.init_object();
             dest_cnode.insert_cap(src_slot, cap.get_raw_cap(), i);
         }

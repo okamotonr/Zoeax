@@ -4,11 +4,7 @@ use core::{
 };
 
 use crate::{
-    object::Registers,
-    riscv::{r_scause, r_sepc, r_stval},
-    scheduler::{get_current_tcb, get_current_tcb_mut, schedule, timer_tick, CpuVar},
-    syscall::handle_syscall,
-    timer::set_timer,
+    object::Registers, println, riscv::{r_scause, r_sepc, r_stval}, scheduler::{get_current_reg, get_current_tcb, get_current_tcb_mut, schedule, timer_tick, CpuVar}, syscall::handle_syscall, timer::set_timer
 };
 
 // I wanna use enum;
@@ -188,8 +184,9 @@ fn handle_trap() -> ! {
     } else {
         match code {
             ECALLUSER => {
-                let syscall_n = get_current_tcb().registers.a7;
-                handle_syscall(syscall_n);
+                let reg = get_current_reg();
+                let syscall_n = reg.a7;
+                handle_syscall(syscall_n, reg);
             }
             IMISSALIGNED => {
                 panic!(
