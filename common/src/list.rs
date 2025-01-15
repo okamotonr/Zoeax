@@ -18,6 +18,10 @@ impl<T> ListItem<T> {
     pub const fn new(value: T) -> Self {
         ListItem { value, next: None }
     }
+
+    pub fn next_is_none(&self) -> bool {
+        self.next.is_none()
+    }
 }
 
 impl<T> Default for LinkedList<T> {

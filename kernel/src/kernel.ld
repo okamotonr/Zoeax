@@ -67,7 +67,7 @@ SECTIONS {
     . = ALIGN(8);
     __stack_bottom = .;
     PROVIDE(__stack_bottom_phys = __stack_bottom - _KOFF);
-    . += 128 * 1024; /* 128KB */
+    . += 128 * 4096; /* 128KB */
     __stack_top = .;
     PROVIDE(__stack_top_phys = __stack_top - _KOFF);
 

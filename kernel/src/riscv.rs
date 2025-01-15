@@ -11,9 +11,9 @@ pub const SIP_STIP: usize = 1 << 5;
 
 /// interrupt-enable bit
 pub const SSTATUS_SIE: usize = 1 << 1;
-/// interrupt-enable bit active prior to the trap
+/// previous (before intteruput) value of sie
 pub const SSTATUS_SPIE: usize = 1 << 5;
-/// previous privilege mode
+/// whether status before intteruput is privilege mode or not.
 pub const SSTATUS_SPP: usize = 1 << 8;
 /// permit supervisor user memory access
 pub const SSTATUS_SUM: usize = 1 << 18;

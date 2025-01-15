@@ -11,6 +11,7 @@ use crate::common::{align_up, ErrKind, KernelResult};
 use crate::object::CNode;
 use crate::object::CNodeEntry;
 use crate::object::Untyped;
+use crate::println;
 
 use super::cnode::CNodeCap;
 use super::endpoint::EndPointCap;
@@ -146,6 +147,7 @@ impl UntypedCap {
     ) -> KernelResult<()> {
         let cap_gen = self.retype::<T>(user_size, num)?;
         for (i, mut cap) in cap_gen.enumerate() {
+            println!("init object");
             cap.init_object();
             dest_cnode.insert_cap(src_slot, cap.get_raw_cap(), i);
         }

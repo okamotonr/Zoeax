@@ -63,7 +63,7 @@ impl Capability for TCBCap {
         let addr = KernelVAddress::from(self.0.get_address());
         let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr);
         unsafe {
-            *ptr = ThreadControlBlock::new(ThreadInfo::default());
+            *ptr = ThreadControlBlock::new(ThreadInfo::new());
         }
     }
 

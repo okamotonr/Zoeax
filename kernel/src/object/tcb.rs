@@ -9,6 +9,8 @@ use crate::scheduler::SCHEDULER;
 use core::ops::{Index, IndexMut};
 
 use super::cnode::CNodeEntry;
+#[cfg(debug_assertions)]
+static mut TCBIDX: usize = 0;
 
 pub type ThreadControlBlock = ListItem<ThreadInfo>;
 
@@ -17,6 +19,16 @@ pub type ThreadControlBlock = ListItem<ThreadInfo>;
 pub fn resume(thread: &mut ThreadControlBlock) {
     thread.resume();
     unsafe { SCHEDULER.push(thread) }
+}
+
+#[allow(dead_code)]
+pub fn suspend(_thread: &mut ThreadControlBlock) {
+    // TODO: Impl Double linked list
+    // 1, check self status is Runnable.
+    // 2, if true, then self.next.prev = self.prev and self.prev.next = self.next
+    // (i.e take self out from runqueue)
+    // then call self.suspend()
+    todo!()
 }
 
 #[derive(PartialEq, Eq, Debug, Default)]
@@ -118,15 +130,28 @@ pub struct ThreadInfo {
     pub vspace: CNodeEntry,
     pub registers: Registers,
     pub msg_buffer: usize,
+    #[cfg(debug_assertions)]
+    pub tid: usize,
 }
 
 impl ThreadInfo {
+    pub fn new() -> Self {
+        let mut ret = Self::default();
+        if cfg!(debug_assertions) {
+            let tid = unsafe {
+                TCBIDX += 1;
+                TCBIDX
+            };
+            ret.tid = tid;
+        }
+        ret
+    }
     pub fn set_msg(&mut self, _msg_buffer: usize) {}
     pub fn resume(&mut self) {
         self.status = ThreadState::Runnable;
     }
     pub fn suspend(&mut self) {
-        todo!()
+        self.status = ThreadState::Blocked;
     }
     pub fn is_runnable(&self) -> bool {
         self.status == ThreadState::Runnable
@@ -143,6 +168,8 @@ impl ThreadInfo {
             vspace: CNodeEntry::null(),
             registers: Registers::null(),
             msg_buffer: 0,
+            #[cfg(debug_assertions)]
+            tid: 0,
         }
     }
 

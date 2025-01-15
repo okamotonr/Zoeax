@@ -66,6 +66,7 @@ pub unsafe fn schedule() {
         next
     } else {
         if (*CURRENT_PROC).is_runnable() {
+            (*CURRENT_PROC).set_timeout(TASK_QUANTUM);
             return;
         }
         &raw mut IDLE_THREAD
@@ -122,4 +123,8 @@ pub fn timer_tick() {
             require_schedule()
         }
     }
+}
+
+pub fn get_current_reg<'a>() -> &'a mut Registers {
+    unsafe { &mut *(CPU_VAR.cur_reg_base) }
 }

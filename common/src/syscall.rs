@@ -3,12 +3,12 @@ use core::arch::asm;
 pub enum SysNo {
     PutChar = PUTCHAR,
     Call = CALL,
+    Send = SEND,
+    Recv = RECV,
 }
 
 pub const PUTCHAR: usize = 0;
 pub const CALL: usize = 1;
-
-pub const SLEEP: usize = 1;
 pub const SEND: usize = 2;
 pub const RECV: usize = 3;
 
@@ -17,9 +17,12 @@ pub const UNTYPED_RETYPE: usize = 1;
 pub const TCB_CONFIGURE: usize = 2;
 pub const TCB_WRITE_REG: usize = 3;
 pub const TCB_RESUME: usize = 4;
+pub const NOTIFY_WAIT: usize = 5;
+pub const NOTIFY_SEND: usize = 6;
 
 // TODO: same kernel::capability::CapabilityType
 pub const TYPE_TCB: usize = 3;
+pub const TYPE_NOTIFY: usize = 9;
 
 #[allow(clippy::too_many_arguments)]
 unsafe fn syscall(
@@ -77,18 +80,9 @@ pub fn untyped_retype(
     }
 }
 
-pub fn write_reg(src_ptr: usize, is_ip: bool, value: usize) {
+pub fn write_reg(src_ptr: usize, is_ip: usize, value: usize) {
     unsafe {
-        syscall(
-            src_ptr,
-            TCB_WRITE_REG,
-            is_ip as usize,
-            value,
-            0,
-            0,
-            0,
-            SysNo::Call,
-        );
+        syscall(src_ptr, TCB_WRITE_REG, is_ip, value, 0, 0, 0, SysNo::Call);
     }
 }
 
@@ -111,4 +105,17 @@ pub fn resume_tcb(src_ptr: usize) {
     unsafe {
         syscall(src_ptr, TCB_RESUME, 0, 0, 0, 0, 0, SysNo::Call);
     }
+}
+
+pub fn send_signal(src_ptr: usize) {
+    unsafe {
+        syscall(src_ptr, NOTIFY_SEND, 0, 0, 0, 0, 0, SysNo::Send);
+    }
+}
+
+pub fn recv_signal(src_ptr: usize) -> usize {
+    unsafe {
+        syscall(src_ptr, NOTIFY_WAIT, 0, 0, 0, 0, 0, SysNo::Recv);
+    }
+    src_ptr // TODO: return a0
 }
