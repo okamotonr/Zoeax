@@ -1,6 +1,5 @@
 use crate::common::KernelResult;
 use core::arch::naked_asm;
-use core::{fmt, marker::PhantomData, ops};
 
 extern "C" {
     pub static __free_ram: u8;
@@ -73,121 +72,128 @@ extern "C" fn mem_copy_to_user<T>(dst: *mut T, src: *const T, len: usize) {
         )
     }
 }
+mod inner {
+    use core::{fmt, marker::PhantomData, ops};
+    pub trait AddressType {}
+    #[repr(C)]
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct Address<T: AddressType> {
+        pub addr: usize,
+        _phantom: PhantomData<fn() -> T>,
+    }
 
-#[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Address<T> {
-    pub addr: usize,
-    _phantom: PhantomData<fn() -> T>,
-}
+    impl<T: AddressType> Address<T> {
+        pub const fn new(addr: usize) -> Self {
+            Self {
+                addr,
+                _phantom: PhantomData,
+            }
+        }
 
-impl<T> Address<T> {
-    pub const fn new(addr: usize) -> Self {
-        Self {
-            addr,
-            _phantom: PhantomData,
+        pub fn add(self, val: usize) -> Self {
+            Self::new(self.addr + val)
+        }
+
+        pub fn bit_or(self, val: usize) -> Self {
+            Self::new(self.addr | val)
+        }
+
+        pub fn bit_and(self, val: usize) -> Self {
+            Self::new(self.addr & val)
         }
     }
 
-    pub fn add(self, val: usize) -> Self {
-        Self::new(self.addr + val)
-    }
-
-    pub fn bit_or(self, val: usize) -> Self {
-        Self::new(self.addr | val)
-    }
-
-    pub fn bit_and(self, val: usize) -> Self {
-        Self::new(self.addr & val)
-    }
-}
-
-impl<T> From<usize> for Address<T> {
-    fn from(item: usize) -> Self {
-        Self::new(item)
-    }
-}
-
-impl<T> From<Address<T>> for usize {
-    fn from(item: Address<T>) -> Self {
-        item.addr
-    }
-}
-
-impl<T, S> From<*const S> for Address<T> {
-    fn from(value: *const S) -> Self {
-        Self::new(value as usize)
-    }
-}
-
-impl<T, S> From<*mut S> for Address<T> {
-    fn from(value: *mut S) -> Self {
-        Self::new(value as usize)
-    }
-}
-
-impl<T, S> From<Address<T>> for *const S {
-    fn from(value: Address<T>) -> Self {
-        value.addr as *const S
-    }
-}
-
-impl<T, S> From<Address<T>> for *mut S {
-    fn from(value: Address<T>) -> Self {
-        value.addr as *mut S
-    }
-}
-
-impl<T> fmt::Debug for Address<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Address {{0x{:x}, {}}}:",
-            self.addr,
-            core::any::type_name::<T>()
-        )
-    }
-}
-
-impl<T> ops::Add for Address<T> {
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            addr: self.addr + rhs.addr,
-            _phantom: PhantomData,
+    impl<T: AddressType> From<usize> for Address<T> {
+        fn from(item: usize) -> Self {
+            Self::new(item)
         }
     }
-}
 
-impl<T> ops::AddAssign for Address<T> {
-    fn add_assign(&mut self, rhs: Self) {
-        self.addr += rhs.addr;
+    impl<T: AddressType> From<Address<T>> for usize {
+        fn from(item: Address<T>) -> Self {
+            item.addr
+        }
     }
-}
 
-impl<T> ops::Sub for Address<T> {
-    type Output = Self;
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(self.addr - rhs.addr)
+    impl<T: AddressType, S> From<*const S> for Address<T> {
+        fn from(value: *const S) -> Self {
+            Self::new(value as usize)
+        }
     }
-}
 
-impl<T> ops::SubAssign for Address<T> {
-    fn sub_assign(&mut self, rhs: Self) {
-        self.addr -= rhs.addr
+    impl<T: AddressType, S> From<*mut S> for Address<T> {
+        fn from(value: *mut S) -> Self {
+            Self::new(value as usize)
+        }
     }
+
+    impl<T: AddressType, S> From<Address<T>> for *const S {
+        fn from(value: Address<T>) -> Self {
+            value.addr as *const S
+        }
+    }
+
+    impl<T: AddressType, S> From<Address<T>> for *mut S {
+        fn from(value: Address<T>) -> Self {
+            value.addr as *mut S
+        }
+    }
+
+    impl<T: AddressType> fmt::Debug for Address<T> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(
+                f,
+                "Address {{0x{:x}, {}}}:",
+                self.addr,
+                core::any::type_name::<T>()
+            )
+        }
+    }
+
+    impl<T: AddressType> ops::Add for Address<T> {
+        type Output = Self;
+        fn add(self, rhs: Self) -> Self::Output {
+            Self {
+                addr: self.addr + rhs.addr,
+                _phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<T: AddressType> ops::AddAssign for Address<T> {
+        fn add_assign(&mut self, rhs: Self) {
+            self.addr += rhs.addr;
+        }
+    }
+
+    impl<T: AddressType> ops::Sub for Address<T> {
+        type Output = Self;
+        fn sub(self, rhs: Self) -> Self::Output {
+            Self::new(self.addr - rhs.addr)
+        }
+    }
+
+    impl<T: AddressType> ops::SubAssign for Address<T> {
+        fn sub_assign(&mut self, rhs: Self) {
+            self.addr -= rhs.addr
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct Physical;
+
+    impl AddressType for Physical {}
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct Virtual;
+    impl AddressType for Virtual {}
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct KVirtual;
+    impl AddressType for KVirtual {}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Physical;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Virtual;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct KVirtual;
-
-pub type PhysAddr = Address<Physical>;
-pub type VirtAddr = Address<Virtual>;
-pub type KernelVAddress = Address<KVirtual>;
+pub type PhysAddr = inner::Address<inner::Physical>;
+pub type VirtAddr = inner::Address<inner::Virtual>;
+pub type KernelVAddress = inner::Address<inner::KVirtual>;
 
 impl From<PhysAddr> for VirtAddr {
     fn from(value: PhysAddr) -> Self {
