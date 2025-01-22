@@ -1,10 +1,10 @@
 use common::println;
-use common::syscall::cnode_copy;
+//use common::syscall::cnode_copy;
+use common::syscall::cnode_mint;
 use common::syscall::recv_signal;
 use common::syscall::resume_tcb;
 use common::syscall::send_signal;
 use common::syscall::write_reg;
-use common::syscall::cnode_mint;
 use common::syscall::TYPE_CNODE;
 use common::syscall::TYPE_NOTIFY;
 use common::syscall::{configure_tcb, untyped_retype, TYPE_TCB};
@@ -32,8 +32,24 @@ pub fn main(untyped_cnode_idx: usize) {
     write_reg(tcb_idx, 0, sp_val);
     write_reg(tcb_idx, 1, children as usize);
 
-    cnode_mint(root_cnode_idx, notify_idx, ROOT_CNODE_RADIX, root_cnode_idx, lv2_cnode_idx + 1, ROOT_CNODE_RADIX, 0b100);
-    cnode_mint(root_cnode_idx, notify_idx, ROOT_CNODE_RADIX, root_cnode_idx, lv2_cnode_idx + 2, ROOT_CNODE_RADIX, 0b1000);
+    cnode_mint(
+        root_cnode_idx,
+        notify_idx,
+        ROOT_CNODE_RADIX,
+        root_cnode_idx,
+        lv2_cnode_idx + 1,
+        ROOT_CNODE_RADIX,
+        0b100,
+    );
+    cnode_mint(
+        root_cnode_idx,
+        notify_idx,
+        ROOT_CNODE_RADIX,
+        root_cnode_idx,
+        lv2_cnode_idx + 2,
+        ROOT_CNODE_RADIX,
+        0b1000,
+    );
     write_reg(tcb_idx, 2, lv2_cnode_idx + 1);
     configure_tcb(tcb_idx, root_cnode_idx, root_vspace_idx);
     resume_tcb(tcb_idx);

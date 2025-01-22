@@ -120,16 +120,49 @@ pub fn recv_signal(src_ptr: usize) -> usize {
     unsafe { syscall(src_ptr, NOTIFY_WAIT, 0, 0, 0, 0, 0, SysNo::Recv) as usize }
 }
 
-pub fn cnode_copy(src_root: usize, src_index: usize, src_depth: u32, dest_root: usize, dest_index: usize, dest_depth: u32) {
-    let depth = (src_depth as usize) << 31 | dest_depth as usize;
+pub fn cnode_copy(
+    src_root: usize,
+    src_index: usize,
+    src_depth: u32,
+    dest_root: usize,
+    dest_index: usize,
+    dest_depth: u32,
+) {
+    let depth = ((src_depth as usize) << 31) | dest_depth as usize;
     unsafe {
-        syscall(src_root, CNODE_COPY, src_index, depth, dest_root, dest_index, 0, SysNo::Call);
+        syscall(
+            src_root,
+            CNODE_COPY,
+            src_index,
+            depth,
+            dest_root,
+            dest_index,
+            0,
+            SysNo::Call,
+        );
     }
 }
 
-pub fn cnode_mint(src_root: usize, src_index: usize, src_depth: u32, dest_root: usize, dest_index: usize, dest_depth: u32, cap_val: usize) {
-    let depth = (src_depth as usize) << 31 | dest_depth as usize;
+pub fn cnode_mint(
+    src_root: usize,
+    src_index: usize,
+    src_depth: u32,
+    dest_root: usize,
+    dest_index: usize,
+    dest_depth: u32,
+    cap_val: usize,
+) {
+    let depth = ((src_depth as usize) << 31) | dest_depth as usize;
     unsafe {
-        syscall(src_root, CNODE_MINT, src_index, depth, dest_root, dest_index, cap_val, SysNo::Call);
+        syscall(
+            src_root,
+            CNODE_MINT,
+            src_index,
+            depth,
+            dest_root,
+            dest_index,
+            cap_val,
+            SysNo::Call,
+        );
     }
 }

@@ -11,7 +11,8 @@ use crate::{
 };
 
 use common::syscall::{
-    CALL, CNODE_COPY, CNODE_MINT, NOTIFY_SEND, NOTIFY_WAIT, PUTCHAR, RECV, SEND, TCB_CONFIGURE, TCB_RESUME, TCB_WRITE_REG, UNTYPED_RETYPE
+    CALL, CNODE_COPY, CNODE_MINT, NOTIFY_SEND, NOTIFY_WAIT, PUTCHAR, RECV, SEND, TCB_CONFIGURE,
+    TCB_RESUME, TCB_WRITE_REG, UNTYPED_RETYPE,
 };
 
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
@@ -99,20 +100,35 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             )?;
             tcb_cap.make_runnable();
             Ok(())
-        },
+        }
         CNODE_COPY | CNODE_MINT => {
             let src_depth = (reg.a3 >> 31) as u32;
             let dest_depth = reg.a3 as u32;
-            let mut src_root = CNodeCap::try_from_raw(root_cnode.lookup_entry_mut_one_level(cap_ptr)?.as_mut().unwrap().cap())?;
-            let src_slot = src_root.lookup_entry_mut(reg.a2, src_depth)?.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
+            let mut src_root = CNodeCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
+            let src_slot = src_root
+                .lookup_entry_mut(reg.a2, src_depth)?
+                .as_mut()
+                .ok_or(kerr!(ErrKind::SlotIsEmpty))?;
 
-            let mut dest_root = CNodeCap::try_from_raw(root_cnode.lookup_entry_mut_one_level(reg.a4)?.as_mut().unwrap().cap())?;
+            let mut dest_root = CNodeCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut_one_level(reg.a4)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
             let dest_slot = dest_root.lookup_entry_mut(reg.a5, dest_depth)?;
             if dest_slot.is_some() {
                 Err(kerr!(ErrKind::NotEmptySlot))
             } else {
                 let raw_cap = src_slot.cap();
-                // TODO: Whether this cap is derivable 
+                // TODO: Whether this cap is derivable
                 let mut cap = raw_cap;
                 if inv_label == CNODE_MINT {
                     let cap_val = reg.a6;
@@ -123,7 +139,7 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                 *dest_slot = Some(new_slot);
                 Ok(())
             }
-        },
+        }
         _ => Err(kerr!(ErrKind::UnknownInvocation)),
     }
 }
