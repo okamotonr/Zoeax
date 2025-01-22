@@ -49,7 +49,8 @@ impl PageTableCap {
     }
 
     fn set_mapped(&mut self, vaddr: VirtAddr) {
-        self.0[0] |= (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff)
+        self.0.cap_dep_val |=
+            (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff) as u64
     }
 
     pub fn root_map(&mut self) -> KernelResult<()> {
@@ -63,11 +64,11 @@ impl PageTableCap {
     }
 
     fn is_mapped(&self) -> bool {
-        ((self.0[0] >> 48) & 0x1) == 1
+        ((self.0.cap_dep_val >> 48) & 0x1) == 1
     }
 
     fn get_mapped_address(&self) -> PhysAddr {
-        (self.0[0] & !(0xffff << 48)).into()
+        ((self.0.cap_dep_val & !(0xffff << 48)) as usize).into()
     }
 }
 
@@ -120,11 +121,12 @@ impl PageCap {
     }
 
     fn set_mapped(&mut self, vaddr: VirtAddr) {
-        self.0[0] |= (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff)
+        self.0.cap_dep_val |=
+            (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff) as u64
     }
 
     fn is_mapped(&self) -> bool {
-        ((self.0[0] >> 48) & 0x1) == 1
+        ((self.0.cap_dep_val >> 48) & 0x1) == 1
     }
     pub fn get_address(&self) -> KernelVAddress {
         self.0.get_address().into()

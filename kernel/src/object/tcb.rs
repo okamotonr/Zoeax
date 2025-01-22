@@ -1,6 +1,7 @@
 use crate::capability::Capability;
 use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
-use crate::common::KernelResult;
+use crate::common::{ErrKind, KernelResult};
+use crate::kerr;
 use crate::object::PageTable;
 use crate::println;
 use common::list::ListItem;
@@ -126,8 +127,8 @@ impl Registers {
 pub struct ThreadInfo {
     pub status: ThreadState,
     pub time_slice: usize,
-    pub root_cnode: CNodeEntry,
-    pub vspace: CNodeEntry,
+    pub root_cnode: Option<CNodeEntry>,
+    pub vspace: Option<CNodeEntry>,
     pub registers: Registers,
     pub msg_buffer: usize,
     #[cfg(debug_assertions)]
@@ -164,8 +165,8 @@ impl ThreadInfo {
         Self {
             status: ThreadState::Idle,
             time_slice: 0,
-            root_cnode: CNodeEntry::null(),
-            vspace: CNodeEntry::null(),
+            root_cnode: None,
+            vspace: None,
             registers: Registers::null(),
             msg_buffer: 0,
             #[cfg(debug_assertions)]
@@ -181,18 +182,26 @@ impl ThreadInfo {
     }
 
     unsafe fn activate_vspace_inner(&self) -> KernelResult<()> {
-        let mut pt_cap = PageTableCap::try_from_raw(self.vspace.cap())?;
+        let raw_cap = self
+            .vspace
+            .as_ref()
+            .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
+        let mut pt_cap = PageTableCap::try_from_raw(raw_cap.cap())?;
         unsafe { pt_cap.activate() }
     }
 
     pub fn set_root_cspace(&mut self, cspace_cap: CNodeCap, parent: &mut CNodeEntry) {
-        assert!(self.root_cnode.is_null(), "{:?}", self.root_cnode);
-        self.root_cnode.insert(parent, cspace_cap.get_raw_cap());
+        assert!(self.root_cnode.is_none(), "{:?}", self.root_cnode);
+        let mut new_entry = CNodeEntry::new_with_rawcap(cspace_cap.get_raw_cap());
+        new_entry.insert(parent);
+        self.root_cnode = Some(new_entry)
     }
 
     pub fn set_root_vspace(&mut self, vspace_cap: PageTableCap, parent: &mut CNodeEntry) {
-        assert!(self.vspace.is_null(), "{:?}", self.vspace);
-        self.vspace.insert(parent, vspace_cap.get_raw_cap());
+        assert!(self.vspace.is_none(), "{:?}", self.vspace);
+        let mut new_entry = CNodeEntry::new_with_rawcap(vspace_cap.get_raw_cap());
+        new_entry.insert(parent);
+        self.vspace = Some(new_entry)
     }
 }
 

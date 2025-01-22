@@ -75,11 +75,10 @@ extern "C" fn mem_copy_to_user<T>(dst: *mut T, src: *const T, len: usize) {
 mod inner {
     use core::{fmt, marker::PhantomData, ops};
     pub trait AddressType {}
-    #[repr(C)]
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub struct Address<T: AddressType> {
         pub addr: usize,
-        _phantom: PhantomData<fn() -> T>,
+        _phantom: PhantomData<T>,
     }
 
     impl<T: AddressType> Address<T> {

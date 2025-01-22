@@ -39,7 +39,7 @@ unsafe fn syscall(
 
     asm!(
         "ecall",
-        in("a0") src_ptr,
+        inout("a0") src_ptr => result,
         in("a1") inv_label,
         in("a2") arg2,
         in("a3") arg3,
@@ -47,7 +47,6 @@ unsafe fn syscall(
         in("a5") arg5,
         in("a6") arg6,
         in("a7") sysno as usize,
-        lateout("a0") result,
     );
 
     result
@@ -114,8 +113,5 @@ pub fn send_signal(src_ptr: usize) {
 }
 
 pub fn recv_signal(src_ptr: usize) -> usize {
-    unsafe {
-        syscall(src_ptr, NOTIFY_WAIT, 0, 0, 0, 0, 0, SysNo::Recv);
-    }
-    src_ptr // TODO: return a0
+    unsafe { syscall(src_ptr, NOTIFY_WAIT, 0, 0, 0, 0, 0, SysNo::Recv) as usize }
 }

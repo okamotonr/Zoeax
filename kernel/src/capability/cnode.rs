@@ -63,9 +63,9 @@ impl CNodeCap {
         let cnode = self.get_cnode(num, offset)?;
         for i in 0..num {
             let entry = cnode.lookup_entry_mut(i)?;
-            (!entry.is_null())
-                .then_some(())
-                .ok_or(kerr!(ErrKind::NotEntrySlot))?;
+            entry
+                .as_ref()
+                .map_or(Ok(()), |_| Err(kerr!(ErrKind::NotEmptySlot)))?;
         }
         Ok(cnode)
     }
@@ -93,11 +93,11 @@ impl CNodeCap {
         self.radix()
     }
 
-    pub fn lookup_entry_mut(&mut self, index: usize) -> KernelResult<&mut CNodeEntry> {
+    pub fn lookup_entry_mut(&mut self, index: usize) -> KernelResult<&mut Option<CNodeEntry>> {
         self.get_cnode(1, index)?.lookup_entry_mut(0)
     }
 
     fn radix(&self) -> usize {
-        self.0[0]
+        self.0.cap_dep_val as usize
     }
 }

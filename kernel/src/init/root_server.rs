@@ -131,13 +131,26 @@ impl<'a> RootServerMemory<'a> {
 
         // insert cnode_cap into tcb cnode_cap
         let raw_cap = cnode_cap.get_raw_cap();
-        tcb.root_cnode
-            .insert(cnode_cap.lookup_entry_mut(ROOT_CNODE_IDX).unwrap(), raw_cap);
-        // insert vspace cap into tcb vspace
-        tcb.vspace.insert(
-            cnode_cap.lookup_entry_mut(ROOT_VSPACE_IDX).unwrap(),
-            vspace_cap.get_raw_cap(),
+        let mut new_entry = CNodeEntry::new_with_rawcap(raw_cap);
+        new_entry.insert(
+            cnode_cap
+                .lookup_entry_mut(ROOT_CNODE_IDX)
+                .unwrap()
+                .as_mut()
+                .unwrap(),
         );
+        tcb.root_cnode = Some(new_entry);
+        // insert vspace cap into tcb vspace
+        let raw_cap = vspace_cap.get_raw_cap();
+        let mut new_entry = CNodeEntry::new_with_rawcap(raw_cap);
+        new_entry.insert(
+            cnode_cap
+                .lookup_entry_mut(ROOT_VSPACE_IDX)
+                .unwrap()
+                .as_mut()
+                .unwrap(),
+        );
+        tcb.vspace = Some(new_entry);
 
         let cap = TCBCap::init((tcb as *const ThreadControlBlock).into(), 0);
         cnode_cap.write_slot(cap.get_raw_cap(), ROOT_TCB_IDX);
