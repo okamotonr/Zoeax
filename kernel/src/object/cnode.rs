@@ -104,6 +104,10 @@ impl CNodeEntry {
     pub fn set_cap(&mut self, raw_cap: RawCapability) {
         self.cap = raw_cap
     }
+
+    pub fn cap_ref_mut(&mut self) -> &mut RawCapability {
+        &mut self.cap
+    }
 }
 
 #[derive(Debug, Default)]

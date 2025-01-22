@@ -19,9 +19,13 @@ pub const TCB_WRITE_REG: usize = 3;
 pub const TCB_RESUME: usize = 4;
 pub const NOTIFY_WAIT: usize = 5;
 pub const NOTIFY_SEND: usize = 6;
+pub const CNODE_COPY: usize = 7;
+pub const CNODE_MINT: usize = 9;
+pub const CNODE_MOVE: usize = 10;
 
 // TODO: same kernel::capability::CapabilityType
 pub const TYPE_TCB: usize = 3;
+pub const TYPE_CNODE: usize = 7;
 pub const TYPE_NOTIFY: usize = 9;
 
 #[allow(clippy::too_many_arguments)]
@@ -114,4 +118,18 @@ pub fn send_signal(src_ptr: usize) {
 
 pub fn recv_signal(src_ptr: usize) -> usize {
     unsafe { syscall(src_ptr, NOTIFY_WAIT, 0, 0, 0, 0, 0, SysNo::Recv) as usize }
+}
+
+pub fn cnode_copy(src_root: usize, src_index: usize, src_depth: u32, dest_root: usize, dest_index: usize, dest_depth: u32) {
+    let depth = (src_depth as usize) << 31 | dest_depth as usize;
+    unsafe {
+        syscall(src_root, CNODE_COPY, src_index, depth, dest_root, dest_index, 0, SysNo::Call);
+    }
+}
+
+pub fn cnode_mint(src_root: usize, src_index: usize, src_depth: u32, dest_root: usize, dest_index: usize, dest_depth: u32, cap_val: usize) {
+    let depth = (src_depth as usize) << 31 | dest_depth as usize;
+    unsafe {
+        syscall(src_root, CNODE_MINT, src_index, depth, dest_root, dest_index, cap_val, SysNo::Call);
+    }
 }

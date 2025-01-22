@@ -25,7 +25,7 @@ impl Capability for NotificationCap {
     }
 
     fn create_cap_dep_val(_addr: KernelVAddress, _user_size: usize) -> usize {
-        1 // badge
+        0 // badge
     }
 
     fn init_object(&mut self) {
