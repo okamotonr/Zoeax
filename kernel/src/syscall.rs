@@ -39,7 +39,7 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
 fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
     // change registers with result of invocation.
-    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.cap())?;
+    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.as_mut().unwrap().cap())?;
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
     match inv_label {
@@ -56,11 +56,17 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
         TCB_CONFIGURE => {
             // TODO: lookup entry first to be able to rollback
             // TODO: we have to do something to make rust ownership be calm down.
-            let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
+            let mut tcb_cap = TCBCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
             let cspace_slot = root_cnode.lookup_entry_mut(reg.a2)?;
-            tcb_cap.set_cspace(cspace_slot)?;
+            tcb_cap.set_cspace(cspace_slot.as_mut().unwrap())?;
             let vspace = root_cnode.lookup_entry_mut(reg.a3)?;
-            tcb_cap.set_vspace(vspace)?;
+            tcb_cap.set_vspace(vspace.as_mut().unwrap())?;
             Ok(())
         }
         TCB_WRITE_REG => {
@@ -73,12 +79,24 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                 _ => panic!("cannot set reg {:x}", reg.a2),
             };
             let value = reg.a3;
-            let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
+            let mut tcb_cap = TCBCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
             tcb_cap.set_registers(&[(reg_id, value)]);
             Ok(())
         }
         TCB_RESUME => {
-            let mut tcb_cap = TCBCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
+            let mut tcb_cap = TCBCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
             tcb_cap.make_runnable();
             Ok(())
         }
@@ -88,13 +106,18 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
 
 fn handle_send_invocation(reg: &mut Registers) -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
-    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.cap())?;
+    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.as_mut().unwrap().cap())?;
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
     match inv_label {
         NOTIFY_SEND => {
-            let mut notify_cap =
-                NotificationCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
+            let mut notify_cap = NotificationCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
             notify_cap.send();
             Ok(())
         }
@@ -104,13 +127,18 @@ fn handle_send_invocation(reg: &mut Registers) -> KernelResult<()> {
 
 fn handle_recieve_invocation(reg: &mut Registers) -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
-    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.cap())?;
+    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.as_mut().unwrap().cap())?;
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
     match inv_label {
         NOTIFY_WAIT => {
-            let mut notify_cap =
-                NotificationCap::try_from_raw(root_cnode.lookup_entry_mut(cap_ptr)?.cap())?;
+            let mut notify_cap = NotificationCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
             if notify_cap.wait(current_tcb) {
                 require_schedule()
             }

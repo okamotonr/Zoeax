@@ -68,20 +68,13 @@ impl ManagementDB {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CNodeEntry {
     cap: RawCapability,
     mdb: ManagementDB,
 }
 
 impl CNodeEntry {
-    pub const fn null() -> Self {
-        Self {
-            cap: RawCapability::null(),
-            mdb: ManagementDB([0; 2]),
-        }
-    }
-
     pub fn new_with_rawcap(cap: RawCapability) -> Self {
         Self {
             cap,
@@ -93,8 +86,7 @@ impl CNodeEntry {
         self.cap
     }
 
-    pub fn insert(&mut self, parent: &mut Self, cap: RawCapability) {
-        self.cap = cap;
+    pub fn insert(&mut self, parent: &mut Self) {
         if let Some(prev_next) = parent.get_next() {
             self.set_next(prev_next);
         };
@@ -112,10 +104,6 @@ impl CNodeEntry {
     pub fn set_cap(&mut self, raw_cap: RawCapability) {
         self.cap = raw_cap
     }
-
-    pub fn is_null(&self) -> bool {
-        self.cap.is_null()
-    }
 }
 
 #[derive(Debug, Default)]
@@ -126,8 +114,8 @@ impl CNode {
         Self
     }
 
-    pub fn lookup_entry_mut(&mut self, index: usize) -> KernelResult<&mut CNodeEntry> {
-        let root = (self as *mut Self).cast::<CNodeEntry>();
+    pub fn lookup_entry_mut(&mut self, index: usize) -> KernelResult<&mut Option<CNodeEntry>> {
+        let root = (self as *mut Self).cast::<Option<CNodeEntry>>();
         unsafe {
             let ret = root.add(index);
             Ok(ret.as_mut().unwrap())

@@ -5,7 +5,7 @@ use crate::{
     object::CNodeEntry,
 };
 
-use core::ops::{Deref, DerefMut};
+use core::num::NonZeroU8;
 use core::{fmt, mem};
 
 pub mod cnode;
@@ -15,67 +15,64 @@ pub mod page_table;
 pub mod tcb;
 pub mod untyped;
 
-const CAP_TYPE_BIT: usize = 0x1f << 59;
-const PADDING_BIT: usize = 0x7ff << 48;
-const ADDRESS_BIT: usize = !(CAP_TYPE_BIT | PADDING_BIT);
-
-#[repr(transparent)]
-#[derive(Clone, Copy, Default)]
-pub struct RawCapability([usize; 2]);
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+pub struct RawCapability {
+    cap_type: NonZeroU8,
+    cap_right: u8,
+    address_top: u16,
+    address_bottom: u32,
+    cap_dep_val: u64,
+}
 
 /*
  * RawCapability[1]
- * | cap_type | padding | address or none |
- * 64   5         11       48
+ * | cap_type | cap_right | padding | address or none |
+ * 64   5         5           6              48
  */
 
 impl RawCapability {
-    pub const fn null() -> Self {
-        Self([0; 2])
+    pub fn new(cap_type: CapabilityType, address: PhysAddr) -> Self {
+        let mut ret = Self {
+            cap_type: NonZeroU8::new(cap_type as u8).unwrap(),
+            cap_right: 0,
+            address_top: 0,
+            address_bottom: 0,
+            cap_dep_val: 0,
+        };
+        ret.set_address(address);
+        ret
     }
-
-    pub fn is_null(&self) -> bool {
-        matches!(self.get_cap_type(), Ok(CapabilityType::Null))
-    }
-}
-
-impl Deref for RawCapability {
-    type Target = [usize; 2];
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for RawCapability {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl RawCapability {
     pub fn get_cap_type(&self) -> KernelResult<CapabilityType> {
-        CapabilityType::try_from_u8(((self[1] & CAP_TYPE_BIT) >> 59) as u8)
+        CapabilityType::try_from_u8(self.cap_type.get())
     }
 
+    // TODO: u64 and usize
     pub fn set_cap_dep_val(&mut self, val: usize) {
-        self[0] = val;
+        self.cap_dep_val = val as u64;
     }
 
     pub fn get_address(&self) -> PhysAddr {
-        PhysAddr::new(self[1] & ADDRESS_BIT)
+        // TODO: u64 and usize
+        let addr = (((self.address_top as u64) << 32) | self.address_bottom as u64) as usize;
+        PhysAddr::new(addr)
     }
 
     pub fn set_cap_type(&mut self, cap_type: CapabilityType) {
-        self[1] = (self[1] & !CAP_TYPE_BIT) | ((cap_type as u8 as usize) << 59)
+        self.cap_type = NonZeroU8::new(cap_type as u8).unwrap()
     }
 
     pub fn set_address(&mut self, address: PhysAddr) {
-        self[1] = (self[1] & CAP_TYPE_BIT) | <PhysAddr as Into<usize>>::into(address)
+        let address: usize = address.into();
+        let address_top = ((address >> 32) & u16::MAX as usize) as u16;
+        let address_bottom = (address & u32::MAX as usize) as u32;
+        self.address_top = address_top;
+        self.address_bottom = address_bottom
     }
 
     pub fn set_address_and_type(&mut self, address: PhysAddr, cap_type: CapabilityType) {
-        let v = ((cap_type as u8 as usize) << 59) | <PhysAddr as Into<usize>>::into(address);
-        self[1] = v
+        self.set_cap_type(cap_type);
+        self.set_address(address)
     }
 }
 
@@ -143,9 +140,7 @@ where
         }
     }
     fn create_raw_cap(addr: KernelVAddress) -> RawCapability {
-        let mut raw_capability = RawCapability::null();
-        raw_capability.set_address_and_type(addr.into(), Self::CAP_TYPE);
-        raw_capability
+        RawCapability::new(Self::CAP_TYPE, addr.into())
     }
     fn create_cap_dep_val(_addr: KernelVAddress, _user_size: usize) -> usize {
         0

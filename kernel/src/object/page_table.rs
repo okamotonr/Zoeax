@@ -30,10 +30,10 @@ use crate::{
     memlayout::KERNEL_CODE_PFX,
 };
 
-use core::ptr;
 use core::{
     arch::asm,
     ops::{Deref, DerefMut},
+    ptr,
 };
 
 pub const SATP_SV48: usize = 9 << 60;

@@ -99,7 +99,7 @@ impl UntypedCap {
         let new_free_address = cap_generator.end_address;
         // 4, update self information
         let v = Self::create_cap_dep_val(new_free_address, block_size);
-        self.0[0] = v;
+        self.0.cap_dep_val = v as u64;
         if is_device {
             self.mark_is_device()
         }
@@ -156,20 +156,20 @@ impl UntypedCap {
     }
 
     pub fn get_free_index(&self) -> KernelVAddress {
-        let physadd = PhysAddr::new(self.0[0] >> 16);
+        let physadd = PhysAddr::new(self.0.cap_dep_val as usize >> 16);
         physadd.into()
     }
 
     pub fn is_device(&self) -> bool {
-        ((&self.0[0] >> 6) & 0x1) == 1
+        ((&self.0.cap_dep_val >> 6) & 0x1) == 1
     }
 
     pub fn block_size(&self) -> usize {
-        2_usize.pow((&self.0[0] & 0x3f) as u32)
+        2_usize.pow((&self.0.cap_dep_val & 0x3f) as u32)
     }
 
     pub fn mark_is_device(&mut self) {
-        self.0[1] &= 0x3f
+        self.0.cap_dep_val &= 0x3f
     }
 
     fn get_free_bytes(&self) -> usize {

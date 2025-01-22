@@ -28,7 +28,7 @@ pub enum ErrKind {
     UnexpectedCapType,
     CanNotNewFromDeviceMemory,
     NoEnoughSlot,
-    NotEntrySlot,
+    NotEmptySlot,
     VaddressAlreadyMapped,
     PageTableAlreadyMapped,
     PageAlreadyMapped,

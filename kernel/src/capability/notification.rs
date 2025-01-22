@@ -58,7 +58,7 @@ impl NotificationCap {
     }
 
     fn get_batch(&self) -> u64 {
-        self.0[0] as u64
+        self.0.cap_dep_val
     }
 
     pub fn set_badge(&mut self, _val: u64) -> KernelResult<()> {
