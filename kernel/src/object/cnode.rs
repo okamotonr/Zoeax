@@ -93,12 +93,31 @@ impl CNodeEntry {
         parent.set_next(self)
     }
 
+    pub fn replace(&mut self, src: &mut Self) {
+        if let Some(src_next) = src.get_next() {
+            src_next.set_prev(self);
+            self.set_next(src_next);
+        };
+        if let Some(src_prev) = src.get_prev() {
+            src_prev.set_next(self);
+            self.set_prev(src_prev);
+        }
+    }
+
     pub fn set_next(&mut self, next: &mut Self) {
         self.mdb.set_next(next)
     }
 
+    pub fn set_prev(&mut self, prev: &mut Self) {
+        self.mdb.set_prev(prev)
+    }
+
     pub fn get_next(&mut self) -> Option<&mut Self> {
         self.mdb.get_next()
+    }
+
+    pub fn get_prev(&mut self) -> Option<&mut Self> {
+        self.mdb.get_prev()
     }
 
     pub fn set_cap(&mut self, raw_cap: RawCapability) {

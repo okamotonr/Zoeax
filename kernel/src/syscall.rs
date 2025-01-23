@@ -11,8 +11,8 @@ use crate::{
 };
 
 use common::syscall::{
-    CALL, CNODE_COPY, CNODE_MINT, NOTIFY_SEND, NOTIFY_WAIT, PUTCHAR, RECV, SEND, TCB_CONFIGURE,
-    TCB_RESUME, TCB_WRITE_REG, UNTYPED_RETYPE,
+    CALL, CNODE_COPY, CNODE_MINT, CNODE_MOVE, NOTIFY_SEND, NOTIFY_WAIT, PUTCHAR, RECV, SEND,
+    TCB_CONFIGURE, TCB_RESUME, TCB_WRITE_REG, UNTYPED_RETYPE,
 };
 
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
@@ -101,7 +101,7 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             tcb_cap.make_runnable();
             Ok(())
         }
-        CNODE_COPY | CNODE_MINT => {
+        CNODE_COPY | CNODE_MINT | CNODE_MOVE => {
             let src_depth = (reg.a3 >> 31) as u32;
             let dest_depth = reg.a3 as u32;
             let mut src_root = CNodeCap::try_from_raw(
@@ -111,10 +111,8 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                     .unwrap()
                     .cap(),
             )?;
-            let src_slot = src_root
-                .lookup_entry_mut(reg.a2, src_depth)?
-                .as_mut()
-                .ok_or(kerr!(ErrKind::SlotIsEmpty))?;
+            let src_slot = src_root.lookup_entry_mut(reg.a2, src_depth)?;
+            let src_entry = src_slot.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
 
             let mut dest_root = CNodeCap::try_from_raw(
                 root_cnode
@@ -127,15 +125,21 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             if dest_slot.is_some() {
                 Err(kerr!(ErrKind::NotEmptySlot))
             } else {
-                let raw_cap = src_slot.cap();
+                let raw_cap = src_entry.cap();
                 // TODO: Whether this cap is derivable
                 let mut cap = raw_cap;
                 if inv_label == CNODE_MINT {
                     let cap_val = reg.a6;
                     cap.set_cap_dep_val(cap_val);
                 }
+
                 let mut new_slot = CNodeEntry::new_with_rawcap(cap);
-                new_slot.insert(src_slot);
+                if inv_label == CNODE_MOVE {
+                    new_slot.replace(src_entry);
+                    *src_slot = None
+                } else {
+                    new_slot.insert(src_entry);
+                }
                 *dest_slot = Some(new_slot);
                 Ok(())
             }

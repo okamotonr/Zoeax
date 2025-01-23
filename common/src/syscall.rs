@@ -166,3 +166,26 @@ pub fn cnode_mint(
         );
     }
 }
+
+pub fn cnode_move(
+    src_root: usize,
+    src_index: usize,
+    src_depth: u32,
+    dest_root: usize,
+    dest_index: usize,
+    dest_depth: u32,
+) {
+    let depth = ((src_depth as usize) << 31) | dest_depth as usize;
+    unsafe {
+        syscall(
+            src_root,
+            CNODE_MOVE,
+            src_index,
+            depth,
+            dest_root,
+            dest_index,
+            0,
+            SysNo::Call,
+        );
+    }
+}
