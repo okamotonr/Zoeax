@@ -30,7 +30,7 @@ use core::mem::MaybeUninit;
 use core::ptr;
 
 // TODO
-const ROOT_CNODE_ENTRY_NUM: usize = 64;
+const ROOT_CNODE_ENTRY_NUM_BITS: usize = 18; // 2^18
 const ROOT_TCB_IDX: usize = 1;
 const ROOT_CNODE_IDX: usize = 2;
 const ROOT_VSPACE_IDX: usize = 3;
@@ -42,16 +42,17 @@ extern "C" {
 impl CNode {
     // todo: broken
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        let root = (self as *mut Self).cast::<CNodeEntry>();
+        let root = (self as *mut Self).cast::<Option<CNodeEntry>>();
         let entry = CNodeEntry::new_with_rawcap(cap);
-        unsafe { *root.add(index) = entry }
+        unsafe { *root.add(index) = Some(entry) }
     }
 }
 
 impl CNodeCap {
     fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        let cnode = self.get_cnode(1, index).unwrap();
-        cnode.write_slot(cap, 0);
+        let cnode = self.get_cnode();
+        let entry = CNodeEntry::new_with_rawcap(cap);
+        cnode[index] = Some(entry);
     }
 }
 
@@ -78,7 +79,7 @@ impl<'a> RootServerMemory<'a> {
     }
 
     fn init_with_uninit(bump_allocator: &mut BumpAllocator) -> Self {
-        let cnode = Self::alloc_obj::<CNodeCap>(bump_allocator, ROOT_CNODE_ENTRY_NUM);
+        let cnode = Self::alloc_obj::<CNodeCap>(bump_allocator, ROOT_CNODE_ENTRY_NUM_BITS);
         let vspace = Self::alloc_obj::<PageTableCap>(bump_allocator, 0);
         let tcb = Self::alloc_obj::<TCBCap>(bump_allocator, 0);
         Self { cnode, vspace, tcb }
@@ -86,7 +87,7 @@ impl<'a> RootServerMemory<'a> {
 
     fn create_root_cnode(&mut self) -> CNodeCap {
         let cnode = self.cnode.write(CNode::new());
-        let cap = CNodeCap::init((cnode as *const CNode).into(), ROOT_CNODE_ENTRY_NUM);
+        let cap = CNodeCap::init((cnode as *const CNode).into(), ROOT_CNODE_ENTRY_NUM_BITS);
         cnode.write_slot(cap.get_raw_cap(), ROOT_CNODE_IDX);
         cap
     }
@@ -134,7 +135,7 @@ impl<'a> RootServerMemory<'a> {
         let mut new_entry = CNodeEntry::new_with_rawcap(raw_cap);
         new_entry.insert(
             cnode_cap
-                .lookup_entry_mut(ROOT_CNODE_IDX)
+                .lookup_entry_mut_one_level(ROOT_CNODE_IDX)
                 .unwrap()
                 .as_mut()
                 .unwrap(),
@@ -145,7 +146,7 @@ impl<'a> RootServerMemory<'a> {
         let mut new_entry = CNodeEntry::new_with_rawcap(raw_cap);
         new_entry.insert(
             cnode_cap
-                .lookup_entry_mut(ROOT_VSPACE_IDX)
+                .lookup_entry_mut_one_level(ROOT_VSPACE_IDX)
                 .unwrap()
                 .as_mut()
                 .unwrap(),
@@ -284,7 +285,7 @@ pub fn init_root_server(mut bump_allocator: BumpAllocator, elf_header: *const El
     let bootstage_mbr = BootStateManager::new(
         bump_allocator,
         ROOT_VSPACE_IDX + 1,
-        ROOT_CNODE_ENTRY_NUM - 1,
+        2_usize.pow(ROOT_CNODE_ENTRY_NUM_BITS as u32) - 1,
     );
     create_initial_thread(&mut root_server_mem, bootstage_mbr, elf_header);
 

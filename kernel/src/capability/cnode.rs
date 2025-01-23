@@ -26,14 +26,16 @@ impl Capability for CNodeCap {
     }
 
     fn get_object_size<'a>(user_size: usize) -> usize {
-        user_size * mem::size_of::<CNodeEntry>()
+        2_usize.pow(user_size as u32) * mem::size_of::<CNodeEntry>()
     }
     fn derive(&self, _src_slot: &CNodeEntry) -> KernelResult<Self> {
         // unchecked
         Ok(Self::new(self.get_raw_cap()))
     }
 
-    fn init_object(&mut self) {}
+    fn init_object(&mut self) {
+        // TODO: Zero clear
+    }
 }
 
 impl CNodeCap {
@@ -47,27 +49,10 @@ impl CNodeCap {
         todo!();
     }
 
-    pub fn get_cnode(&mut self, num: usize, offset: usize) -> KernelResult<&mut CNode> {
-        (self.get_entry_num() >= num + offset)
-            .then_some(())
-            .ok_or(kerr!(ErrKind::NoEnoughSlot))?;
+    pub fn get_cnode(&mut self) -> &mut [Option<CNodeEntry>] {
         let ptr: KernelVAddress = self.0.get_address().into();
-        let ptr: *mut CNodeEntry = ptr.into();
-        unsafe {
-            let cnode = ptr.add(offset).cast::<CNode>();
-            Ok(cnode.as_mut().unwrap())
-        }
-    }
-
-    pub fn get_writable(&mut self, num: usize, offset: usize) -> KernelResult<&mut CNode> {
-        let cnode = self.get_cnode(num, offset)?;
-        for i in 0..num {
-            let entry = cnode.lookup_entry_mut(i)?;
-            entry
-                .as_ref()
-                .map_or(Ok(()), |_| Err(kerr!(ErrKind::NotEmptySlot)))?;
-        }
-        Ok(cnode)
+        let ptr: *mut Option<CNodeEntry> = ptr.into();
+        unsafe { core::slice::from_raw_parts_mut(ptr, 2_usize.pow(self.radix())) }
     }
 
     pub fn get_src_and_dest(
@@ -89,15 +74,58 @@ impl CNodeCap {
         }
     }
 
-    fn get_entry_num(&self) -> usize {
-        self.radix()
+    pub fn lookup_entry_mut(
+        &mut self,
+        capptr: usize,
+        depth_bits: u32,
+    ) -> KernelResult<&mut Option<CNodeEntry>> {
+        let mut cnode_cap = self;
+        let mut depth_bits = depth_bits;
+        loop {
+            let (next_cap, next_bits) = match cnode_cap._lookup_entry_mut(capptr, depth_bits)? {
+                (val @ &mut None, _) => return Ok(val),
+                (val, 0) => return Ok(val),
+                (val, rem) => {
+                    let entry = val.as_mut().unwrap();
+                    let cap = entry.cap_ref_mut();
+                    if cap.get_cap_type()? != CapabilityType::CNode {
+                        return Ok(val);
+                    }
+                    unsafe {
+                        // TODO: Fix this dirty hack
+                        let ptr = cap as *mut RawCapability as *mut CNodeCap;
+                        (&mut *ptr, rem)
+                    }
+                }
+            };
+            cnode_cap = next_cap;
+            depth_bits = next_bits;
+        }
     }
 
-    pub fn lookup_entry_mut(&mut self, index: usize) -> KernelResult<&mut Option<CNodeEntry>> {
-        self.get_cnode(1, index)?.lookup_entry_mut(0)
+    pub fn lookup_entry_mut_one_level(
+        &mut self,
+        capptr: usize,
+    ) -> KernelResult<&mut Option<CNodeEntry>> {
+        self.lookup_entry_mut(capptr, self.radix())
     }
 
-    fn radix(&self) -> usize {
-        self.0.cap_dep_val as usize
+    fn _lookup_entry_mut(
+        &mut self,
+        capptr: usize,
+        depth_bits: u32,
+    ) -> KernelResult<(&mut Option<CNodeEntry>, u32)> {
+        let radix = self.radix();
+        let remain_bits = depth_bits
+            .checked_sub(radix)
+            .ok_or(kerr!(ErrKind::OutOfMemory))?;
+        let cnode = self.get_cnode();
+        let offset = (capptr >> remain_bits) & ((1 << radix) - 1); // TODO: usize::BITS
+        let entry = &mut cnode[offset];
+        Ok((entry, remain_bits))
+    }
+
+    fn radix(&self) -> u32 {
+        self.0.cap_dep_val as u32
     }
 }
