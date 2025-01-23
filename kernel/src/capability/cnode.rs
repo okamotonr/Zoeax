@@ -3,7 +3,6 @@ use crate::address::KernelVAddress;
 use crate::common::{ErrKind, KernelResult};
 use crate::kerr;
 use crate::object::{CNode, CNodeEntry};
-use crate::println;
 
 use core::mem;
 
@@ -34,7 +33,9 @@ impl Capability for CNodeCap {
         Ok(Self::new(self.get_raw_cap()))
     }
 
-    fn init_object(&mut self) {}
+    fn init_object(&mut self) {
+        // TODO: Zero clear
+    }
 }
 
 impl CNodeCap {
@@ -80,7 +81,6 @@ impl CNodeCap {
     ) -> KernelResult<&mut Option<CNodeEntry>> {
         let mut cnode_cap = self;
         let mut depth_bits = depth_bits;
-        println!("lookuping");
         loop {
             let (next_cap, next_bits) = match cnode_cap._lookup_entry_mut(capptr, depth_bits)? {
                 (val @ &mut None, _) => return Ok(val),
@@ -116,19 +116,12 @@ impl CNodeCap {
         depth_bits: u32,
     ) -> KernelResult<(&mut Option<CNodeEntry>, u32)> {
         let radix = self.radix();
-        println!("{}", depth_bits);
         let remain_bits = depth_bits
             .checked_sub(radix)
             .ok_or(kerr!(ErrKind::OutOfMemory))?;
-        let n_bits = radix.saturating_sub(depth_bits);
         let cnode = self.get_cnode();
-        println!("nbits is {n_bits}");
-        println!("remain_bits is {remain_bits}");
-        let offset = capptr >> n_bits; // TODO: usize::BITS
-        println!("offset is {offset}");
-        println!("capptr is {capptr}");
+        let offset = (capptr >> remain_bits) & ((1 << radix) - 1); // TODO: usize::BITS
         let entry = &mut cnode[offset];
-        println!("entry is {:?}", entry);
         Ok((entry, remain_bits))
     }
 

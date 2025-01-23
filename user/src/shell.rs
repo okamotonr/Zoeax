@@ -1,5 +1,5 @@
 use common::println;
-//use common::syscall::cnode_copy;
+use common::syscall::cnode_copy;
 use common::syscall::cnode_mint;
 use common::syscall::recv_signal;
 use common::syscall::resume_tcb;
@@ -23,7 +23,7 @@ pub fn main(untyped_cnode_idx: usize) {
     let notify_idx = tcb_idx + 1;
     untyped_retype(untyped_cnode_idx, notify_idx, 0, 1, TYPE_NOTIFY);
     let lv2_cnode_idx = notify_idx + 1;
-    untyped_retype(untyped_cnode_idx, lv2_cnode_idx, 0, 1, TYPE_CNODE);
+    untyped_retype(untyped_cnode_idx, lv2_cnode_idx, 1, 1, TYPE_CNODE);
 
     let sp_val = unsafe {
         let stack_bottom = &mut STACK[511];
@@ -31,6 +31,19 @@ pub fn main(untyped_cnode_idx: usize) {
     };
     write_reg(tcb_idx, 0, sp_val);
     write_reg(tcb_idx, 1, children as usize);
+
+    let dest_idx = lv2_cnode_idx << 1;
+    println!("heyheyheyhey     copy");
+    println!("{:#b}", dest_idx);
+    println!("{:#b}", lv2_cnode_idx);
+    cnode_copy(
+        root_cnode_idx,
+        notify_idx,
+        ROOT_CNODE_RADIX,
+        root_cnode_idx,
+        dest_idx,
+        ROOT_CNODE_RADIX + 1,
+    );
 
     cnode_mint(
         root_cnode_idx,

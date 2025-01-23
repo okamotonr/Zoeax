@@ -78,9 +78,10 @@ impl UntypedCap {
         num: usize,
     ) -> KernelResult<CapGenerator<T>> {
         // 1, can convert from device memory
+        println!("user size is {}", user_size);
         let is_device = self.is_device();
         if is_device {
-            Self::can_be_retyped_from_device_memory()
+            T::can_be_retyped_from_device_memory()
                 .then_some(())
                 .ok_or(kerr!(ErrKind::CanNotNewFromDeviceMemory))?
         }
@@ -95,7 +96,7 @@ impl UntypedCap {
             .ok_or(kerr!(ErrKind::NoMemory))?;
         // 3, create given type capabilities
         let free_idx_aligned = align_up(self.get_free_index().into(), align).into();
-        let cap_generator = CapGenerator::<T>::new(num, free_idx_aligned, object_size);
+        let cap_generator = CapGenerator::<T>::new(num, free_idx_aligned, user_size, object_size);
         let new_free_address = cap_generator.end_address;
         // 4, update self information
         let v = Self::create_cap_dep_val(new_free_address, block_size);
@@ -182,19 +183,26 @@ impl UntypedCap {
 pub struct CapGenerator<C: Capability> {
     num: usize,              // mutable
     address: KernelVAddress, // mutable
+    user_size: usize,
     obj_size: usize,
     end_address: KernelVAddress,
     _phantom: PhantomData<fn() -> C>,
 }
 
 impl<C: Capability> CapGenerator<C> {
-    pub fn new(num: usize, start_address: KernelVAddress, obj_size: usize) -> Self {
+    pub fn new(
+        num: usize,
+        start_address: KernelVAddress,
+        user_size: usize,
+        obj_size: usize,
+    ) -> Self {
         let end_address = KernelVAddress::new(
             <KernelVAddress as Into<usize>>::into(start_address) + obj_size * num,
         );
         Self {
             num,
             address: start_address,
+            user_size,
             obj_size,
             _phantom: PhantomData,
             end_address,
@@ -208,7 +216,7 @@ impl<C: Capability> Iterator for CapGenerator<C> {
         if self.num == 0 {
             None
         } else {
-            let cap = C::init(self.address, self.obj_size);
+            let cap = C::init(self.address, self.user_size);
             self.address = self.address.add(self.obj_size);
             self.num -= 1;
             Some(cap)
