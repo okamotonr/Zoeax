@@ -5,7 +5,7 @@ use crate::object::{resume, CNodeEntry, ThreadControlBlock, ThreadInfo};
 use core::mem;
 
 use super::cnode::CNodeCap;
-use super::page_table::PageTableCap;
+use super::page_table::{PageCap, PageTableCap};
 
 #[derive(Debug)]
 pub struct TCBCap(RawCapability);
@@ -45,6 +45,12 @@ impl TCBCap {
         let vspace = PageTableCap::try_from_raw(src.cap())?;
         let vspace_new = vspace.derive(src)?;
         self.get_tcb().set_root_vspace(vspace_new, src);
+        Ok(())
+    }
+    pub fn set_ipc_buffer(&mut self, src: &mut CNodeEntry) -> KernelResult<()> {
+        let page_cap = PageCap::try_from_raw(src.cap())?;
+        let page_cap_new = page_cap.derive(src)?;
+        self.get_tcb().set_ipc_buffer(page_cap_new, src);
         Ok(())
     }
 }

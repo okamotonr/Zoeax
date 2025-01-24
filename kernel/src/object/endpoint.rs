@@ -44,7 +44,7 @@ impl Endpoint {
 
     pub fn send(&mut self, thread: &mut ThreadControlBlock) {
         if let Some(reciever_thread) = self.pop_from_queue(EndpointState::Send) {
-            reciever_thread.set_msg(thread.msg_buffer);
+            //reciever_thread.set_msg(thread.msg_buffer);
             wake_up_thread(thread);
             wake_up_thread(reciever_thread);
         } else {
@@ -55,7 +55,7 @@ impl Endpoint {
 
     pub fn recv(&mut self, thread: &mut ThreadControlBlock) {
         if let Some(send_thread) = self.pop_from_queue(EndpointState::Recv) {
-            thread.set_msg(send_thread.msg_buffer);
+            //thread.set_msg(send_thread.msg_buffer);
             wake_up_thread(thread);
             wake_up_thread(send_thread);
         } else {

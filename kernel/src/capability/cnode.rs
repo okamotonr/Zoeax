@@ -8,8 +8,8 @@ use core::mem;
 
 /*
  * RawCapability[0]
- * |   radix    |
- * 64    64    0
+ * | padding |  radix  |
+ * 63      32         0
  */
 pub struct CNodeCap(RawCapability);
 impl Capability for CNodeCap {

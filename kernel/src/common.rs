@@ -17,7 +17,7 @@ pub fn align_down(value: usize, align: usize) -> usize {
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrKind {
-    NoMemory,
+    NoMemory = 1,
     TooManyTasks,
     PteNotFound,
     OutOfMemory,

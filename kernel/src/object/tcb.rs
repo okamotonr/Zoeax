@@ -1,3 +1,4 @@
+use crate::capability::page_table::PageCap;
 use crate::capability::Capability;
 use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
 use crate::common::{ErrKind, KernelResult};
@@ -130,7 +131,7 @@ pub struct ThreadInfo {
     pub root_cnode: Option<CNodeEntry>,
     pub vspace: Option<CNodeEntry>,
     pub registers: Registers,
-    pub msg_buffer: usize,
+    pub ipc_buffer: Option<CNodeEntry>,
     #[cfg(debug_assertions)]
     pub tid: usize,
 }
@@ -147,7 +148,6 @@ impl ThreadInfo {
         }
         ret
     }
-    pub fn set_msg(&mut self, _msg_buffer: usize) {}
     pub fn resume(&mut self) {
         self.status = ThreadState::Runnable;
     }
@@ -156,6 +156,9 @@ impl ThreadInfo {
     }
     pub fn is_runnable(&self) -> bool {
         self.status == ThreadState::Runnable
+    }
+    pub fn ipc_buffer_ref(&self) -> Option<&[u64; 512]> {
+        None
     }
     pub fn set_timeout(&mut self, time_out: usize) {
         self.time_slice = time_out
@@ -168,7 +171,7 @@ impl ThreadInfo {
             root_cnode: None,
             vspace: None,
             registers: Registers::null(),
-            msg_buffer: 0,
+            ipc_buffer: None,
             #[cfg(debug_assertions)]
             tid: 0,
         }
@@ -202,6 +205,13 @@ impl ThreadInfo {
         let mut new_entry = CNodeEntry::new_with_rawcap(vspace_cap.get_raw_cap());
         new_entry.insert(parent);
         self.vspace = Some(new_entry)
+    }
+
+    pub fn set_ipc_buffer(&mut self, page_cap: PageCap, parent: &mut CNodeEntry) {
+        assert!(self.ipc_buffer.is_none());
+        let mut new_entry = CNodeEntry::new_with_rawcap(page_cap.get_raw_cap());
+        new_entry.insert(parent);
+        self.ipc_buffer = Some(new_entry)
     }
 }
 

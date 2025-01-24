@@ -24,7 +24,7 @@ impl Notification {
     pub fn send_signal(&mut self, val: u64) {
         // TODO: val must be nonzero
         if let Some(wait_thread) = self.wait_queue.pop() {
-            wait_thread.registers.a0 = val as usize;
+            wait_thread.registers.a1 = val as usize;
             wake_up_thread(wait_thread);
         } else {
             let old_v = if let Some(v) = self.notify_bit {
@@ -39,7 +39,7 @@ impl Notification {
 
     pub fn wait_signal(&mut self, thread: &mut ThreadControlBlock) -> bool {
         if let Some(bit) = self.notify_bit.take() {
-            thread.registers.a0 = u64::from(bit) as usize;
+            thread.registers.a1 = u64::from(bit) as usize;
             false
         } else {
             block_thread(thread);
