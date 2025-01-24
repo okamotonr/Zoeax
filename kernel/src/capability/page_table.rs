@@ -145,7 +145,11 @@ impl Capability for PageTableCap {
     }
 
     fn init_object(&mut self) {
-        todo!()
+        let addr = KernelVAddress::from(self.0.get_address());
+        let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr);
+        unsafe {
+            *ptr = PageTable::new();
+        }
     }
     fn get_object_size<'a>(_user_size: usize) -> usize {
         PAGE_SIZE // page size, bytes
@@ -170,7 +174,11 @@ impl Capability for PageCap {
     }
 
     fn init_object(&mut self) {
-        todo!()
+        let addr = KernelVAddress::from(self.0.get_address());
+        let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr);
+        unsafe {
+            *ptr = Page::new();
+        }
     }
 
     fn get_object_size<'a>(_user_size: usize) -> usize {

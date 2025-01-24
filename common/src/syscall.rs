@@ -23,11 +23,15 @@ pub const NOTIFY_SEND: usize = 7;
 pub const CNODE_COPY: usize = 8;
 pub const CNODE_MINT: usize = 9;
 pub const CNODE_MOVE: usize = 10;
+pub const PAGE_MAP: usize = 11;
+pub const PAGE_TABLE_MAP: usize = 12;
 
 // TODO: same kernel::capability::CapabilityType
 pub const TYPE_TCB: usize = 3;
 pub const TYPE_CNODE: usize = 7;
 pub const TYPE_NOTIFY: usize = 9;
+pub const TYPE_PAGE_TABLE: usize = 2;
+pub const TYPE_PAGE: usize = 4;
 
 // TODO: use kernel::common
 pub type SysCallRes = Result<usize, (usize, usize)>;
@@ -205,5 +209,26 @@ pub fn cnode_move(
             0,
             SysNo::Call,
         )
+    }
+}
+
+pub fn map_page(
+    src_ptr: usize,
+    dest_ptr: usize,
+    vaddr: usize,
+    flags: usize
+) -> SysCallRes {
+    unsafe {
+        syscall(src_ptr, PAGE_MAP, dest_ptr, vaddr, flags, 0, 0, SysNo::Call)
+    }
+}
+
+pub fn map_page_table(
+    src_ptr: usize,
+    dest_ptr: usize,
+    vaddr: usize
+) -> SysCallRes {
+    unsafe {
+        syscall(src_ptr, PAGE_TABLE_MAP, dest_ptr, vaddr, 0, 0, 0, SysNo::Call)
     }
 }

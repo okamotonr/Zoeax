@@ -4,6 +4,8 @@
 
 use core::{arch::naked_asm, panic::PanicInfo};
 
+use common::println;
+
 mod shell;
 
 extern "C" {
@@ -25,7 +27,8 @@ extern "C" fn start() {
 }
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
+    println!("{:?}", info);
     loop {}
 }
 

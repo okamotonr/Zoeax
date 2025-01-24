@@ -37,6 +37,8 @@ pub enum ErrKind {
     UnknownInvocation,
     CanNotDerivable,
     InvalidOperation,
+    CapNotFound,
+    NotAligned,
 }
 
 pub type KernelResult<T> = Result<T, KernelError>;
@@ -56,6 +58,19 @@ macro_rules! kerr {
         $crate::common::KernelError {
             e_kind: $ekind,
             e_val: 0,
+            #[cfg(debug_assertions)]
+            e_place: $crate::common::EPlace {
+                e_line: line!(),
+                e_column: column!(),
+                e_file: file!(),
+            },
+        }
+    };
+
+    ($ekind:expr, $eval:expr) => {
+        $crate::common::KernelError {
+            e_kind: $ekind,
+            e_val: $eval,
             #[cfg(debug_assertions)]
             e_place: $crate::common::EPlace {
                 e_line: line!(),

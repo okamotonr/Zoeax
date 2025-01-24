@@ -1,17 +1,11 @@
 use crate::{
-    capability::{
-        cnode::CNodeCap, notification::NotificationCap, page_table::PageCap, tcb::TCBCap, untyped::UntypedCap, Capability, CapabilityType
-    },
-    common::{ErrKind, KernelResult},
-    kerr,
-    object::{CNodeEntry, Registers},
-    scheduler::{get_current_tcb_mut, require_schedule},
-    uart::putchar,
-    println,
+    address::PAGE_SIZE, capability::{
+        cnode::CNodeCap, notification::NotificationCap, page_table::{PageCap, PageTableCap}, tcb::TCBCap, untyped::UntypedCap, Capability, CapabilityType
+    }, common::{is_aligned, ErrKind, KernelResult}, kerr, object::{page_table::PAGE_U, CNodeEntry, Registers}, println, scheduler::{get_current_tcb_mut, require_schedule}, uart::putchar
 };
 
 use common::syscall::{
-    CALL, CNODE_COPY, CNODE_MINT, CNODE_MOVE, NOTIFY_SEND, NOTIFY_WAIT, PUTCHAR, RECV, SEND, TCB_CONFIGURE, TCB_RESUME, TCB_SET_IPC_BUFFER, TCB_WRITE_REG, UNTYPED_RETYPE
+    CALL, CNODE_COPY, CNODE_MINT, CNODE_MOVE, NOTIFY_SEND, NOTIFY_WAIT, PAGE_MAP, PAGE_TABLE_MAP, PUTCHAR, RECV, SEND, TCB_CONFIGURE, TCB_RESUME, TCB_SET_IPC_BUFFER, TCB_WRITE_REG, UNTYPED_RETYPE
 };
 
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
@@ -32,8 +26,6 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
         }
         _ => panic!("Unknown system call"),
     };
-    // increment pc
-    reg.sepc += 4;
     if let Err(e) = syscall_ret {
         println!("system call failed, {:?}", e);
         reg.a0 = e.e_kind as usize;
@@ -41,6 +33,8 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
     } else {
         reg.a0 = 0;
     }
+    // increment pc
+    reg.sepc += 4;
 }
 
 fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
@@ -123,6 +117,44 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             )?;
             tcb_cap.make_runnable();
             Ok(())
+        },
+        PAGE_MAP | PAGE_TABLE_MAP => {
+            let page_table_ptr = reg.a2;
+            let vaddr = reg.a3;
+            is_aligned(vaddr, PAGE_SIZE).then_some(()).ok_or(kerr!(ErrKind::NotAligned, PAGE_SIZE as u16))?;
+            let mut page_table_cap = PageTableCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut_one_level(page_table_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
+            if inv_label == PAGE_MAP {
+                // TODO: interpret flags
+                let flags = PAGE_U | reg.a4;
+                let mut page = PageCap::try_from_raw(
+                    root_cnode
+                        .lookup_entry_mut_one_level(cap_ptr)?
+                        .as_mut()
+                        .unwrap()
+                        .cap(),
+                )?;
+                page.map(&mut page_table_cap, vaddr.into(), flags)?;
+                let page_entry = root_cnode.lookup_entry_mut_one_level(cap_ptr)?.as_mut().ok_or(kerr!(ErrKind::CapNotFound))?;
+                page_entry.set_cap(page.get_raw_cap());
+            } else {
+                let mut page = PageTableCap::try_from_raw(
+                    root_cnode
+                        .lookup_entry_mut_one_level(cap_ptr)?
+                        .as_mut()
+                        .unwrap()
+                        .cap(),
+                )?;
+                page.map(&mut page_table_cap, vaddr.into())?;
+                let page_entry = root_cnode.lookup_entry_mut_one_level(cap_ptr)?.as_mut().ok_or(kerr!(ErrKind::CapNotFound))?;
+                page_entry.set_cap(page.get_raw_cap());
+            }
+            Ok(())
         }
         CNODE_COPY | CNODE_MINT | CNODE_MOVE => {
             let src_depth = (reg.a3 >> 31) as u32;
@@ -166,7 +198,7 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                 *dest_slot = Some(new_slot);
                 Ok(())
             }
-        }
+        },
         _ => Err(kerr!(ErrKind::UnknownInvocation)),
     }
 }
