@@ -157,8 +157,15 @@ impl ThreadInfo {
     pub fn is_runnable(&self) -> bool {
         self.status == ThreadState::Runnable
     }
-    pub fn ipc_buffer_ref(&self) -> Option<&[u64; 512]> {
-        None
+
+    pub fn ipc_buffer_ref(&self) -> Option<&mut [u64; 512]> {
+        self.ipc_buffer.as_ref().map(|ref page_cap_e| {
+            let page_cap = PageCap::try_from_raw(page_cap_e.cap()).unwrap();
+            let address: *mut [u64; 512] = page_cap.get_address().into();
+            unsafe {
+                &mut *{address}
+            }
+        })
     }
     pub fn set_timeout(&mut self, time_out: usize) {
         self.time_slice = time_out
@@ -194,6 +201,7 @@ impl ThreadInfo {
     }
 
     pub fn set_root_cspace(&mut self, cspace_cap: CNodeCap, parent: &mut CNodeEntry) {
+        // TODO: you should consider when already set.
         assert!(self.root_cnode.is_none(), "{:?}", self.root_cnode);
         let mut new_entry = CNodeEntry::new_with_rawcap(cspace_cap.get_raw_cap());
         new_entry.insert(parent);
@@ -201,6 +209,7 @@ impl ThreadInfo {
     }
 
     pub fn set_root_vspace(&mut self, vspace_cap: PageTableCap, parent: &mut CNodeEntry) {
+        // TODO: you should consider when already set.
         assert!(self.vspace.is_none(), "{:?}", self.vspace);
         let mut new_entry = CNodeEntry::new_with_rawcap(vspace_cap.get_raw_cap());
         new_entry.insert(parent);
@@ -208,6 +217,8 @@ impl ThreadInfo {
     }
 
     pub fn set_ipc_buffer(&mut self, page_cap: PageCap, parent: &mut CNodeEntry) {
+        // TODO: check right
+        // TODO: you should consider when already set.
         assert!(self.ipc_buffer.is_none());
         let mut new_entry = CNodeEntry::new_with_rawcap(page_cap.get_raw_cap());
         new_entry.insert(parent);

@@ -6,6 +6,7 @@ use common::syscall::map_page_table;
 use common::syscall::recv_signal;
 use common::syscall::resume_tcb;
 use common::syscall::send_signal;
+use common::syscall::set_ipc_buffer;
 use common::syscall::write_reg;
 use common::syscall::TYPE_CNODE;
 use common::syscall::TYPE_NOTIFY;
@@ -45,6 +46,7 @@ pub fn main(untyped_cnode_idx: usize) {
     unsafe {
         (*ptr) = 3;
     }
+    set_ipc_buffer(tcb_idx, page_idx).unwrap();
 
     let sp_val = unsafe {
         let stack_bottom = &mut STACK[511];

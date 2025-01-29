@@ -232,3 +232,11 @@ pub fn map_page_table(
         syscall(src_ptr, PAGE_TABLE_MAP, dest_ptr, vaddr, 0, 0, 0, SysNo::Call)
     }
 }
+
+pub const MESSAGE_LEN: usize = 128;
+
+pub struct IPCBuffer {
+    pub tag: usize,
+    pub message: [usize; MESSAGE_LEN],
+    pub user_data: usize
+}

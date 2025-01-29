@@ -39,7 +39,6 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
 
 fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
-    // change registers with result of invocation.
     let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.as_mut().unwrap().cap())?;
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
