@@ -1,11 +1,11 @@
 use crate::{
     address::PAGE_SIZE, capability::{
-        cnode::CNodeCap, notification::NotificationCap, page_table::{PageCap, PageTableCap}, tcb::TCBCap, untyped::UntypedCap, Capability, CapabilityType
+        cnode::CNodeCap, endpoint::EndPointCap, notification::NotificationCap, page_table::{PageCap, PageTableCap}, tcb::TCBCap, untyped::UntypedCap, Capability, CapabilityType
     }, common::{is_aligned, ErrKind, KernelResult}, kerr, object::{page_table::PAGE_U, CNodeEntry, Registers}, println, scheduler::{get_current_tcb_mut, require_schedule}, uart::putchar
 };
 
 use common::syscall::{
-    CALL, CNODE_COPY, CNODE_MINT, CNODE_MOVE, NOTIFY_SEND, NOTIFY_WAIT, PAGE_MAP, PAGE_TABLE_MAP, PUTCHAR, RECV, SEND, TCB_CONFIGURE, TCB_RESUME, TCB_SET_IPC_BUFFER, TCB_WRITE_REG, UNTYPED_RETYPE
+    CALL, CNODE_COPY, CNODE_MINT, CNODE_MOVE, NOTIFY_SEND, NOTIFY_WAIT, PAGE_MAP, PAGE_TABLE_MAP, PUTCHAR, RECV, SEND, TCB_CONFIGURE, TCB_RESUME, TCB_SET_IPC_BUFFER, TCB_WRITE_REG, UNTYPED_RETYPE, EP_SEND, EP_RECV
 };
 
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
@@ -77,6 +77,8 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                 0 => 2,  // stack pointer
                 1 => 34, // sepc
                 2 => 10, // a0
+                3 => 11, // a1
+                4 => 12, // a2
                 _ => panic!("cannot set reg {:x}", reg.a2),
             };
             let value = reg.a3;
@@ -102,6 +104,7 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             let page_cap = root_cnode.lookup_entry_mut_one_level(page_ptr)?
                     .as_mut()
                     .unwrap();
+            // TODO: validate this page is mapped in this tcb's address space.
             tcb_cap.set_ipc_buffer(page_cap)?;
             Ok(())
         }
@@ -219,6 +222,20 @@ fn handle_send_invocation(reg: &mut Registers) -> KernelResult<()> {
             notify_cap.send();
             Ok(())
         }
+        EP_SEND => {
+            let mut ep_cap = EndPointCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
+            if ep_cap.send(current_tcb) {
+                require_schedule()
+            }
+            Ok(())
+
+        }
         _ => Err(kerr!(ErrKind::UnknownInvocation)),
     }
 }
@@ -238,6 +255,19 @@ fn handle_recieve_invocation(reg: &mut Registers) -> KernelResult<()> {
                     .cap(),
             )?;
             if notify_cap.wait(current_tcb) {
+                require_schedule()
+            }
+            Ok(())
+        }
+        EP_RECV => {
+            let mut ep_cap = EndPointCap::try_from_raw(
+                root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap(),
+            )?;
+            if ep_cap.recv(current_tcb) {
                 require_schedule()
             }
             Ok(())

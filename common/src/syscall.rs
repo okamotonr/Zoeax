@@ -25,9 +25,12 @@ pub const CNODE_MINT: usize = 9;
 pub const CNODE_MOVE: usize = 10;
 pub const PAGE_MAP: usize = 11;
 pub const PAGE_TABLE_MAP: usize = 12;
+pub const EP_SEND: usize = 13;
+pub const EP_RECV: usize = 14;
 
 // TODO: same kernel::capability::CapabilityType
 pub const TYPE_TCB: usize = 3;
+pub const TYPE_EP: usize = 5;
 pub const TYPE_CNODE: usize = 7;
 pub const TYPE_NOTIFY: usize = 9;
 pub const TYPE_PAGE_TABLE: usize = 2;
@@ -230,6 +233,18 @@ pub fn map_page_table(
 ) -> SysCallRes {
     unsafe {
         syscall(src_ptr, PAGE_TABLE_MAP, dest_ptr, vaddr, 0, 0, 0, SysNo::Call)
+    }
+}
+
+pub fn send_ipc(src_ptr: usize) -> SysCallRes {
+    unsafe {
+        syscall(src_ptr, EP_SEND, 0, 0, 0, 0, 0, SysNo::Send)
+    }
+}
+
+pub fn recv_ipc(src_ptr: usize) -> SysCallRes {
+    unsafe {
+        syscall(src_ptr, EP_RECV, 0, 0, 0, 0, 0, SysNo::Recv)
     }
 }
 

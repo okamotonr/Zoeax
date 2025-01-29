@@ -9,6 +9,7 @@ use common::list::ListItem;
 
 use crate::scheduler::SCHEDULER;
 use core::ops::{Index, IndexMut};
+use core::ptr;
 
 use super::cnode::CNodeEntry;
 #[cfg(debug_assertions)]
@@ -156,6 +157,16 @@ impl ThreadInfo {
     }
     pub fn is_runnable(&self) -> bool {
         self.status == ThreadState::Runnable
+    }
+
+    pub fn set_ipc_msg(&mut self, ipc_buffer_ref: Option<&mut [u64; 512]>) {
+        let self_ref = self.ipc_buffer_ref();
+        match (self_ref, ipc_buffer_ref) {
+            (Some(reciever_ref), Some(sender_ref)) => {
+                unsafe { ptr::copy(sender_ref, reciever_ref, 512) }
+            }
+            _ => {}
+        }
     }
 
     pub fn ipc_buffer_ref(&self) -> Option<&mut [u64; 512]> {

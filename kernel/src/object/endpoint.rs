@@ -1,6 +1,6 @@
 use common::list::{LinkedList, ListItem};
 
-use super::tcb::{ThreadControlBlock, ThreadInfo};
+use super::tcb::{ThreadControlBlock, ThreadInfo, resume};
 
 // TODO: More efficiency
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -42,25 +42,27 @@ impl Endpoint {
         }
     }
 
-    pub fn send(&mut self, thread: &mut ThreadControlBlock) {
+    pub fn send(&mut self, thread: &mut ThreadControlBlock) -> bool {
         if let Some(reciever_thread) = self.pop_from_queue(EndpointState::Send) {
-            //reciever_thread.set_msg(thread.msg_buffer);
-            wake_up_thread(thread);
+            reciever_thread.set_ipc_msg(thread.ipc_buffer_ref());
             wake_up_thread(reciever_thread);
+            false
         } else {
             block_thread(thread);
             self.queue.push(thread);
+            true
         }
     }
 
-    pub fn recv(&mut self, thread: &mut ThreadControlBlock) {
+    pub fn recv(&mut self, thread: &mut ThreadControlBlock) -> bool {
         if let Some(send_thread) = self.pop_from_queue(EndpointState::Recv) {
-            //thread.set_msg(send_thread.msg_buffer);
-            wake_up_thread(thread);
+            thread.set_ipc_msg(send_thread.ipc_buffer_ref());
             wake_up_thread(send_thread);
+            false
         } else {
             block_thread(thread);
             self.queue.push(thread);
+            true
         }
     }
 
@@ -75,12 +77,16 @@ impl Default for Endpoint {
     }
 }
 
-fn wake_up_thread<T>(_: &mut ListItem<T>) {
-    // 1, change thread state to Runnable
-    // 2, put into runqueu
-    todo!()
+
+fn wake_up_thread(tcb: &mut ThreadControlBlock) {
+    assert!(tcb.next_is_none());
+    resume(tcb);
 }
-fn block_thread<T>(_: &mut ListItem<T>) {
+ 
+fn block_thread(tcb: &mut ThreadControlBlock) {
     // 1, change thread state block
-    todo!()
+    assert!(tcb.next_is_none());
+    tcb.suspend();
+    // 2, remove tcb from runqueue
+    // currently tcb which will be blocked was poped out from runqueue because it is running thread.
 }
