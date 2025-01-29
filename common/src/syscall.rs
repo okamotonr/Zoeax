@@ -136,9 +136,7 @@ pub fn resume_tcb(src_ptr: usize) -> SysCallRes {
 }
 
 pub fn send_signal(src_ptr: usize) -> SysCallRes {
-    unsafe {
-        syscall(src_ptr, NOTIFY_SEND, 0, 0, 0, 0, 0, SysNo::Send)
-    }
+    unsafe { syscall(src_ptr, NOTIFY_SEND, 0, 0, 0, 0, 0, SysNo::Send) }
 }
 
 pub fn recv_signal(src_ptr: usize) -> SysCallRes {
@@ -215,37 +213,31 @@ pub fn cnode_move(
     }
 }
 
-pub fn map_page(
-    src_ptr: usize,
-    dest_ptr: usize,
-    vaddr: usize,
-    flags: usize
-) -> SysCallRes {
-    unsafe {
-        syscall(src_ptr, PAGE_MAP, dest_ptr, vaddr, flags, 0, 0, SysNo::Call)
-    }
+pub fn map_page(src_ptr: usize, dest_ptr: usize, vaddr: usize, flags: usize) -> SysCallRes {
+    unsafe { syscall(src_ptr, PAGE_MAP, dest_ptr, vaddr, flags, 0, 0, SysNo::Call) }
 }
 
-pub fn map_page_table(
-    src_ptr: usize,
-    dest_ptr: usize,
-    vaddr: usize
-) -> SysCallRes {
+pub fn map_page_table(src_ptr: usize, dest_ptr: usize, vaddr: usize) -> SysCallRes {
     unsafe {
-        syscall(src_ptr, PAGE_TABLE_MAP, dest_ptr, vaddr, 0, 0, 0, SysNo::Call)
+        syscall(
+            src_ptr,
+            PAGE_TABLE_MAP,
+            dest_ptr,
+            vaddr,
+            0,
+            0,
+            0,
+            SysNo::Call,
+        )
     }
 }
 
 pub fn send_ipc(src_ptr: usize) -> SysCallRes {
-    unsafe {
-        syscall(src_ptr, EP_SEND, 0, 0, 0, 0, 0, SysNo::Send)
-    }
+    unsafe { syscall(src_ptr, EP_SEND, 0, 0, 0, 0, 0, SysNo::Send) }
 }
 
 pub fn recv_ipc(src_ptr: usize) -> SysCallRes {
-    unsafe {
-        syscall(src_ptr, EP_RECV, 0, 0, 0, 0, 0, SysNo::Recv)
-    }
+    unsafe { syscall(src_ptr, EP_RECV, 0, 0, 0, 0, 0, SysNo::Recv) }
 }
 
 pub const MESSAGE_LEN: usize = 128;
@@ -253,5 +245,5 @@ pub const MESSAGE_LEN: usize = 128;
 pub struct IPCBuffer {
     pub tag: usize,
     pub message: [usize; MESSAGE_LEN],
-    pub user_data: usize
+    pub user_data: usize,
 }

@@ -1,6 +1,6 @@
-use common::list::{LinkedList, ListItem};
+use common::list::LinkedList;
 
-use super::tcb::{ThreadControlBlock, ThreadInfo, resume};
+use super::tcb::{resume, ThreadControlBlock, ThreadInfo};
 
 // TODO: More efficiency
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -77,12 +77,11 @@ impl Default for Endpoint {
     }
 }
 
-
 fn wake_up_thread(tcb: &mut ThreadControlBlock) {
     assert!(tcb.next_is_none());
     resume(tcb);
 }
- 
+
 fn block_thread(tcb: &mut ThreadControlBlock) {
     // 1, change thread state block
     assert!(tcb.next_is_none());

@@ -33,7 +33,6 @@ impl Capability for EndPointCap {
 }
 
 impl EndPointCap {
-
     /// return should be resche (because of blocking)
     pub fn send(&mut self, tcb: &mut ThreadControlBlock) -> bool {
         self.get_ep().send(tcb)
@@ -46,13 +45,11 @@ impl EndPointCap {
     fn get_ep(&mut self) -> &mut Endpoint {
         let addr = KernelVAddress::from(self.0.get_address());
         let ptr =
-            <KernelVAddress as Into<*mut <EndPointCap as Capability>::KernelObject>>::into(
-                addr,
-            );
+            <KernelVAddress as Into<*mut <EndPointCap as Capability>::KernelObject>>::into(addr);
         unsafe { &mut *ptr }
     }
 
-    fn get_batch(&self) -> u64 {
+    pub fn get_batch(&self) -> u64 {
         self.0.cap_dep_val
     }
 

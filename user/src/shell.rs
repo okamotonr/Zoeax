@@ -32,7 +32,7 @@ pub fn main(untyped_cnode_idx: usize) {
     untyped_retype(untyped_cnode_idx, notify_idx, 0, 1, TYPE_NOTIFY).unwrap();
     let lv2_cnode_idx = notify_idx + 1;
     untyped_retype(untyped_cnode_idx, lv2_cnode_idx, 1, 1, TYPE_CNODE).unwrap();
-    
+
     let page_idx = lv2_cnode_idx + 1;
     untyped_retype(untyped_cnode_idx, page_idx, 0, 1, TYPE_PAGE).unwrap();
     let page_table_idx = page_idx + 1;
@@ -72,7 +72,8 @@ pub fn main(untyped_cnode_idx: usize) {
         root_cnode_idx,
         dest_idx,
         ROOT_CNODE_RADIX + 1,
-    ).unwrap();
+    )
+    .unwrap();
 
     cnode_mint(
         root_cnode_idx,
@@ -82,7 +83,8 @@ pub fn main(untyped_cnode_idx: usize) {
         page_table_idx + 1,
         ROOT_CNODE_RADIX,
         0b100,
-    ).unwrap();
+    )
+    .unwrap();
     cnode_mint(
         root_cnode_idx,
         notify_idx,
@@ -91,7 +93,8 @@ pub fn main(untyped_cnode_idx: usize) {
         page_table_idx + 2,
         ROOT_CNODE_RADIX,
         0b1000,
-    ).unwrap();
+    )
+    .unwrap();
     cnode_mint(
         root_cnode_idx,
         ep_idx,
@@ -99,8 +102,9 @@ pub fn main(untyped_cnode_idx: usize) {
         root_cnode_idx,
         ep_mint_idx,
         ROOT_CNODE_RADIX,
-        0xdeadbeef
-    ).unwrap();
+        0xdeadbeef,
+    )
+    .unwrap();
     write_reg(tcb_idx, 2, page_table_idx + 1).unwrap();
     write_reg(tcb_idx, 3, ep_mint_idx).unwrap();
     write_reg(tcb_idx, 4, untyped_cnode_idx).unwrap();
@@ -124,7 +128,7 @@ pub fn main(untyped_cnode_idx: usize) {
 
 #[allow(clippy::empty_loop)]
 fn children(a0: usize, a1: usize, a2: usize) {
-    let root_cnode_idx: usize = 2;
+    let _root_cnode_idx: usize = 2;
     let root_vspace_idx: usize = 3;
     println!("children: hello from children");
     println!("children: a0 is {a0}");

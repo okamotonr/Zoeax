@@ -1,11 +1,26 @@
 use crate::{
-    address::PAGE_SIZE, capability::{
-        cnode::CNodeCap, endpoint::EndPointCap, notification::NotificationCap, page_table::{PageCap, PageTableCap}, tcb::TCBCap, untyped::UntypedCap, Capability, CapabilityType
-    }, common::{is_aligned, ErrKind, KernelResult}, kerr, object::{page_table::PAGE_U, CNodeEntry, Registers}, println, scheduler::{get_current_tcb_mut, require_schedule}, uart::putchar
+    address::PAGE_SIZE,
+    capability::{
+        cnode::CNodeCap,
+        endpoint::EndPointCap,
+        notification::NotificationCap,
+        page_table::{PageCap, PageTableCap},
+        tcb::TCBCap,
+        untyped::UntypedCap,
+        Capability, CapabilityType,
+    },
+    common::{is_aligned, ErrKind, KernelResult},
+    kerr,
+    object::{page_table::PAGE_U, CNodeEntry, Registers},
+    println,
+    scheduler::{get_current_tcb_mut, require_schedule},
+    uart::putchar,
 };
 
 use common::syscall::{
-    CALL, CNODE_COPY, CNODE_MINT, CNODE_MOVE, NOTIFY_SEND, NOTIFY_WAIT, PAGE_MAP, PAGE_TABLE_MAP, PUTCHAR, RECV, SEND, TCB_CONFIGURE, TCB_RESUME, TCB_SET_IPC_BUFFER, TCB_WRITE_REG, UNTYPED_RETYPE, EP_SEND, EP_RECV
+    CALL, CNODE_COPY, CNODE_MINT, CNODE_MOVE, EP_RECV, EP_SEND, NOTIFY_SEND, NOTIFY_WAIT, PAGE_MAP,
+    PAGE_TABLE_MAP, PUTCHAR, RECV, SEND, TCB_CONFIGURE, TCB_RESUME, TCB_SET_IPC_BUFFER,
+    TCB_WRITE_REG, UNTYPED_RETYPE,
 };
 
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
@@ -15,15 +30,9 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
             putchar(a0 as u8);
             Ok(())
         }
-        CALL => {
-            handle_call_invocation(reg)
-        }
-        SEND => {
-            handle_send_invocation(reg)
-        }
-        RECV => {
-            handle_recieve_invocation(reg)
-        }
+        CALL => handle_call_invocation(reg),
+        SEND => handle_send_invocation(reg),
+        RECV => handle_recieve_invocation(reg),
         _ => panic!("Unknown system call"),
     };
     if let Err(e) = syscall_ret {
@@ -101,14 +110,15 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                     .unwrap()
                     .cap(),
             )?;
-            let page_cap = root_cnode.lookup_entry_mut_one_level(page_ptr)?
-                    .as_mut()
-                    .unwrap();
+            let page_cap = root_cnode
+                .lookup_entry_mut_one_level(page_ptr)?
+                .as_mut()
+                .unwrap();
             // TODO: validate this page is mapped in this tcb's address space.
             tcb_cap.set_ipc_buffer(page_cap)?;
             Ok(())
         }
-    
+
         TCB_RESUME => {
             let mut tcb_cap = TCBCap::try_from_raw(
                 root_cnode
@@ -119,11 +129,13 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             )?;
             tcb_cap.make_runnable();
             Ok(())
-        },
+        }
         PAGE_MAP | PAGE_TABLE_MAP => {
             let page_table_ptr = reg.a2;
             let vaddr = reg.a3;
-            is_aligned(vaddr, PAGE_SIZE).then_some(()).ok_or(kerr!(ErrKind::NotAligned, PAGE_SIZE as u16))?;
+            is_aligned(vaddr, PAGE_SIZE)
+                .then_some(())
+                .ok_or(kerr!(ErrKind::NotAligned, PAGE_SIZE as u16))?;
             let mut page_table_cap = PageTableCap::try_from_raw(
                 root_cnode
                     .lookup_entry_mut_one_level(page_table_ptr)?
@@ -142,7 +154,10 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                         .cap(),
                 )?;
                 page.map(&mut page_table_cap, vaddr.into(), flags)?;
-                let page_entry = root_cnode.lookup_entry_mut_one_level(cap_ptr)?.as_mut().ok_or(kerr!(ErrKind::CapNotFound))?;
+                let page_entry = root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .ok_or(kerr!(ErrKind::CapNotFound))?;
                 page_entry.set_cap(page.get_raw_cap());
             } else {
                 let mut page = PageTableCap::try_from_raw(
@@ -153,7 +168,10 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                         .cap(),
                 )?;
                 page.map(&mut page_table_cap, vaddr.into())?;
-                let page_entry = root_cnode.lookup_entry_mut_one_level(cap_ptr)?.as_mut().ok_or(kerr!(ErrKind::CapNotFound))?;
+                let page_entry = root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .ok_or(kerr!(ErrKind::CapNotFound))?;
                 page_entry.set_cap(page.get_raw_cap());
             }
             Ok(())
@@ -200,7 +218,7 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                 *dest_slot = Some(new_slot);
                 Ok(())
             }
-        },
+        }
         _ => Err(kerr!(ErrKind::UnknownInvocation)),
     }
 }
@@ -234,7 +252,6 @@ fn handle_send_invocation(reg: &mut Registers) -> KernelResult<()> {
                 require_schedule()
             }
             Ok(())
-
         }
         _ => Err(kerr!(ErrKind::UnknownInvocation)),
     }

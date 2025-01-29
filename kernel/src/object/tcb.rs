@@ -160,22 +160,16 @@ impl ThreadInfo {
     }
 
     pub fn set_ipc_msg(&mut self, ipc_buffer_ref: Option<&mut [u64; 512]>) {
-        let self_ref = self.ipc_buffer_ref();
-        match (self_ref, ipc_buffer_ref) {
-            (Some(reciever_ref), Some(sender_ref)) => {
-                unsafe { ptr::copy(sender_ref, reciever_ref, 512) }
-            }
-            _ => {}
+        if let (Some(reciever_ref), Some(sender_ref)) = (self.ipc_buffer_ref(), ipc_buffer_ref) {
+            unsafe { ptr::copy(sender_ref, reciever_ref, 512) }
         }
     }
 
     pub fn ipc_buffer_ref(&self) -> Option<&mut [u64; 512]> {
-        self.ipc_buffer.as_ref().map(|ref page_cap_e| {
+        self.ipc_buffer.as_ref().map(|page_cap_e| {
             let page_cap = PageCap::try_from_raw(page_cap_e.cap()).unwrap();
             let address: *mut [u64; 512] = page_cap.get_address().into();
-            unsafe {
-                &mut *{address}
-            }
+            unsafe { &mut *{ address } }
         })
     }
     pub fn set_timeout(&mut self, time_out: usize) {

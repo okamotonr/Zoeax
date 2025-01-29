@@ -19,7 +19,7 @@ impl fmt::Write for SyscallWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for ch in s.as_bytes() {
             let ch = *ch;
-            put_char(ch);
+            put_char(ch).unwrap();
         }
         Ok(())
     }
