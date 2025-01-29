@@ -90,7 +90,6 @@ impl fmt::Debug for RawCapability {
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum CapabilityType {
-    Null = 0,
     Untyped = 1,
     TCB = 3,
     EndPoint = 5,
@@ -104,7 +103,6 @@ pub enum CapabilityType {
 impl CapabilityType {
     pub fn try_from_u8(val: u8) -> KernelResult<Self> {
         match val {
-            0 => Ok(Self::Null),
             1 => Ok(Self::Untyped),
             3 => Ok(Self::TCB),
             5 => Ok(Self::EndPoint),

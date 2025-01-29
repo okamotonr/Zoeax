@@ -1,3 +1,4 @@
+use crate::capability::page_table::PageCap;
 use crate::capability::Capability;
 use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
 use crate::common::{ErrKind, KernelResult};
@@ -8,6 +9,7 @@ use common::list::ListItem;
 
 use crate::scheduler::SCHEDULER;
 use core::ops::{Index, IndexMut};
+use core::ptr;
 
 use super::cnode::CNodeEntry;
 #[cfg(debug_assertions)]
@@ -130,7 +132,7 @@ pub struct ThreadInfo {
     pub root_cnode: Option<CNodeEntry>,
     pub vspace: Option<CNodeEntry>,
     pub registers: Registers,
-    pub msg_buffer: usize,
+    pub ipc_buffer: Option<CNodeEntry>,
     #[cfg(debug_assertions)]
     pub tid: usize,
 }
@@ -147,7 +149,6 @@ impl ThreadInfo {
         }
         ret
     }
-    pub fn set_msg(&mut self, _msg_buffer: usize) {}
     pub fn resume(&mut self) {
         self.status = ThreadState::Runnable;
     }
@@ -156,6 +157,20 @@ impl ThreadInfo {
     }
     pub fn is_runnable(&self) -> bool {
         self.status == ThreadState::Runnable
+    }
+
+    pub fn set_ipc_msg(&mut self, ipc_buffer_ref: Option<&mut [u64; 512]>) {
+        if let (Some(reciever_ref), Some(sender_ref)) = (self.ipc_buffer_ref(), ipc_buffer_ref) {
+            unsafe { ptr::copy(sender_ref, reciever_ref, 512) }
+        }
+    }
+
+    pub fn ipc_buffer_ref(&self) -> Option<&mut [u64; 512]> {
+        self.ipc_buffer.as_ref().map(|page_cap_e| {
+            let page_cap = PageCap::try_from_raw(page_cap_e.cap()).unwrap();
+            let address: *mut [u64; 512] = page_cap.get_address().into();
+            unsafe { &mut *{ address } }
+        })
     }
     pub fn set_timeout(&mut self, time_out: usize) {
         self.time_slice = time_out
@@ -168,7 +183,7 @@ impl ThreadInfo {
             root_cnode: None,
             vspace: None,
             registers: Registers::null(),
-            msg_buffer: 0,
+            ipc_buffer: None,
             #[cfg(debug_assertions)]
             tid: 0,
         }
@@ -191,6 +206,7 @@ impl ThreadInfo {
     }
 
     pub fn set_root_cspace(&mut self, cspace_cap: CNodeCap, parent: &mut CNodeEntry) {
+        // TODO: you should consider when already set.
         assert!(self.root_cnode.is_none(), "{:?}", self.root_cnode);
         let mut new_entry = CNodeEntry::new_with_rawcap(cspace_cap.get_raw_cap());
         new_entry.insert(parent);
@@ -198,10 +214,20 @@ impl ThreadInfo {
     }
 
     pub fn set_root_vspace(&mut self, vspace_cap: PageTableCap, parent: &mut CNodeEntry) {
+        // TODO: you should consider when already set.
         assert!(self.vspace.is_none(), "{:?}", self.vspace);
         let mut new_entry = CNodeEntry::new_with_rawcap(vspace_cap.get_raw_cap());
         new_entry.insert(parent);
         self.vspace = Some(new_entry)
+    }
+
+    pub fn set_ipc_buffer(&mut self, page_cap: PageCap, parent: &mut CNodeEntry) {
+        // TODO: check right
+        // TODO: you should consider when already set.
+        assert!(self.ipc_buffer.is_none());
+        let mut new_entry = CNodeEntry::new_with_rawcap(page_cap.get_raw_cap());
+        new_entry.insert(parent);
+        self.ipc_buffer = Some(new_entry)
     }
 }
 

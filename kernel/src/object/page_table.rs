@@ -141,7 +141,7 @@ impl Page {
     pub fn map(&self, parent: &mut PageTable, vaddr: VirtAddr, flags: usize) -> KernelResult<()> {
         let (level, entry) = parent.walk(vaddr);
         if level != 0 {
-            Err(kerr!(ErrKind::PageTableNotMappedYet))
+            Err(kerr!(ErrKind::PageTableNotMappedYet, level as u16))
         } else if entry.is_valid() {
             Err(kerr!(ErrKind::VaddressAlreadyMapped))
         } else {

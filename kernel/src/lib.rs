@@ -9,6 +9,7 @@ pub mod capability;
 pub mod common;
 pub mod handler;
 pub mod init;
+pub mod ipc_args;
 mod memlayout;
 pub mod object;
 pub mod riscv;
