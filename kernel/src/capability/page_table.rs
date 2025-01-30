@@ -1,4 +1,3 @@
-use crate::address::PhysAddr;
 use crate::address::PAGE_SIZE;
 use crate::common::ErrKind;
 use crate::kerr;
@@ -70,14 +69,6 @@ impl PageTableCap {
 
     fn is_mapped(&self) -> bool {
         ((self.cap_dep_val >> 48) & 0x1) == 1
-    }
-
-    fn get_mapped_address(&self) -> PhysAddr {
-        ((self.cap_dep_val & !(0xffff << 48)) as usize).into()
-    }
-
-    pub fn get_address_virtual(&self) -> KernelVAddress {
-        self.get_address().into()
     }
 }
 
@@ -151,14 +142,7 @@ impl Capability for PageTableCap {
         self.is_mapped()
             .then_some(())
             .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
-        Ok(Self {
-            _obj_type: self._obj_type,
-            cap_type: self.cap_type,
-            cap_right: self.cap_right,
-            address_top: self.address_top,
-            address_bottom: self.address_bottom,
-            cap_dep_val: self.cap_dep_val
-        })
+        Ok(self.replicate())
     }
 }
 
@@ -183,13 +167,6 @@ impl Capability for PageCap {
             .then_some(())
             .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
 
-        Ok(Self {
-            _obj_type: self._obj_type,
-            cap_type: self.cap_type,
-            cap_right: self.cap_right,
-            address_top: self.address_top,
-            address_bottom: self.address_bottom,
-            cap_dep_val: self.cap_dep_val
-        })
+        Ok(self.replicate())
     }
 }

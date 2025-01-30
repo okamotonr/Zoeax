@@ -4,7 +4,7 @@ mod notification;
 pub mod page_table;
 mod tcb;
 
-pub use crate::object::cnode::{CNode, CNodeEntry, up_cast_ref_mut, up_cast_ref};
+pub use crate::object::cnode::{CNode, CNodeEntry, ManagementDB};
 pub use crate::object::endpoint::Endpoint;
 pub use crate::object::notification::Notification;
 pub use crate::object::page_table::PageTable;

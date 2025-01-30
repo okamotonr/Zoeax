@@ -1,5 +1,5 @@
 use crate::{
-    address::{KernelVAddress, PhysAddr, VirtAddr},
+    address::{KernelVAddress, PhysAddr},
     common::{ErrKind, KernelResult},
     kerr,
     object::{CNodeEntry, KObject},
@@ -39,21 +39,6 @@ impl KObject for Something {}
 
 pub type CapInSlot = CapabilityData<Something>;
 
-pub trait IntoSomething {
-    fn into_something(&self) -> &CapabilityData<Something> {
-        unsafe { 
-            let ptr = self as *const Self as *const CapabilityData<Something>;
-            ptr.as_ref().unwrap()
-        }
-    }
-
-    fn into_something_mut(&mut self) -> &mut CapabilityData<Something> {
-        unsafe {
-            let ptr = self as *mut Self as *mut CapabilityData<Something>;
-            ptr.as_mut().unwrap()
-        }
-    }
-}
 
 impl CapInSlot {
     pub fn as_capability<NK>(&mut self) -> KernelResult<&mut CapabilityData<NK>>
@@ -67,16 +52,6 @@ impl CapInSlot {
             let ptr = self as *mut CapabilityData<Something> as *mut CapabilityData<NK>;
             Ok(ptr.as_mut().unwrap())
         }
-    }
-}
-
-impl IntoSomething for CapInSlot {
-    fn into_something(&self) -> &CapabilityData<Something> {
-        self
-    }
-
-    fn into_something_mut(&mut self) -> &mut CapabilityData<Something> {
-        self
     }
 }
 
@@ -138,21 +113,12 @@ where  CapabilityData<K>: Capability {
         PhysAddr::new(addr)
     }
 
-    pub fn set_cap_type(&mut self, cap_type: CapabilityType) {
-        self.cap_type = NonZeroU8::new(cap_type as u8).unwrap()
-    }
-
     pub fn set_address(&mut self, address: PhysAddr) {
         let address: usize = address.into();
         let address_top = ((address >> 32) & u16::MAX as usize) as u16;
         let address_bottom = (address & u32::MAX as usize) as u32;
         self.address_top = address_top;
         self.address_bottom = address_bottom
-    }
-
-    pub fn set_address_and_type(&mut self, address: PhysAddr, cap_type: CapabilityType) {
-        self.set_cap_type(cap_type);
-        self.set_address(address)
     }
 
     pub fn replicate(&self) -> Self {
@@ -165,25 +131,25 @@ where  CapabilityData<K>: Capability {
             _obj_type: self._obj_type
         }
     }
+
+    pub fn up_cast(self) -> CapInSlot {
+        CapInSlot {
+            cap_type: self.cap_type,
+            cap_dep_val: self.cap_dep_val,
+            cap_right: self.cap_right,
+            address_bottom: self.address_bottom,
+            address_top: self.address_top,
+            _obj_type: PhantomData
+        }
+    }
 }
-//
-// impl<K: KObject> fmt::Debug for CapabilityData<K> {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(
-//             f,
-//             "captype: {:?}, address: {:?}",
-//             self.get_cap_type(),
-//             self.get_address()
-//         )
-//     }
-// }
 
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum CapabilityType {
     Anything = 11,
     Untyped = 1,
-    TCB = 3,
+    Tcb = 3,
     EndPoint = 5,
     CNode = 7,
     Notification = 9,
@@ -196,7 +162,7 @@ impl CapabilityType {
     pub fn try_from_u8(val: u8) -> KernelResult<Self> {
         match val {
             val if val == Self::Untyped as u8 => Ok(Self::Untyped),
-            val if val == Self::TCB as u8 => Ok(Self::TCB),
+            val if val == Self::Tcb as u8 => Ok(Self::Tcb),
             val if val == Self::EndPoint as u8 => Ok(Self::EndPoint),
             val if val == Self::CNode as u8 => Ok(Self::CNode),
             val if val == Self::Notification as u8 => Ok(Self::Notification),
@@ -208,7 +174,7 @@ impl CapabilityType {
 }
 
 // TODO: Change of capability should change raw_cap in slot.
-pub trait Capability// : IntoSomething 
+pub trait Capability
 where
     Self: Sized,
 {
@@ -230,13 +196,3 @@ where
     fn init_object(&mut self);
 }
 
-pub fn up_cast<K: KObject>(cap: CapabilityData<K>) -> CapInSlot {
-    CapInSlot {
-        cap_type: cap.cap_type,
-        cap_dep_val: cap.cap_dep_val,
-        cap_right: cap.cap_right,
-        address_bottom: cap.address_bottom,
-        address_top: cap.address_top,
-        _obj_type: PhantomData
-    }
-}

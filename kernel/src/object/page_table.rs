@@ -54,11 +54,11 @@ pub static mut LV2TABLE: PageTable = PageTable::new();
 // TODO: root page table and other tables should be different type?
 #[repr(align(4096))]
 #[derive(Debug)]
-pub struct PageTable([PTE; 512]);
+pub struct PageTable([Pte; 512]);
 
 impl PageTable {
     pub const fn new() -> Self {
-        Self([PTE(0); 512])
+        Self([Pte(0); 512])
     }
     pub fn map(&self, parent: &mut Self, vaddr: VirtAddr) -> KernelResult<usize> {
         let (level, entry) = parent.walk(vaddr);
@@ -70,7 +70,7 @@ impl PageTable {
         }
     }
 
-    pub fn walk(&mut self, vaddr: VirtAddr) -> (usize, &mut PTE) {
+    pub fn walk(&mut self, vaddr: VirtAddr) -> (usize, &mut Pte) {
         let mut page_table = self;
         // walk page table
         for level in (1..=3).rev() {
@@ -118,7 +118,7 @@ impl PageTable {
 }
 
 impl Deref for PageTable {
-    type Target = [PTE; 512];
+    type Target = [Pte; 512];
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -153,9 +153,9 @@ impl Page {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct PTE(usize);
+pub struct Pte(usize);
 
-impl PTE {
+impl Pte {
     pub fn is_valid(&self) -> bool {
         self.0 & PAGE_V != 0
     }

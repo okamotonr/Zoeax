@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use core::arch::asm;
 
 /// supervisor-level software interrupts

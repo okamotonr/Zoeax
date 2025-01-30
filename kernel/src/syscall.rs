@@ -1,7 +1,7 @@
 use crate::{
     address::PAGE_SIZE,
     capability::{
-        cnode::CNodeCap, endpoint::EndPointCap, notification::NotificationCap, untyped::UntypedCap, CapabilityType
+        endpoint::EndPointCap, notification::NotificationCap, untyped::UntypedCap, CapabilityType
     },
     common::{is_aligned, ErrKind, KernelResult},
     kerr,

@@ -5,6 +5,7 @@ use crate::address::KernelVAddress;
 use crate::capability::PhysAddr;
 use crate::capability::{Capability, CapabilityType, CapabilityData};
 use crate::common::{align_up, ErrKind, KernelResult};
+use crate::object::Untyped;
 use crate::object::page_table::Page;
 use crate::object::Endpoint;
 use crate::object::KObject;
@@ -13,8 +14,8 @@ use crate::object::CNodeEntry;
 use crate::object::Notification;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
+use crate::object::ManagementDB;
 use crate::println;
-use super::up_cast;
 
 use super::Something;
 use crate::kerr;
@@ -25,7 +26,6 @@ use crate::kerr;
  * 64                                                                   0
  */
 
-pub struct Untyped;
 impl KObject for Untyped {}
 
 pub type UntypedCap = CapabilityData<Untyped>;
@@ -113,29 +113,26 @@ impl UntypedCap {
         num: usize,
         new_type: CapabilityType,
     ) -> KernelResult<()> {
-        // TODO: Fix this dirty hack.
-        let cap_ptr = {
-            src_slot.cap_ref_mut().as_capability::<Untyped>()? as *mut CapabilityData<Untyped>
-        };
-        let untyped_cap = unsafe {cap_ptr.as_mut().unwrap()};
+        let (untyped_cap, mdb) = src_slot.cap_and_mdb();
+        let untyped_cap = untyped_cap.as_capability::<Untyped>()?;
         match new_type {
-            CapabilityType::TCB => {
-                untyped_cap._invocation::<ThreadControlBlock>(src_slot, dest_cnode, user_size, num)
+            CapabilityType::Tcb => {
+                untyped_cap._invocation::<ThreadControlBlock>(mdb, dest_cnode, user_size, num)
             }
             CapabilityType::CNode => {
-                untyped_cap._invocation::<CNode>(src_slot, dest_cnode, user_size, num)
+                untyped_cap._invocation::<CNode>(mdb, dest_cnode, user_size, num)
             }
             CapabilityType::EndPoint => {
-                untyped_cap._invocation::<Endpoint>(src_slot, dest_cnode, user_size, num)
+                untyped_cap._invocation::<Endpoint>(mdb, dest_cnode, user_size, num)
             }
             CapabilityType::Notification => {
-                untyped_cap._invocation::<Notification>(src_slot, dest_cnode, user_size, num)
+                untyped_cap._invocation::<Notification>(mdb, dest_cnode, user_size, num)
             }
             CapabilityType::PageTable => {
-                untyped_cap._invocation::<PageTable>(src_slot, dest_cnode, user_size, num)
+                untyped_cap._invocation::<PageTable>(mdb, dest_cnode, user_size, num)
             }
             CapabilityType::Page => {
-                untyped_cap._invocation::<Page>(src_slot, dest_cnode, user_size, num)
+                untyped_cap._invocation::<Page>(mdb, dest_cnode, user_size, num)
             }
             _ => Err(kerr!(ErrKind::UnknownCapType)),
         }
@@ -143,7 +140,7 @@ impl UntypedCap {
 
     fn _invocation<K: KObject>(
         &mut self,
-        src_slot: &mut CNodeEntry<Something>,
+        src_slot: &mut ManagementDB,
         dest_cnode: &mut CNode,
         user_size: usize,
         num: usize,
@@ -152,7 +149,7 @@ impl UntypedCap {
         let cap_gen = self.retype::<K>(user_size, num)?;
         for (i, mut cap) in cap_gen.enumerate() {
             cap.init_object();
-            let cap_in_slot = up_cast(cap);
+            let cap_in_slot = cap.up_cast();
             dest_cnode.insert_cap(src_slot, cap_in_slot, i);
         }
         Ok(())

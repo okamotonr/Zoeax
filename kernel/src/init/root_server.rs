@@ -9,7 +9,6 @@ use crate::capability::page_table::PageCap;
 use crate::capability::page_table::PageTableCap;
 use crate::capability::tcb::TCBCap;
 use crate::capability::untyped::UntypedCap;
-use crate::capability::up_cast;
 use crate::capability::Capability;
 use crate::capability::CapabilityData;
 use crate::capability::Something;
@@ -94,7 +93,7 @@ impl<'a> RootServerMemory<'a> {
         let cap_type = CNodeCap::CAP_TYPE;
         let cap = CNodeCap::new(
             cap_type, vaddr.into(), cap_dep_val as u64);
-        let cap_in_slot = up_cast(cap.replicate());
+        let cap_in_slot = cap.replicate().up_cast();
         cnode.write_slot(cap_in_slot, ROOT_CNODE_IDX);
         cap
     }
@@ -115,7 +114,7 @@ impl<'a> RootServerMemory<'a> {
         let mut cap = PageTableCap::new(
             cap_type, vaddr.into(), cap_dep_val as u64);
         cap.root_map().unwrap();
-        cnode_cap.write_slot(up_cast(cap.replicate()), ROOT_VSPACE_IDX);
+        cnode_cap.write_slot(cap.replicate().up_cast(), ROOT_VSPACE_IDX);
         println!("map segments");
         unsafe {
             for idx in 0..(*elf_header).e_phnum {
@@ -167,7 +166,7 @@ impl<'a> RootServerMemory<'a> {
         tcb.vspace = Some(new_entry);
 
         let cap = TCBCap::init((tcb as *const ThreadControlBlock).into(), 0);
-        cnode_cap.write_slot(up_cast(cap.replicate()), ROOT_TCB_IDX);
+        cnode_cap.write_slot(cap.replicate().up_cast(), ROOT_TCB_IDX);
         cap
     }
 }
@@ -254,7 +253,7 @@ unsafe fn allocate_p_segment(
             println!("{:?}, {:?}", copy_src, copy_dst);
             ptr::copy::<u8>(copy_src, copy_dst, copy_size);
             println!("write slot");
-            cnode_cap.write_slot(up_cast(page_cap), bootstage_mbr.alloc_cnode_idx())
+            cnode_cap.write_slot(page_cap.up_cast(), bootstage_mbr.alloc_cnode_idx())
         }
     }
 }
@@ -268,7 +267,7 @@ fn map_page_tables(
     loop {
         let mut page_table_cap = PageTableCap::init(bootstage_mbr.alloc_page(), 0);
         cnode_cap.write_slot(
-            up_cast(page_table_cap.replicate()),
+            page_table_cap.replicate().up_cast(),
             bootstage_mbr.alloc_cnode_idx(),
         );
         if let Ok(level) = page_table_cap.map(root_table_cap, vaddr_n) {
@@ -339,7 +338,7 @@ fn create_initial_thread(
     let untyped_cap_idx = bootstage_mbr.alloc_cnode_idx();
     let untyped_cap = bootstage_mbr.into_untyped();
 
-    root_cnode_cap.write_slot(up_cast(untyped_cap.replicate()), untyped_cap_idx);
+    root_cnode_cap.write_slot(untyped_cap.replicate().up_cast(), untyped_cap_idx);
     // 7, set initial thread into current thread
     root_tcb.set_registers(&[(10, untyped_cap_idx)]);
     root_tcb.make_runnable();

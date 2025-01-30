@@ -81,17 +81,6 @@ where
     mdb: ManagementDB,
 }
 
-pub fn up_cast_ref_mut<K>(entry: &mut CNodeEntry<K>) -> &mut CNodeEntry<Something> 
-where 
-    K: KObject,
-    CapabilityData<K>: Capability
-{
-    unsafe {
-        let ptr = entry as *mut CNodeEntry<K> as *mut CNodeEntry<Something>;
-        ptr.as_mut().unwrap()
-    }
-}
-
 impl CNodeEntry<Something> {
     pub fn as_capability<K>(&mut self) -> KernelResult<&mut CNodeEntry<K>>
         where
@@ -107,17 +96,6 @@ impl CNodeEntry<Something> {
     }
 }
 
-pub fn up_cast_ref<K>(entry: &CNodeEntry<K>) -> &CNodeEntry<Something> 
-where 
-    K: KObject,
-    CapabilityData<K>: Capability
-{
-    unsafe {
-        let ptr = entry as *const CNodeEntry<K> as *const CNodeEntry<Something>;
-        ptr.as_ref().unwrap()
-    }
-}
-
 impl<K: KObject> CNodeEntry<K>
 where CapabilityData<K>: Capability
 {
@@ -128,6 +106,10 @@ where CapabilityData<K>: Capability
         }
     }
 
+    pub fn cap_and_mdb(&mut self) -> (&mut CapabilityData<K>, &mut ManagementDB) {
+        (&mut self.cap, &mut self.mdb)
+    }
+
     pub fn cap(&self) -> &CapabilityData<K> {
         &self.cap
     }
@@ -136,18 +118,18 @@ where CapabilityData<K>: Capability
         if let Some(prev_next) = parent.get_next() {
             self.set_next(prev_next);
         };
-        parent.set_next(up_cast_ref_mut(self))
+        parent.set_next(self.up_cast_ref_mut())
     }
 
     pub fn replace(&mut self, src: &mut CNodeEntry<Something>) {
         if let Some(src_next) = src.get_next() {
             // TODO: Down cast
-            src_next.set_prev(up_cast_ref_mut(self));
+            src_next.set_prev(self.up_cast_ref_mut());
             self.set_next(src_next);
         };
         if let Some(src_prev) = src.get_prev() {
             // TODO: Down cast
-            src_prev.set_next(up_cast_ref_mut(self));
+            src_prev.set_next(self.up_cast_ref_mut());
             self.set_prev(src_prev);
         }
     }
@@ -168,12 +150,23 @@ where CapabilityData<K>: Capability
         self.mdb.get_prev()
     }
 
-    pub fn set_cap(&mut self, raw_cap: CapabilityData<K>) {
-        self.cap = raw_cap
-    }
 
     pub fn cap_ref_mut(&mut self) -> &mut CapabilityData<K> {
         &mut self.cap
+    }
+
+    pub fn up_cast_ref(&self) -> &CNodeEntry<Something> {
+        unsafe {
+            let ptr = self as *const CNodeEntry<K> as *const CNodeEntry<Something>;
+            ptr.as_ref().unwrap()
+        }
+    }
+
+    pub fn up_cast_ref_mut(&mut self) -> &mut CNodeEntry<Something> {
+        unsafe {
+            let ptr = self as *mut CNodeEntry<K> as *mut CNodeEntry<Something>;
+            ptr.as_mut().unwrap()
+        }
     }
 }
 
@@ -185,15 +178,7 @@ impl CNode {
         Self
     }
 
-    pub fn lookup_entry_mut(&mut self, index: usize) -> KernelResult<&mut Option<CNodeEntry<Something>>> {
-        let root = (self as *mut Self).cast::<Option<CNodeEntry<Something>>>();
-        unsafe {
-            let ret = root.add(index);
-            Ok(ret.as_mut().unwrap())
-        }
-    }
-
-    pub fn insert_cap(&mut self, parent: &mut CNodeEntry<Something>, cap: CapInSlot, index: usize) {
+    pub fn insert_cap(&mut self, parent: &mut ManagementDB, cap: CapInSlot, index: usize) {
         let root = (self as *mut Self).cast::<CNodeEntry<Something>>();
         let mut entry = CNodeEntry {
             cap,

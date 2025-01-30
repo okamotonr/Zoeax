@@ -19,7 +19,7 @@ pub static mut CPU_VAR: CpuVar = CpuVar {
 };
 
 // TODO: use unsafe_cell
-pub static mut SCHEDULER: Scheduler = Scheduler::new();
+static mut SCHEDULER: Scheduler = Scheduler::new();
 
 #[repr(C)]
 #[derive(Debug)]
@@ -100,8 +100,12 @@ fn idle() -> ! {
     }
 }
 
-pub fn get_current_tcb<'a>() -> &'a ThreadControlBlock {
-    unsafe { &*CURRENT_PROC }
+// TODO: remove this attribute
+#[allow(static_mut_refs)]
+pub fn push(tcb: &mut ThreadControlBlock) {
+    unsafe {
+        SCHEDULER.push(tcb)
+    }
 }
 
 pub fn get_current_tcb_mut<'a>() -> &'a mut ThreadControlBlock {

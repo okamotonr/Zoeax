@@ -15,6 +15,7 @@ impl KObject for CNode {}
 
 pub type CNodeCap = CapabilityData<CNode>;
 
+
 impl Capability for CNodeCap {
     const CAP_TYPE: CapabilityType = CapabilityType::CNode;
     type KernelObject = CNode;
@@ -38,16 +39,6 @@ impl Capability for CNodeCap {
 }
 
 impl CNodeCap {
-    #[allow(unused_variables)]
-    pub fn insert_cap(
-        &mut self,
-        src_slot: &mut CNodeEntry<Something>,
-        new_cap: CapabilityData<Something>,
-        index: usize,
-    ) -> KernelResult<()> {
-        todo!();
-    }
-
     pub fn get_cnode(&mut self) -> &mut [Option<CNodeEntry<Something>>] {
         let ptr: KernelVAddress = self.get_address().into();
         let ptr: *mut Option<CNodeEntry<Something>> = ptr.into();
