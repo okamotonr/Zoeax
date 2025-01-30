@@ -1,9 +1,12 @@
-use super::{Capability, CapabilityType, RawCapability};
+use super::{Capability, CapabilityType, CapabilityData};
 use crate::address::KernelVAddress;
 use crate::common::KernelResult;
-use crate::object::{Notification, ThreadControlBlock};
+use crate::object::{KObject, Notification, ThreadControlBlock};
 
-pub struct NotificationCap(RawCapability);
+
+impl KObject for Notification {}
+
+pub type NotificationCap = CapabilityData<Notification>;
 
 /*
  * RawCapability[1]
@@ -17,19 +20,13 @@ impl Capability for NotificationCap {
     const CAP_TYPE: CapabilityType = CapabilityType::Notification;
     // TODO
     type KernelObject = Notification;
-    fn new(raw_cap: RawCapability) -> Self {
-        Self(raw_cap)
-    }
-    fn get_raw_cap(&self) -> RawCapability {
-        self.0
-    }
 
     fn create_cap_dep_val(_addr: KernelVAddress, _user_size: usize) -> usize {
         0 // badge
     }
 
     fn init_object(&mut self) {
-        let addr = KernelVAddress::from(self.0.get_address());
+        let addr = KernelVAddress::from(self.get_address());
         let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr);
         unsafe {
             *ptr = Self::KernelObject::new();
@@ -49,7 +46,7 @@ impl NotificationCap {
     }
 
     fn get_notify(&mut self) -> &mut Notification {
-        let addr = KernelVAddress::from(self.0.get_address());
+        let addr = KernelVAddress::from(self.get_address());
         let ptr =
             <KernelVAddress as Into<*mut <NotificationCap as Capability>::KernelObject>>::into(
                 addr,
@@ -58,7 +55,7 @@ impl NotificationCap {
     }
 
     fn get_batch(&self) -> u64 {
-        self.0.cap_dep_val
+        self.cap_dep_val
     }
 
     pub fn set_badge(&mut self, _val: u64) -> KernelResult<()> {

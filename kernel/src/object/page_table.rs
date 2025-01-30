@@ -53,6 +53,7 @@ pub static mut LV2TABLE: PageTable = PageTable::new();
 
 // TODO: root page table and other tables should be different type?
 #[repr(align(4096))]
+#[derive(Debug)]
 pub struct PageTable([PTE; 512]);
 
 impl PageTable {

@@ -1,7 +1,8 @@
 use crate::capability::page_table::PageCap;
-use crate::capability::Capability;
+use crate::capability::{Something};
 use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
 use crate::common::{ErrKind, KernelResult};
+use super::up_cast_ref_mut;
 use crate::kerr;
 use crate::object::PageTable;
 use crate::println;
@@ -12,10 +13,14 @@ use core::ops::{Index, IndexMut};
 use core::ptr;
 
 use super::cnode::CNodeEntry;
+use super::page_table::Page;
+use super::{CNode, KObject};
 #[cfg(debug_assertions)]
 static mut TCBIDX: usize = 0;
 
 pub type ThreadControlBlock = ListItem<ThreadInfo>;
+
+impl KObject for ListItem<ThreadInfo> {}
 
 // Because type alias cannot impl method
 #[allow(static_mut_refs)]
@@ -129,10 +134,10 @@ impl Registers {
 pub struct ThreadInfo {
     pub status: ThreadState,
     pub time_slice: usize,
-    pub root_cnode: Option<CNodeEntry>,
-    pub vspace: Option<CNodeEntry>,
+    pub root_cnode: Option<CNodeEntry<CNode>>,
+    pub vspace: Option<CNodeEntry<PageTable>>,
     pub registers: Registers,
-    pub ipc_buffer: Option<CNodeEntry>,
+    pub ipc_buffer: Option<CNodeEntry<Page>>,
     #[cfg(debug_assertions)]
     pub tid: usize,
 }
@@ -167,7 +172,7 @@ impl ThreadInfo {
 
     pub fn ipc_buffer_ref(&self) -> Option<&mut [u64; 512]> {
         self.ipc_buffer.as_ref().map(|page_cap_e| {
-            let page_cap = PageCap::try_from_raw(page_cap_e.cap()).unwrap();
+            let page_cap = page_cap_e.cap();
             let address: *mut [u64; 512] = page_cap.get_address().into();
             unsafe { &mut *{ address } }
         })
@@ -189,44 +194,44 @@ impl ThreadInfo {
         }
     }
 
-    pub unsafe fn activate_vspace(&self) {
+    pub unsafe fn activate_vspace(&mut self) {
         if let Err(e) = self.activate_vspace_inner() {
             println!("{e:?}");
             PageTable::activate_kernel_table();
         }
     }
 
-    unsafe fn activate_vspace_inner(&self) -> KernelResult<()> {
-        let raw_cap = self
+    unsafe fn activate_vspace_inner(&mut self) -> KernelResult<()> {
+        let cap_entry = self
             .vspace
-            .as_ref()
+            .as_mut()
             .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
-        let mut pt_cap = PageTableCap::try_from_raw(raw_cap.cap())?;
+        let pt_cap = cap_entry.cap_ref_mut();
         unsafe { pt_cap.activate() }
     }
 
-    pub fn set_root_cspace(&mut self, cspace_cap: CNodeCap, parent: &mut CNodeEntry) {
+    pub fn set_root_cspace(&mut self, cspace_cap: CNodeCap, parent: &mut CNodeEntry<CNode>) {
         // TODO: you should consider when already set.
         assert!(self.root_cnode.is_none(), "{:?}", self.root_cnode);
-        let mut new_entry = CNodeEntry::new_with_rawcap(cspace_cap.get_raw_cap());
-        new_entry.insert(parent);
+        let mut new_entry = CNodeEntry::new_with_rawcap(cspace_cap);
+        new_entry.insert(up_cast_ref_mut(parent));
         self.root_cnode = Some(new_entry)
     }
 
-    pub fn set_root_vspace(&mut self, vspace_cap: PageTableCap, parent: &mut CNodeEntry) {
+    pub fn set_root_vspace(&mut self, vspace_cap: PageTableCap, parent: &mut CNodeEntry<PageTable>) {
         // TODO: you should consider when already set.
         assert!(self.vspace.is_none(), "{:?}", self.vspace);
-        let mut new_entry = CNodeEntry::new_with_rawcap(vspace_cap.get_raw_cap());
-        new_entry.insert(parent);
+        let mut new_entry = CNodeEntry::new_with_rawcap(vspace_cap);
+        new_entry.insert(up_cast_ref_mut(parent));
         self.vspace = Some(new_entry)
     }
 
-    pub fn set_ipc_buffer(&mut self, page_cap: PageCap, parent: &mut CNodeEntry) {
+    pub fn set_ipc_buffer(&mut self, page_cap: PageCap, parent: &mut CNodeEntry<Page>) {
         // TODO: check right
         // TODO: you should consider when already set.
         assert!(self.ipc_buffer.is_none());
-        let mut new_entry = CNodeEntry::new_with_rawcap(page_cap.get_raw_cap());
-        new_entry.insert(parent);
+        let mut new_entry = CNodeEntry::new_with_rawcap(page_cap);
+        new_entry.insert(up_cast_ref_mut(parent));
         self.ipc_buffer = Some(new_entry)
     }
 }

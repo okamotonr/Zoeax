@@ -1,8 +1,8 @@
-use super::{Capability, CapabilityType, RawCapability};
+use super::{Capability, CapabilityData, CapabilityType, Something};
 use crate::address::KernelVAddress;
 use crate::common::{ErrKind, KernelResult};
 use crate::kerr;
-use crate::object::{CNode, CNodeEntry};
+use crate::object::{CNode, CNodeEntry, KObject};
 
 use core::mem;
 
@@ -11,26 +11,25 @@ use core::mem;
  * | padding |  radix  |
  * 63      32         0
  */
-pub struct CNodeCap(RawCapability);
+impl KObject for CNode {}
+
+pub type CNodeCap = CapabilityData<CNode>;
+
 impl Capability for CNodeCap {
     const CAP_TYPE: CapabilityType = CapabilityType::CNode;
     type KernelObject = CNode;
-    fn new(raw_cap: RawCapability) -> Self {
-        Self(raw_cap)
-    }
     fn create_cap_dep_val(_addr: KernelVAddress, user_size: usize) -> usize {
         user_size
     }
-    fn get_raw_cap(&self) -> RawCapability {
-        self.0
-    }
 
     fn get_object_size<'a>(user_size: usize) -> usize {
-        2_usize.pow(user_size as u32) * mem::size_of::<CNodeEntry>()
+        2_usize.pow(user_size as u32) * mem::size_of::<CNodeEntry<Something>>()
     }
-    fn derive(&self, _src_slot: &CNodeEntry) -> KernelResult<Self> {
+    fn derive(&self, _src_slot: &CNodeEntry<Something>) -> KernelResult<Self> {
         // unchecked
-        Ok(Self::new(self.get_raw_cap()))
+        Ok(Self {
+            ..*self
+        })
     }
 
     fn init_object(&mut self) {
@@ -42,16 +41,16 @@ impl CNodeCap {
     #[allow(unused_variables)]
     pub fn insert_cap(
         &mut self,
-        src_slot: &mut CNodeEntry,
-        new_cap: RawCapability,
+        src_slot: &mut CNodeEntry<Something>,
+        new_cap: CapabilityData<Something>,
         index: usize,
     ) -> KernelResult<()> {
         todo!();
     }
 
-    pub fn get_cnode(&mut self) -> &mut [Option<CNodeEntry>] {
-        let ptr: KernelVAddress = self.0.get_address().into();
-        let ptr: *mut Option<CNodeEntry> = ptr.into();
+    pub fn get_cnode(&mut self) -> &mut [Option<CNodeEntry<Something>>] {
+        let ptr: KernelVAddress = self.get_address().into();
+        let ptr: *mut Option<CNodeEntry<Something>> = ptr.into();
         unsafe { core::slice::from_raw_parts_mut(ptr, 2_usize.pow(self.radix())) }
     }
 
@@ -60,13 +59,13 @@ impl CNodeCap {
         src: usize,
         dst: usize,
         num: usize,
-    ) -> KernelResult<(&mut CNodeEntry, &mut CNode)> {
+    ) -> KernelResult<(&mut CNodeEntry<Something>, &mut CNode)> {
         // TODO: check src and dst is acceptable
         (!((dst..dst + num).contains(&src)))
             .then_some(())
             .ok_or(kerr!(ErrKind::InvalidOperation))?;
-        let ptr: KernelVAddress = self.0.get_address().into();
-        let ptr: *mut CNodeEntry = ptr.into();
+        let ptr: KernelVAddress = self.get_address().into();
+        let ptr: *mut CNodeEntry<Something> = ptr.into();
         unsafe {
             let src = ptr.add(src);
             let dst = ptr.add(dst);
@@ -78,7 +77,7 @@ impl CNodeCap {
         &mut self,
         capptr: usize,
         depth_bits: u32,
-    ) -> KernelResult<&mut Option<CNodeEntry>> {
+    ) -> KernelResult<&mut Option<CNodeEntry<Something>>> {
         let mut cnode_cap = self;
         let mut depth_bits = depth_bits;
         loop {
@@ -93,7 +92,7 @@ impl CNodeCap {
                     }
                     unsafe {
                         // TODO: Fix this dirty hack
-                        let ptr = cap as *mut RawCapability as *mut CNodeCap;
+                        let ptr = cap as *mut CapabilityData<Something> as *mut CNodeCap;
                         (&mut *ptr, rem)
                     }
                 }
@@ -106,7 +105,7 @@ impl CNodeCap {
     pub fn lookup_entry_mut_one_level(
         &mut self,
         capptr: usize,
-    ) -> KernelResult<&mut Option<CNodeEntry>> {
+    ) -> KernelResult<&mut Option<CNodeEntry<Something>>> {
         self.lookup_entry_mut(capptr, self.radix())
     }
 
@@ -114,7 +113,7 @@ impl CNodeCap {
         &mut self,
         capptr: usize,
         depth_bits: u32,
-    ) -> KernelResult<(&mut Option<CNodeEntry>, u32)> {
+    ) -> KernelResult<(&mut Option<CNodeEntry<Something>>, u32)> {
         let radix = self.radix();
         let remain_bits = depth_bits
             .checked_sub(radix)
@@ -126,6 +125,6 @@ impl CNodeCap {
     }
 
     fn radix(&self) -> u32 {
-        self.0.cap_dep_val as u32
+        self.cap_dep_val as u32
     }
 }

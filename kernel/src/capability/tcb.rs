@@ -1,14 +1,12 @@
 use crate::address::KernelVAddress;
-use crate::capability::{Capability, CapabilityType, RawCapability};
+use crate::capability::{Capability, CapabilityType};
 use crate::common::KernelResult;
-use crate::object::{resume, CNodeEntry, ThreadControlBlock, ThreadInfo};
+use crate::object::page_table::Page;
+use crate::object::{up_cast_ref, resume, CNode, CNodeEntry, PageTable, ThreadControlBlock, ThreadInfo};
 use core::mem;
 
-use super::cnode::CNodeCap;
-use super::page_table::{PageCap, PageTableCap};
+use super::CapabilityData;
 
-#[derive(Debug)]
-pub struct TCBCap(RawCapability);
 
 impl TCBCap {
     pub fn set_registers(&mut self, registers: &[(usize, usize)]) {
@@ -19,7 +17,7 @@ impl TCBCap {
     }
 
     pub fn get_tcb(&mut self) -> &mut ThreadControlBlock {
-        let addr = KernelVAddress::from(self.0.get_address());
+        let addr = KernelVAddress::from(self.get_address());
         let ptr = <KernelVAddress as Into<*mut <TCBCap as Capability>::KernelObject>>::into(addr);
         unsafe { ptr.as_mut().unwrap() }
     }
@@ -34,22 +32,22 @@ impl TCBCap {
         tcb.suspend()
     }
 
-    pub fn set_cspace(&mut self, src: &mut CNodeEntry) -> KernelResult<()> {
-        let cspace_src = CNodeCap::try_from_raw(src.cap())?;
-        let cspace_new = cspace_src.derive(src)?;
+    pub fn set_cspace(&mut self, src: &mut CNodeEntry<CNode>) -> KernelResult<()> {
+        let cspace_src = src.cap();
+        let cspace_new = cspace_src.derive(up_cast_ref(src))?;
         self.get_tcb().set_root_cspace(cspace_new, src);
         Ok(())
     }
 
-    pub fn set_vspace(&mut self, src: &mut CNodeEntry) -> KernelResult<()> {
-        let vspace = PageTableCap::try_from_raw(src.cap())?;
-        let vspace_new = vspace.derive(src)?;
+    pub fn set_vspace(&mut self, src: &mut CNodeEntry<PageTable>) -> KernelResult<()> {
+        let vspace = src.cap();
+        let vspace_new = vspace.derive(up_cast_ref(src))?;
         self.get_tcb().set_root_vspace(vspace_new, src);
         Ok(())
     }
-    pub fn set_ipc_buffer(&mut self, src: &mut CNodeEntry) -> KernelResult<()> {
-        let page_cap = PageCap::try_from_raw(src.cap())?;
-        let page_cap_new = page_cap.derive(src)?;
+    pub fn set_ipc_buffer(&mut self, src: &mut CNodeEntry<Page>) -> KernelResult<()> {
+        let page_cap = src.cap();
+        let page_cap_new = page_cap.derive(up_cast_ref(src))?;
         self.get_tcb().set_ipc_buffer(page_cap_new, src);
         Ok(())
     }
@@ -58,15 +56,9 @@ impl TCBCap {
 impl Capability for TCBCap {
     const CAP_TYPE: CapabilityType = CapabilityType::TCB;
     type KernelObject = ThreadControlBlock;
-    fn new(raw_cap: RawCapability) -> Self {
-        Self(raw_cap)
-    }
-    fn get_raw_cap(&self) -> RawCapability {
-        self.0
-    }
 
     fn init_object(&mut self) {
-        let addr = KernelVAddress::from(self.0.get_address());
+        let addr = KernelVAddress::from(self.get_address());
         let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr);
         unsafe {
             *ptr = ThreadControlBlock::new(ThreadInfo::new());
@@ -77,3 +69,5 @@ impl Capability for TCBCap {
         mem::size_of::<Self::KernelObject>()
     }
 }
+
+pub type TCBCap = CapabilityData<ThreadControlBlock>;

@@ -1,17 +1,11 @@
 use crate::{
     address::PAGE_SIZE,
     capability::{
-        cnode::CNodeCap,
-        endpoint::EndPointCap,
-        notification::NotificationCap,
-        page_table::{PageCap, PageTableCap},
-        tcb::TCBCap,
-        untyped::UntypedCap,
-        Capability, CapabilityType,
+        cnode::CNodeCap, endpoint::EndPointCap, notification::NotificationCap, untyped::UntypedCap, CapabilityType
     },
     common::{is_aligned, ErrKind, KernelResult},
     kerr,
-    object::{page_table::PAGE_U, CNodeEntry, Registers},
+    object::{page_table::{Page, PAGE_U}, CNode, CNodeEntry, Endpoint, Notification, PageTable, Registers, ThreadControlBlock},
     println,
     scheduler::{get_current_tcb_mut, require_schedule},
     uart::putchar,
@@ -48,7 +42,7 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
 
 fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
-    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.as_mut().unwrap().cap())?;
+    let mut root_cnode = current_tcb.root_cnode.as_mut().unwrap().cap_ref_mut().replicate();
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
     match inv_label {
@@ -65,18 +59,13 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
         TCB_CONFIGURE => {
             // TODO: lookup entry first to be able to rollback
             // TODO: we have to do something to make rust ownership be calm down.
-            let mut tcb_cap = TCBCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
-            let cspace_slot = root_cnode.lookup_entry_mut_one_level(reg.a2)?;
+            let mut tcb_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<ThreadControlBlock>()?.replicate();
+            let cspace_slot = root_cnode.lookup_entry_mut_one_level(reg.a2)?.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
             //let vspace = root_cnode.lookup_entry_mut_one_level(reg.a3)?;
-            tcb_cap.set_cspace(cspace_slot.as_mut().unwrap())?;
-            let vspace = root_cnode.lookup_entry_mut_one_level(reg.a3)?;
-            tcb_cap.set_vspace(vspace.as_mut().unwrap())?;
+            tcb_cap.set_cspace(cspace_slot.as_capability::<CNode>()?)?;
+            let vspace = root_cnode.lookup_entry_mut_one_level(reg.a3)?.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
+            tcb_cap.set_vspace(vspace.as_capability::<PageTable>()?)?;
             Ok(())
         }
         TCB_WRITE_REG => {
@@ -91,42 +80,27 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                 _ => panic!("cannot set reg {:x}", reg.a2),
             };
             let value = reg.a3;
-            let mut tcb_cap = TCBCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            let tcb_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<ThreadControlBlock>()?;
             tcb_cap.set_registers(&[(reg_id, value)]);
             Ok(())
         }
         TCB_SET_IPC_BUFFER => {
             let page_ptr = reg.a2;
-            let mut tcb_cap = TCBCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            let mut tcb_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<ThreadControlBlock>()?.replicate();
             let page_cap = root_cnode
                 .lookup_entry_mut_one_level(page_ptr)?
                 .as_mut()
                 .unwrap();
             // TODO: validate this page is mapped in this tcb's address space.
-            tcb_cap.set_ipc_buffer(page_cap)?;
+            tcb_cap.set_ipc_buffer(page_cap.as_capability::<Page>()?)?;
             Ok(())
         }
 
         TCB_RESUME => {
-            let mut tcb_cap = TCBCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            let tcb_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<ThreadControlBlock>()?;
             tcb_cap.make_runnable();
             Ok(())
         }
@@ -136,71 +110,36 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             is_aligned(vaddr, PAGE_SIZE)
                 .then_some(())
                 .ok_or(kerr!(ErrKind::NotAligned, PAGE_SIZE as u16))?;
-            let mut page_table_cap = PageTableCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(page_table_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            let mut page_table_cap = root_cnode.lookup_entry_mut_one_level(page_table_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<PageTable>()?.replicate();
             if inv_label == PAGE_MAP {
                 // TODO: interpret flags
                 let flags = PAGE_U | reg.a4;
-                let mut page = PageCap::try_from_raw(
-                    root_cnode
-                        .lookup_entry_mut_one_level(cap_ptr)?
-                        .as_mut()
-                        .unwrap()
-                        .cap(),
-                )?;
+                let page = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<Page>()?;
                 page.map(&mut page_table_cap, vaddr.into(), flags)?;
-                let page_entry = root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .ok_or(kerr!(ErrKind::CapNotFound))?;
-                page_entry.set_cap(page.get_raw_cap());
             } else {
-                let mut page = PageTableCap::try_from_raw(
-                    root_cnode
-                        .lookup_entry_mut_one_level(cap_ptr)?
-                        .as_mut()
-                        .unwrap()
-                        .cap(),
-                )?;
+                let page = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<PageTable>()?;
                 page.map(&mut page_table_cap, vaddr.into())?;
-                let page_entry = root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .ok_or(kerr!(ErrKind::CapNotFound))?;
-                page_entry.set_cap(page.get_raw_cap());
             }
             Ok(())
         }
         CNODE_COPY | CNODE_MINT | CNODE_MOVE => {
             let src_depth = (reg.a3 >> 31) as u32;
             let dest_depth = reg.a3 as u32;
-            let mut src_root = CNodeCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            let mut src_root = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<CNode>()?.replicate();
             let src_slot = src_root.lookup_entry_mut(reg.a2, src_depth)?;
             let src_entry = src_slot.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
 
-            let mut dest_root = CNodeCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(reg.a4)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            let dest_root = root_cnode.lookup_entry_mut_one_level(reg.a4)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<CNode>()?;
             let dest_slot = dest_root.lookup_entry_mut(reg.a5, dest_depth)?;
             if dest_slot.is_some() {
                 Err(kerr!(ErrKind::NotEmptySlot))
             } else {
-                let raw_cap = src_entry.cap();
+                let raw_cap = src_entry.cap().replicate();
                 // TODO: Whether this cap is derivable
                 let mut cap = raw_cap;
                 if inv_label == CNODE_MINT {
@@ -225,29 +164,22 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
 
 fn handle_send_invocation(reg: &mut Registers) -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
-    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.as_mut().unwrap().cap())?;
+    let root_cnode = current_tcb.root_cnode.as_mut().unwrap().cap_ref_mut();
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
     match inv_label {
         NOTIFY_SEND => {
-            let mut notify_cap = NotificationCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            let notify_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<Notification>()?;
             notify_cap.send();
             Ok(())
         }
         EP_SEND => {
-            let mut ep_cap = EndPointCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            // TODO: Dirty hack
+            let ep_cap_ptr = { root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<Endpoint>()? as *mut EndPointCap
+            };
+            let ep_cap = unsafe { ep_cap_ptr.as_mut().unwrap() };
             if ep_cap.send(current_tcb) {
                 require_schedule()
             }
@@ -259,31 +191,28 @@ fn handle_send_invocation(reg: &mut Registers) -> KernelResult<()> {
 
 fn handle_recieve_invocation(reg: &mut Registers) -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
-    let mut root_cnode = CNodeCap::try_from_raw(current_tcb.root_cnode.as_mut().unwrap().cap())?;
+    let root_cnode = current_tcb.root_cnode.as_mut().unwrap().cap_ref_mut();
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
     match inv_label {
         NOTIFY_WAIT => {
-            let mut notify_cap = NotificationCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            // TODO: Dirty Hack
+            let notify_cap_ptr = { root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<Notification>()?
+                    as *mut NotificationCap
+            };
+            let notify_cap = unsafe { notify_cap_ptr.as_mut().unwrap() };
             if notify_cap.wait(current_tcb) {
                 require_schedule()
             }
             Ok(())
         }
         EP_RECV => {
-            let mut ep_cap = EndPointCap::try_from_raw(
-                root_cnode
-                    .lookup_entry_mut_one_level(cap_ptr)?
-                    .as_mut()
-                    .unwrap()
-                    .cap(),
-            )?;
+            // TODO: Dirty Hack
+            let ep_cap_ptr = { root_cnode.lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut().unwrap().cap_ref_mut().as_capability::<Endpoint>()? as *mut EndPointCap
+            };
+            let ep_cap = unsafe { ep_cap_ptr.as_mut().unwrap() };
             if ep_cap.recv(current_tcb) {
                 require_schedule()
             }

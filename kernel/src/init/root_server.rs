@@ -9,8 +9,10 @@ use crate::capability::page_table::PageCap;
 use crate::capability::page_table::PageTableCap;
 use crate::capability::tcb::TCBCap;
 use crate::capability::untyped::UntypedCap;
+use crate::capability::up_cast;
 use crate::capability::Capability;
-use crate::capability::RawCapability;
+use crate::capability::CapabilityData;
+use crate::capability::Something;
 use crate::common::{align_up, ErrKind};
 use crate::object::page_table::{PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use crate::object::CNode;
@@ -41,15 +43,15 @@ extern "C" {
 
 impl CNode {
     // todo: broken
-    fn write_slot(&mut self, cap: RawCapability, index: usize) {
-        let root = (self as *mut Self).cast::<Option<CNodeEntry>>();
+    fn write_slot(&mut self, cap: CapabilityData<Something>, index: usize) {
+        let root = (self as *mut Self).cast::<Option<CNodeEntry<Something>>>();
         let entry = CNodeEntry::new_with_rawcap(cap);
         unsafe { *root.add(index) = Some(entry) }
     }
 }
 
 impl CNodeCap {
-    fn write_slot(&mut self, cap: RawCapability, index: usize) {
+    fn write_slot(&mut self, cap: CapabilityData<Something>, index: usize) {
         let cnode = self.get_cnode();
         let entry = CNodeEntry::new_with_rawcap(cap);
         cnode[index] = Some(entry);
@@ -87,8 +89,13 @@ impl<'a> RootServerMemory<'a> {
 
     fn create_root_cnode(&mut self) -> CNodeCap {
         let cnode = self.cnode.write(CNode::new());
-        let cap = CNodeCap::init((cnode as *const CNode).into(), ROOT_CNODE_ENTRY_NUM_BITS);
-        cnode.write_slot(cap.get_raw_cap(), ROOT_CNODE_IDX);
+        let vaddr = (cnode as *const CNode).into();
+        let cap_dep_val = CNodeCap::create_cap_dep_val(vaddr, ROOT_CNODE_ENTRY_NUM_BITS);
+        let cap_type = CNodeCap::CAP_TYPE;
+        let cap = CNodeCap::new(
+            cap_type, vaddr.into(), cap_dep_val as u64);
+        let cap_in_slot = up_cast(cap.replicate());
+        cnode.write_slot(cap_in_slot, ROOT_CNODE_IDX);
         cap
     }
 
@@ -102,18 +109,26 @@ impl<'a> RootServerMemory<'a> {
         let root_page_table = self.vspace.write(PageTable::new());
 
         root_page_table.copy_global_mapping();
-        let mut cap = PageTableCap::init((root_page_table as *const PageTable).into(), 0);
+        let vaddr = (root_page_table as *const PageTable).into();
+        let cap_dep_val = CNodeCap::create_cap_dep_val(vaddr, ROOT_CNODE_ENTRY_NUM_BITS);
+        let cap_type = PageTableCap::CAP_TYPE;
+        let mut cap = PageTableCap::new(
+            cap_type, vaddr.into(), cap_dep_val as u64);
         cap.root_map().unwrap();
-        cnode_cap.write_slot(cap.get_raw_cap(), ROOT_VSPACE_IDX);
+        cnode_cap.write_slot(up_cast(cap.replicate()), ROOT_VSPACE_IDX);
+        println!("map segments");
         unsafe {
             for idx in 0..(*elf_header).e_phnum {
+                println!("current, {idx}");
                 let p_header = (*elf_header)
                     .get_pheader(elf_header.cast::<usize>(), idx)
                     .unwrap();
                 let p_start_addr = elf_header.cast::<u8>().add((*p_header).p_offset);
+                println!("allocate_p_segment");
                 allocate_p_segment(cnode_cap, &mut cap, bootstage_mbr, p_header, p_start_addr)
             }
         }
+        println!("why ???");
         cap
     }
 
@@ -131,8 +146,7 @@ impl<'a> RootServerMemory<'a> {
         tcb.registers.sepc = entry_point.into();
 
         // insert cnode_cap into tcb cnode_cap
-        let raw_cap = cnode_cap.get_raw_cap();
-        let mut new_entry = CNodeEntry::new_with_rawcap(raw_cap);
+        let mut new_entry = CNodeEntry::new_with_rawcap(cnode_cap.replicate());
         new_entry.insert(
             cnode_cap
                 .lookup_entry_mut_one_level(ROOT_CNODE_IDX)
@@ -142,8 +156,7 @@ impl<'a> RootServerMemory<'a> {
         );
         tcb.root_cnode = Some(new_entry);
         // insert vspace cap into tcb vspace
-        let raw_cap = vspace_cap.get_raw_cap();
-        let mut new_entry = CNodeEntry::new_with_rawcap(raw_cap);
+        let mut new_entry = CNodeEntry::new_with_rawcap(vspace_cap.replicate());
         new_entry.insert(
             cnode_cap
                 .lookup_entry_mut_one_level(ROOT_VSPACE_IDX)
@@ -154,7 +167,7 @@ impl<'a> RootServerMemory<'a> {
         tcb.vspace = Some(new_entry);
 
         let cap = TCBCap::init((tcb as *const ThreadControlBlock).into(), 0);
-        cnode_cap.write_slot(cap.get_raw_cap(), ROOT_TCB_IDX);
+        cnode_cap.write_slot(up_cast(cap.replicate()), ROOT_TCB_IDX);
         cap
     }
 }
@@ -219,8 +232,10 @@ unsafe fn allocate_p_segment(
         if let Err(e) = page_cap.map(root_table_cap, vaddr_n, flags) {
             match e.e_kind {
                 ErrKind::PageTableNotMappedYet => {
+                    println!("map page tables");
                     map_page_tables(cnode_cap, bootstage_mbr, root_table_cap, vaddr_n);
                     page_cap.map(root_table_cap, vaddr_n, flags).unwrap();
+                    println!("map page tables done");
                 }
                 ErrKind::VaddressAlreadyMapped => {
                     panic!("Should never occur")
@@ -231,12 +246,15 @@ unsafe fn allocate_p_segment(
             }
         };
         if file_sz_rem != 0 {
+            println!("you Should copy");
             let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
-            let copy_dst = page_cap.get_address().addr as *mut u8;
+            let copy_dst = page_cap.get_address_virtual().addr as *mut u8;
             let copy_size = min(PAGE_SIZE, file_sz_rem);
             file_sz_rem = file_sz_rem.saturating_sub(PAGE_SIZE);
+            println!("{:?}, {:?}", copy_src, copy_dst);
             ptr::copy::<u8>(copy_src, copy_dst, copy_size);
-            cnode_cap.write_slot(page_cap.get_raw_cap(), bootstage_mbr.alloc_cnode_idx())
+            println!("write slot");
+            cnode_cap.write_slot(up_cast(page_cap), bootstage_mbr.alloc_cnode_idx())
         }
     }
 }
@@ -250,7 +268,7 @@ fn map_page_tables(
     loop {
         let mut page_table_cap = PageTableCap::init(bootstage_mbr.alloc_page(), 0);
         cnode_cap.write_slot(
-            page_table_cap.get_raw_cap(),
+            up_cast(page_table_cap.replicate()),
             bootstage_mbr.alloc_cnode_idx(),
         );
         if let Ok(level) = page_table_cap.map(root_table_cap, vaddr_n) {
@@ -303,20 +321,25 @@ fn create_initial_thread(
     // 8, call return_to_user(after returning user, to clear stack)
     // 1, create root cnode and insert self cap into self(root cnode)
     let mut root_cnode_cap = root_server_mem.create_root_cnode();
+    println!("create vspace_cap");
     // 2, create vm space for root server,
     let mut vspace_cap =
         root_server_mem.create_address_space(&mut root_cnode_cap, elf_header, &mut bootstage_mbr);
+    println!("create idle thread");
     // 3, create idle thread
     create_idle_thread(&raw const __stack_top as usize);
+    println!("create initial thread");
     // 4, create root server tcb,
     let entry_point = unsafe { (*elf_header).e_entry };
     let mut root_tcb =
         root_server_mem.create_root_tcb(&mut root_cnode_cap, &mut vspace_cap, entry_point.into());
+    println!("create initial thread");
 
     // 6, convert rest of memory into untyped objects.
     let untyped_cap_idx = bootstage_mbr.alloc_cnode_idx();
     let untyped_cap = bootstage_mbr.into_untyped();
-    root_cnode_cap.write_slot(untyped_cap.get_raw_cap(), untyped_cap_idx);
+
+    root_cnode_cap.write_slot(up_cast(untyped_cap.replicate()), untyped_cap_idx);
     // 7, set initial thread into current thread
     root_tcb.set_registers(&[(10, untyped_cap_idx)]);
     root_tcb.make_runnable();
