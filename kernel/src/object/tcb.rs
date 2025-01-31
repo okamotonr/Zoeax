@@ -1,3 +1,4 @@
+use crate::address::KernelVAddress;
 use crate::capability::page_table::PageCap;
 use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
 use crate::common::{ErrKind, KernelResult};
@@ -162,14 +163,14 @@ impl ThreadInfo {
 
     pub fn set_ipc_msg(&mut self, ipc_buffer_ref: Option<&mut [u64; 512]>) {
         if let (Some(reciever_ref), Some(sender_ref)) = (self.ipc_buffer_ref(), ipc_buffer_ref) {
-            unsafe { ptr::copy(sender_ref, reciever_ref, 512) }
+            unsafe { ptr::copy(sender_ref, reciever_ref, 1) }
         }
     }
 
     pub fn ipc_buffer_ref(&self) -> Option<&mut [u64; 512]> {
         self.ipc_buffer.as_ref().map(|page_cap_e| {
             let page_cap = page_cap_e.cap();
-            let address: *mut [u64; 512] = page_cap.get_address().into();
+            let address: *mut [u64; 512] = KernelVAddress::from(page_cap.get_address()).into();
             unsafe { &mut *{ address } }
         })
     }
@@ -191,6 +192,7 @@ impl ThreadInfo {
     }
 
     pub unsafe fn activate_vspace(&mut self) {
+        println!("activate_vspace");
         if let Err(e) = self.activate_vspace_inner() {
             println!("{e:?}");
             PageTable::activate_kernel_table();
