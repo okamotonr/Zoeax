@@ -7,9 +7,11 @@
 mod address;
 mod capability;
 pub mod common;
-pub mod handler;
-pub mod init;
+pub mod elf;
+mod handler;
+mod init;
 mod ipc_args;
+pub mod list;
 mod memlayout;
 mod object;
 mod riscv;
@@ -18,3 +20,10 @@ mod scheduler;
 mod syscall;
 mod timer;
 pub mod uart;
+
+pub use capability::CapabilityType;
+pub use common::{ErrKind, KernelError, KernelResult};
+pub use handler::return_to_user;
+pub use init::init_kernel;
+pub use syscall::InvLabel;
+pub use syscall::SysCallNo;

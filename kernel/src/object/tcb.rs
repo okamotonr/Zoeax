@@ -2,9 +2,9 @@ use crate::capability::page_table::PageCap;
 use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
 use crate::common::{ErrKind, KernelResult};
 use crate::kerr;
+use crate::list::ListItem;
 use crate::object::PageTable;
 use crate::println;
-use common::list::ListItem;
 
 use crate::scheduler::push;
 use core::ops::{Index, IndexMut};
@@ -214,7 +214,11 @@ impl ThreadInfo {
         self.root_cnode = Some(new_entry)
     }
 
-    pub fn set_root_vspace(&mut self, vspace_cap: PageTableCap, parent: &mut CNodeEntry<PageTable>) {
+    pub fn set_root_vspace(
+        &mut self,
+        vspace_cap: PageTableCap,
+        parent: &mut CNodeEntry<PageTable>,
+    ) {
         // TODO: you should consider when already set.
         assert!(self.vspace.is_none(), "{:?}", self.vspace);
         let mut new_entry = CNodeEntry::new_with_rawcap(vspace_cap);

@@ -1,4 +1,4 @@
-use common::elf::Elf64Hdr;
+use crate::elf::Elf64Hdr;
 
 mod pm;
 mod root_server;

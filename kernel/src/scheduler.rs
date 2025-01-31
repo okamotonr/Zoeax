@@ -1,7 +1,7 @@
+use crate::list::{LinkedList, ListItem};
 use crate::object::{Registers, ThreadControlBlock, ThreadInfo};
 use crate::println;
 use crate::riscv::{r_sstatus, w_sstatus, wfi, SSTATUS_SIE, SSTATUS_SPIE, SSTATUS_SPP};
-use common::list::{LinkedList, ListItem};
 use core::ptr;
 
 // TODO: use once_cell
@@ -103,9 +103,7 @@ fn idle() -> ! {
 // TODO: remove this attribute
 #[allow(static_mut_refs)]
 pub fn push(tcb: &mut ThreadControlBlock) {
-    unsafe {
-        SCHEDULER.push(tcb)
-    }
+    unsafe { SCHEDULER.push(tcb) }
 }
 
 pub fn get_current_tcb_mut<'a>() -> &'a mut ThreadControlBlock {

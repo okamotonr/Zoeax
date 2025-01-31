@@ -1,54 +1,24 @@
 use core::arch::asm;
-#[repr(usize)]
-pub enum SysNo {
-    PutChar = PUTCHAR,
-    Call = CALL,
-    Send = SEND,
-    Recv = RECV,
-}
+use kernel::kerr;
+use kernel::ErrKind;
+use kernel::InvLabel;
+use kernel::KernelResult;
+use kernel::SysCallNo;
 
-pub const PUTCHAR: usize = 0;
-pub const CALL: usize = 1;
-pub const SEND: usize = 2;
-pub const RECV: usize = 3;
-
-/// inv label
-pub const UNTYPED_RETYPE: usize = 1;
-pub const TCB_CONFIGURE: usize = 2;
-pub const TCB_WRITE_REG: usize = 3;
-pub const TCB_RESUME: usize = 4;
-pub const TCB_SET_IPC_BUFFER: usize = 5;
-pub const NOTIFY_WAIT: usize = 6;
-pub const NOTIFY_SEND: usize = 7;
-pub const CNODE_COPY: usize = 8;
-pub const CNODE_MINT: usize = 9;
-pub const CNODE_MOVE: usize = 10;
-pub const PAGE_MAP: usize = 11;
-pub const PAGE_TABLE_MAP: usize = 12;
-pub const EP_SEND: usize = 13;
-pub const EP_RECV: usize = 14;
-
-// TODO: same kernel::capability::CapabilityType
-pub const TYPE_TCB: usize = 3;
-pub const TYPE_EP: usize = 5;
-pub const TYPE_CNODE: usize = 7;
-pub const TYPE_NOTIFY: usize = 9;
-pub const TYPE_PAGE_TABLE: usize = 2;
-pub const TYPE_PAGE: usize = 4;
-
+pub use kernel::CapabilityType;
 // TODO: use kernel::common
-pub type SysCallRes = Result<usize, (usize, usize)>;
+pub type SysCallRes = KernelResult<usize>;
 
 #[allow(clippy::too_many_arguments)]
 unsafe fn syscall(
     src_ptr: usize,
-    inv_label: usize,
+    inv_label: InvLabel,
     arg2: usize,
     arg3: usize,
     arg4: usize,
     arg5: usize,
     arg6: usize,
-    sysno: SysNo,
+    sysno: SysCallNo,
 ) -> SysCallRes {
     let mut is_error: usize;
     let mut val: usize;
@@ -56,7 +26,7 @@ unsafe fn syscall(
     asm!(
         "ecall",
         inout("a0") src_ptr => is_error,
-        inout("a1") inv_label => val,
+        inout("a1") inv_label as usize => val,
         in("a2") arg2,
         in("a3") arg3,
         in("a4") arg4,
@@ -68,12 +38,24 @@ unsafe fn syscall(
     if is_error == 0 {
         Ok(val)
     } else {
-        Err((is_error, val))
+        let e_kind = ErrKind::try_from(is_error).unwrap();
+        Err(kerr!(e_kind, val as u16))
     }
 }
 
 pub fn put_char(char: u8) -> SysCallRes {
-    unsafe { syscall(char as usize, 0, 0, 0, 0, 0, 0, SysNo::PutChar) }
+    unsafe {
+        syscall(
+            char as usize,
+            InvLabel::PutChar,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::PutChar,
+        )
+    }
 }
 
 pub fn untyped_retype(
@@ -81,37 +63,48 @@ pub fn untyped_retype(
     dest_ptr: usize,
     user_size: usize,
     num: usize,
-    cap_type: usize,
+    cap_type: CapabilityType,
 ) -> SysCallRes {
     unsafe {
         syscall(
             src_ptr,
-            UNTYPED_RETYPE,
+            InvLabel::UntypedRetype,
             dest_ptr,
             user_size,
             num,
-            cap_type,
+            cap_type as usize,
             0,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
 
 pub fn write_reg(src_ptr: usize, is_ip: usize, value: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, TCB_WRITE_REG, is_ip, value, 0, 0, 0, SysNo::Call) }
+    unsafe {
+        syscall(
+            src_ptr,
+            InvLabel::TcbWriteReg,
+            is_ip,
+            value,
+            0,
+            0,
+            0,
+            SysCallNo::Call,
+        )
+    }
 }
 
 pub fn set_ipc_buffer(src_ptr: usize, page_cap_ptr: usize) -> SysCallRes {
     unsafe {
         syscall(
             src_ptr,
-            TCB_SET_IPC_BUFFER,
+            InvLabel::TcbSetIpcBuffer,
             page_cap_ptr,
             0,
             0,
             0,
             0,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
@@ -120,27 +113,49 @@ pub fn configure_tcb(src_ptr: usize, cnode_ptr: usize, vspace_ptr: usize) -> Sys
     unsafe {
         syscall(
             src_ptr,
-            TCB_CONFIGURE,
+            InvLabel::TcbConfigure,
             cnode_ptr,
             vspace_ptr,
             0,
             0,
             0,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
 
 pub fn resume_tcb(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, TCB_RESUME, 0, 0, 0, 0, 0, SysNo::Call) }
+    unsafe { syscall(src_ptr, InvLabel::TcbResume, 0, 0, 0, 0, 0, SysCallNo::Call) }
 }
 
 pub fn send_signal(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, NOTIFY_SEND, 0, 0, 0, 0, 0, SysNo::Send) }
+    unsafe {
+        syscall(
+            src_ptr,
+            InvLabel::NotifySend,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Send,
+        )
+    }
 }
 
 pub fn recv_signal(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, NOTIFY_WAIT, 0, 0, 0, 0, 0, SysNo::Recv) }
+    unsafe {
+        syscall(
+            src_ptr,
+            InvLabel::NotifyWait,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Recv,
+        )
+    }
 }
 
 pub fn cnode_copy(
@@ -155,13 +170,13 @@ pub fn cnode_copy(
     unsafe {
         syscall(
             src_root,
-            CNODE_COPY,
+            InvLabel::CNodeCopy,
             src_index,
             depth,
             dest_root,
             dest_index,
             0,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
@@ -179,13 +194,13 @@ pub fn cnode_mint(
     unsafe {
         syscall(
             src_root,
-            CNODE_MINT,
+            InvLabel::CNodeMint,
             src_index,
             depth,
             dest_root,
             dest_index,
             cap_val,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
@@ -202,42 +217,53 @@ pub fn cnode_move(
     unsafe {
         syscall(
             src_root,
-            CNODE_MOVE,
+            InvLabel::CNodeMove,
             src_index,
             depth,
             dest_root,
             dest_index,
             0,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
 
 pub fn map_page(src_ptr: usize, dest_ptr: usize, vaddr: usize, flags: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, PAGE_MAP, dest_ptr, vaddr, flags, 0, 0, SysNo::Call) }
+    unsafe {
+        syscall(
+            src_ptr,
+            InvLabel::PageMap,
+            dest_ptr,
+            vaddr,
+            flags,
+            0,
+            0,
+            SysCallNo::Call,
+        )
+    }
 }
 
 pub fn map_page_table(src_ptr: usize, dest_ptr: usize, vaddr: usize) -> SysCallRes {
     unsafe {
         syscall(
             src_ptr,
-            PAGE_TABLE_MAP,
+            InvLabel::PageTableMap,
             dest_ptr,
             vaddr,
             0,
             0,
             0,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
 
 pub fn send_ipc(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, EP_SEND, 0, 0, 0, 0, 0, SysNo::Send) }
+    unsafe { syscall(src_ptr, InvLabel::EpSend, 0, 0, 0, 0, 0, SysCallNo::Send) }
 }
 
 pub fn recv_ipc(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, EP_RECV, 0, 0, 0, 0, 0, SysNo::Recv) }
+    unsafe { syscall(src_ptr, InvLabel::EpRecv, 0, 0, 0, 0, 0, SysCallNo::Recv) }
 }
 
 pub const MESSAGE_LEN: usize = 128;

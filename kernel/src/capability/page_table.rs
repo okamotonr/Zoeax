@@ -6,12 +6,11 @@ use crate::object::page_table::PageTable;
 use crate::object::KObject;
 use crate::{
     address::{KernelVAddress, VirtAddr},
-    capability::{Capability, CapabilityType, CapabilityData},
+    capability::{Capability, CapabilityData, CapabilityType},
     common::KernelResult,
 };
 
 use super::Something;
-
 
 /*
  * RawCapability[0]

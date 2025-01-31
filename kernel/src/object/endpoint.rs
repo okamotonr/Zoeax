@@ -1,4 +1,4 @@
-use common::list::LinkedList;
+use crate::list::LinkedList;
 
 use super::tcb::{resume, ThreadControlBlock, ThreadInfo};
 

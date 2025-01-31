@@ -7,7 +7,6 @@ use core::mem;
 
 use super::CapabilityData;
 
-
 impl TCBCap {
     pub fn set_registers(&mut self, registers: &[(usize, usize)]) {
         let tcb = self.get_tcb();

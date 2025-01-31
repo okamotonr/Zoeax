@@ -20,8 +20,7 @@ use super::KObject;
 #[derive(Default, Debug)]
 pub struct ManagementDB([usize; 2]);
 
-impl ManagementDB
-{
+impl ManagementDB {
     pub fn get_next(&mut self) -> Option<&mut CNodeEntry<Something>> {
         self.get_node(true)
     }
@@ -46,7 +45,8 @@ impl ManagementDB
         if address.is_null() {
             None
         } else {
-            let k_address: *mut CNodeEntry<Something> = KernelVAddress::from(PhysAddr::from(address)).into();
+            let k_address: *mut CNodeEntry<Something> =
+                KernelVAddress::from(PhysAddr::from(address)).into();
             unsafe { k_address.as_mut() }
         }
     }
@@ -83,21 +83,22 @@ where
 
 impl CNodeEntry<Something> {
     pub fn as_capability<K>(&mut self) -> KernelResult<&mut CNodeEntry<K>>
-        where
-            K: KObject,
-            CapabilityData<K>: Capability
-        {
-            // whether cast is safe or
-            self.cap.as_capability::<K>()?;
-            unsafe {
-                let ptr = self as *mut Self as *mut CNodeEntry<K>;
-                Ok(ptr.as_mut().unwrap())
-            }
+    where
+        K: KObject,
+        CapabilityData<K>: Capability,
+    {
+        // whether cast is safe or
+        self.cap.as_capability::<K>()?;
+        unsafe {
+            let ptr = self as *mut Self as *mut CNodeEntry<K>;
+            Ok(ptr.as_mut().unwrap())
+        }
     }
 }
 
 impl<K: KObject> CNodeEntry<K>
-where CapabilityData<K>: Capability
+where
+    CapabilityData<K>: Capability,
 {
     pub fn new_with_rawcap(cap: CapabilityData<K>) -> Self {
         Self {
@@ -149,7 +150,6 @@ where CapabilityData<K>: Capability
     pub fn get_prev(&mut self) -> Option<&mut CNodeEntry<Something>> {
         self.mdb.get_prev()
     }
-
 
     pub fn cap_ref_mut(&mut self) -> &mut CapabilityData<K> {
         &mut self.cap

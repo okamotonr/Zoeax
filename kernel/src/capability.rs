@@ -5,8 +5,8 @@ use crate::{
     object::{CNodeEntry, KObject},
 };
 
-use core::{marker::PhantomData, num::NonZeroU8};
 use core::mem;
+use core::{marker::PhantomData, num::NonZeroU8};
 
 pub mod cnode;
 pub mod endpoint;
@@ -24,7 +24,7 @@ pub struct CapabilityData<K: KObject> {
     address_top: u16,
     address_bottom: u32,
     cap_dep_val: u64,
-    _obj_type: PhantomData<K>
+    _obj_type: PhantomData<K>,
 }
 
 /*
@@ -39,15 +39,16 @@ impl KObject for Something {}
 
 pub type CapInSlot = CapabilityData<Something>;
 
-
 impl CapInSlot {
     pub fn as_capability<NK>(&mut self) -> KernelResult<&mut CapabilityData<NK>>
-        where 
-            NK: KObject,
-            CapabilityData<NK>: Capability
+    where
+        NK: KObject,
+        CapabilityData<NK>: Capability,
     {
         let cap_type = self.get_cap_type()?;
-        (CapabilityData::<NK>::CAP_TYPE == cap_type).then_some(()).ok_or(kerr!(ErrKind::UnexpectedCapType))?;
+        (CapabilityData::<NK>::CAP_TYPE == cap_type)
+            .then_some(())
+            .ok_or(kerr!(ErrKind::UnexpectedCapType))?;
         unsafe {
             let ptr = self as *mut CapabilityData<Something> as *mut CapabilityData<NK>;
             Ok(ptr.as_mut().unwrap())
@@ -76,15 +77,16 @@ impl Capability for CapInSlot {
     }
 }
 
-impl<K: KObject> CapabilityData<K> 
-where  CapabilityData<K>: Capability {
-
+impl<K: KObject> CapabilityData<K>
+where
+    CapabilityData<K>: Capability,
+{
     pub fn init(address: KernelVAddress, user_size: usize) -> Self {
         let cap_type = Self::CAP_TYPE;
         let cap_dep_val = Self::create_cap_dep_val(address, user_size);
         Self::new(cap_type, address.into(), cap_dep_val as u64)
     }
-    
+
     pub fn new(cap_type: CapabilityType, address: PhysAddr, cap_dep_val: u64) -> Self {
         let mut ret = Self {
             cap_type: NonZeroU8::new(cap_type as u8).unwrap(),
@@ -92,7 +94,7 @@ where  CapabilityData<K>: Capability {
             address_top: 0,
             address_bottom: 0,
             cap_dep_val,
-            _obj_type: PhantomData
+            _obj_type: PhantomData,
         };
         ret.set_address(address);
         ret
@@ -128,7 +130,7 @@ where  CapabilityData<K>: Capability {
             address_top: self.address_top,
             address_bottom: self.address_bottom,
             cap_dep_val: self.cap_dep_val,
-            _obj_type: self._obj_type
+            _obj_type: self._obj_type,
         }
     }
 
@@ -139,7 +141,7 @@ where  CapabilityData<K>: Capability {
             cap_right: self.cap_right,
             address_bottom: self.address_bottom,
             address_top: self.address_top,
-            _obj_type: PhantomData
+            _obj_type: PhantomData,
         }
     }
 }
@@ -195,4 +197,3 @@ where
     }
     fn init_object(&mut self);
 }
-

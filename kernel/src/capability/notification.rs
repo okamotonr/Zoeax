@@ -1,8 +1,7 @@
-use super::{Capability, CapabilityType, CapabilityData};
+use super::{Capability, CapabilityData, CapabilityType};
 use crate::address::KernelVAddress;
 use crate::common::KernelResult;
 use crate::object::{KObject, Notification, ThreadControlBlock};
-
 
 impl KObject for Notification {}
 

@@ -1,32 +1,56 @@
 use crate::{
     address::PAGE_SIZE,
     capability::{
-        endpoint::EndPointCap, notification::NotificationCap, untyped::UntypedCap, CapabilityType
+        endpoint::EndPointCap, notification::NotificationCap, untyped::UntypedCap, CapabilityType,
     },
     common::{is_aligned, ErrKind, KernelResult},
     kerr,
-    object::{page_table::{Page, PAGE_U}, CNode, CNodeEntry, Endpoint, Notification, PageTable, Registers, ThreadControlBlock},
+    object::{
+        page_table::{Page, PAGE_U},
+        CNode, CNodeEntry, Endpoint, Notification, PageTable, Registers, ThreadControlBlock,
+    },
     println,
     scheduler::{get_current_tcb_mut, require_schedule},
     uart::putchar,
 };
 
-use common::syscall::{
-    CALL, CNODE_COPY, CNODE_MINT, CNODE_MOVE, EP_RECV, EP_SEND, NOTIFY_SEND, NOTIFY_WAIT, PAGE_MAP,
-    PAGE_TABLE_MAP, PUTCHAR, RECV, SEND, TCB_CONFIGURE, TCB_RESUME, TCB_SET_IPC_BUFFER,
-    TCB_WRITE_REG, UNTYPED_RETYPE,
-};
+#[repr(u8)]
+pub enum SysCallNo {
+    PutChar = 0,
+    Call = 1,
+    Send = 2,
+    Recv = 3,
+}
+
+#[repr(usize)]
+pub enum InvLabel {
+    PutChar = 0,
+    UntypedRetype = 1,
+    TcbConfigure,
+    TcbWriteReg,
+    TcbResume,
+    TcbSetIpcBuffer,
+    NotifyWait,
+    NotifySend,
+    CNodeCopy,
+    CNodeMint,
+    CNodeMove,
+    PageMap,
+    PageTableMap,
+    EpSend,
+    EpRecv,
+}
 
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
     let syscall_ret = match syscall_n {
-        PUTCHAR => {
+        n if n == SysCallNo::PutChar as usize => {
             let a0 = reg.a0;
             putchar(a0 as u8);
             Ok(())
         }
-        CALL => handle_call_invocation(reg),
-        SEND => handle_send_invocation(reg),
-        RECV => handle_recieve_invocation(reg),
+        n if n == SysCallNo::Call as usize => handle_call_invocation(reg),
+        n if n == SysCallNo::Send as usize => handle_send_invocation(reg),
+        n if n == SysCallNo::Recv as usize => handle_recieve_invocation(reg),
         _ => panic!("Unknown system call"),
     };
     if let Err(e) = syscall_ret {
@@ -42,11 +66,16 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
 
 fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
-    let mut root_cnode = current_tcb.root_cnode.as_mut().unwrap().cap_ref_mut().replicate();
+    let mut root_cnode = current_tcb
+        .root_cnode
+        .as_mut()
+        .unwrap()
+        .cap_ref_mut()
+        .replicate();
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
     match inv_label {
-        UNTYPED_RETYPE => {
+        n if n == InvLabel::UntypedRetype as usize => {
             let dest_cnode_ptr = reg.a2;
             let user_size = reg.a3;
             let num = reg.a4;
@@ -56,19 +85,30 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             UntypedCap::invoke_retype(src_entry, dest_cnode, user_size, num, new_type)?;
             Ok(())
         }
-        TCB_CONFIGURE => {
+        n if n == InvLabel::TcbConfigure as usize => {
             // TODO: lookup entry first to be able to rollback
             // TODO: we have to do something to make rust ownership be calm down.
-            let mut tcb_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<ThreadControlBlock>()?.replicate();
-            let cspace_slot = root_cnode.lookup_entry_mut_one_level(reg.a2)?.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
+            let mut tcb_cap = root_cnode
+                .lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut()
+                .unwrap()
+                .cap_ref_mut()
+                .as_capability::<ThreadControlBlock>()?
+                .replicate();
+            let cspace_slot = root_cnode
+                .lookup_entry_mut_one_level(reg.a2)?
+                .as_mut()
+                .ok_or(kerr!(ErrKind::SlotIsEmpty))?;
             //let vspace = root_cnode.lookup_entry_mut_one_level(reg.a3)?;
             tcb_cap.set_cspace(cspace_slot.as_capability::<CNode>()?)?;
-            let vspace = root_cnode.lookup_entry_mut_one_level(reg.a3)?.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
+            let vspace = root_cnode
+                .lookup_entry_mut_one_level(reg.a3)?
+                .as_mut()
+                .ok_or(kerr!(ErrKind::SlotIsEmpty))?;
             tcb_cap.set_vspace(vspace.as_capability::<PageTable>()?)?;
             Ok(())
         }
-        TCB_WRITE_REG => {
+        n if n == InvLabel::TcbWriteReg as usize => {
             // TODO: currently only support sp, ip, and a0.
             // is_stack
             let reg_id = match reg.a2 {
@@ -80,15 +120,24 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                 _ => panic!("cannot set reg {:x}", reg.a2),
             };
             let value = reg.a3;
-            let tcb_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<ThreadControlBlock>()?;
+            let tcb_cap = root_cnode
+                .lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut()
+                .unwrap()
+                .cap_ref_mut()
+                .as_capability::<ThreadControlBlock>()?;
             tcb_cap.set_registers(&[(reg_id, value)]);
             Ok(())
         }
-        TCB_SET_IPC_BUFFER => {
+        n if n == InvLabel::TcbSetIpcBuffer as usize => {
             let page_ptr = reg.a2;
-            let mut tcb_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<ThreadControlBlock>()?.replicate();
+            let mut tcb_cap = root_cnode
+                .lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut()
+                .unwrap()
+                .cap_ref_mut()
+                .as_capability::<ThreadControlBlock>()?
+                .replicate();
             let page_cap = root_cnode
                 .lookup_entry_mut_one_level(page_ptr)?
                 .as_mut()
@@ -98,43 +147,72 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
             Ok(())
         }
 
-        TCB_RESUME => {
-            let tcb_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<ThreadControlBlock>()?;
+        n if n == InvLabel::TcbResume as usize => {
+            let tcb_cap = root_cnode
+                .lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut()
+                .unwrap()
+                .cap_ref_mut()
+                .as_capability::<ThreadControlBlock>()?;
             tcb_cap.make_runnable();
             Ok(())
         }
-        PAGE_MAP | PAGE_TABLE_MAP => {
+        n if n == InvLabel::PageMap as usize || n == InvLabel::PageTableMap as usize => {
             let page_table_ptr = reg.a2;
             let vaddr = reg.a3;
             is_aligned(vaddr, PAGE_SIZE)
                 .then_some(())
                 .ok_or(kerr!(ErrKind::NotAligned, PAGE_SIZE as u16))?;
-            let mut page_table_cap = root_cnode.lookup_entry_mut_one_level(page_table_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<PageTable>()?.replicate();
-            if inv_label == PAGE_MAP {
+            let mut page_table_cap = root_cnode
+                .lookup_entry_mut_one_level(page_table_ptr)?
+                .as_mut()
+                .unwrap()
+                .cap_ref_mut()
+                .as_capability::<PageTable>()?
+                .replicate();
+            if n == InvLabel::PageMap as usize {
                 // TODO: interpret flags
                 let flags = PAGE_U | reg.a4;
-                let page = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<Page>()?;
+                let page = root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap_ref_mut()
+                    .as_capability::<Page>()?;
                 page.map(&mut page_table_cap, vaddr.into(), flags)?;
             } else {
-                let page = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<PageTable>()?;
+                let page = root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap_ref_mut()
+                    .as_capability::<PageTable>()?;
                 page.map(&mut page_table_cap, vaddr.into())?;
             }
             Ok(())
         }
-        CNODE_COPY | CNODE_MINT | CNODE_MOVE => {
+        n if n == InvLabel::CNodeCopy as usize
+            || n == InvLabel::CNodeMint as usize
+            || n == InvLabel::CNodeMove as usize =>
+        {
             let src_depth = (reg.a3 >> 31) as u32;
             let dest_depth = reg.a3 as u32;
-            let mut src_root = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<CNode>()?.replicate();
+            let mut src_root = root_cnode
+                .lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut()
+                .unwrap()
+                .cap_ref_mut()
+                .as_capability::<CNode>()?
+                .replicate();
             let src_slot = src_root.lookup_entry_mut(reg.a2, src_depth)?;
             let src_entry = src_slot.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
 
-            let dest_root = root_cnode.lookup_entry_mut_one_level(reg.a4)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<CNode>()?;
+            let dest_root = root_cnode
+                .lookup_entry_mut_one_level(reg.a4)?
+                .as_mut()
+                .unwrap()
+                .cap_ref_mut()
+                .as_capability::<CNode>()?;
             let dest_slot = dest_root.lookup_entry_mut(reg.a5, dest_depth)?;
             if dest_slot.is_some() {
                 Err(kerr!(ErrKind::NotEmptySlot))
@@ -142,13 +220,13 @@ fn handle_call_invocation(reg: &mut Registers) -> KernelResult<()> {
                 let raw_cap = src_entry.cap().replicate();
                 // TODO: Whether this cap is derivable
                 let mut cap = raw_cap;
-                if inv_label == CNODE_MINT {
+                if n == InvLabel::CNodeMint as usize {
                     let cap_val = reg.a6;
                     cap.set_cap_dep_val(cap_val);
                 }
 
                 let mut new_slot = CNodeEntry::new_with_rawcap(cap);
-                if inv_label == CNODE_MOVE {
+                if n == InvLabel::CNodeMove as usize {
                     new_slot.replace(src_entry);
                     *src_slot = None
                 } else {
@@ -168,16 +246,25 @@ fn handle_send_invocation(reg: &mut Registers) -> KernelResult<()> {
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
     match inv_label {
-        NOTIFY_SEND => {
-            let notify_cap = root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<Notification>()?;
+        n if n == InvLabel::NotifySend as usize => {
+            let notify_cap = root_cnode
+                .lookup_entry_mut_one_level(cap_ptr)?
+                .as_mut()
+                .unwrap()
+                .cap_ref_mut()
+                .as_capability::<Notification>()?;
             notify_cap.send();
             Ok(())
         }
-        EP_SEND => {
+        n if n == InvLabel::EpSend as usize => {
             // TODO: Dirty hack
-            let ep_cap_ptr = { root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<Endpoint>()? as *mut EndPointCap
+            let ep_cap_ptr = {
+                root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap_ref_mut()
+                    .as_capability::<Endpoint>()? as *mut EndPointCap
             };
             let ep_cap = unsafe { ep_cap_ptr.as_mut().unwrap() };
             if ep_cap.send(current_tcb) {
@@ -195,11 +282,15 @@ fn handle_recieve_invocation(reg: &mut Registers) -> KernelResult<()> {
     let cap_ptr = reg.a0;
     let inv_label = reg.a1;
     match inv_label {
-        NOTIFY_WAIT => {
+        n if n == InvLabel::NotifyWait as usize => {
             // TODO: Dirty Hack
-            let notify_cap_ptr = { root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<Notification>()?
-                    as *mut NotificationCap
+            let notify_cap_ptr = {
+                root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap_ref_mut()
+                    .as_capability::<Notification>()? as *mut NotificationCap
             };
             let notify_cap = unsafe { notify_cap_ptr.as_mut().unwrap() };
             if notify_cap.wait(current_tcb) {
@@ -207,10 +298,15 @@ fn handle_recieve_invocation(reg: &mut Registers) -> KernelResult<()> {
             }
             Ok(())
         }
-        EP_RECV => {
+        n if n == InvLabel::EpRecv as usize => {
             // TODO: Dirty Hack
-            let ep_cap_ptr = { root_cnode.lookup_entry_mut_one_level(cap_ptr)?
-                .as_mut().unwrap().cap_ref_mut().as_capability::<Endpoint>()? as *mut EndPointCap
+            let ep_cap_ptr = {
+                root_cnode
+                    .lookup_entry_mut_one_level(cap_ptr)?
+                    .as_mut()
+                    .unwrap()
+                    .cap_ref_mut()
+                    .as_capability::<Endpoint>()? as *mut EndPointCap
             };
             let ep_cap = unsafe { ep_cap_ptr.as_mut().unwrap() };
             if ep_cap.recv(current_tcb) {

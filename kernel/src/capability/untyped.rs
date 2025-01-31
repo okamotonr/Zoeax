@@ -3,18 +3,18 @@ use core::mem;
 
 use crate::address::KernelVAddress;
 use crate::capability::PhysAddr;
-use crate::capability::{Capability, CapabilityType, CapabilityData};
+use crate::capability::{Capability, CapabilityData, CapabilityType};
 use crate::common::{align_up, ErrKind, KernelResult};
-use crate::object::Untyped;
 use crate::object::page_table::Page;
-use crate::object::Endpoint;
-use crate::object::KObject;
 use crate::object::CNode;
 use crate::object::CNodeEntry;
+use crate::object::Endpoint;
+use crate::object::KObject;
+use crate::object::ManagementDB;
 use crate::object::Notification;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
-use crate::object::ManagementDB;
+use crate::object::Untyped;
 use crate::println;
 
 use super::Something;
@@ -72,8 +72,9 @@ impl UntypedCap {
         &mut self,
         user_size: usize,
         num: usize,
-    ) -> KernelResult<CapGenerator<K>> 
-    where CapabilityData<K>: Capability
+    ) -> KernelResult<CapGenerator<K>>
+    where
+        CapabilityData<K>: Capability,
     {
         // 1, can convert from device memory
         println!("user size is {}", user_size);
@@ -145,7 +146,9 @@ impl UntypedCap {
         user_size: usize,
         num: usize,
     ) -> KernelResult<()>
-    where CapabilityData<K>: Capability {
+    where
+        CapabilityData<K>: Capability,
+    {
         let cap_gen = self.retype::<K>(user_size, num)?;
         for (i, mut cap) in cap_gen.enumerate() {
             cap.init_object();
@@ -179,10 +182,10 @@ impl UntypedCap {
     }
 }
 
-pub struct CapGenerator<K> 
-where 
+pub struct CapGenerator<K>
+where
     K: KObject,
-    CapabilityData<K>: Capability
+    CapabilityData<K>: Capability,
 {
     num: usize,              // mutable
     address: KernelVAddress, // mutable
@@ -192,10 +195,10 @@ where
     _phantom: PhantomData<K>,
 }
 
-impl<K> CapGenerator<K> 
-where 
+impl<K> CapGenerator<K>
+where
     K: KObject,
-    CapabilityData<K>: Capability
+    CapabilityData<K>: Capability,
 {
     pub fn new(
         num: usize,
@@ -218,21 +221,21 @@ where
 }
 
 impl<K> Iterator for CapGenerator<K>
-where 
+where
     K: KObject,
-    CapabilityData<K>: Capability
+    CapabilityData<K>: Capability,
 {
     type Item = CapabilityData<K>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.num == 0 {
             None
         } else {
-            let cap_dep_val = CapabilityData::<K>::create_cap_dep_val(
-                self.address, self.user_size
-            );
+            let cap_dep_val = CapabilityData::<K>::create_cap_dep_val(self.address, self.user_size);
             let cap = CapabilityData::<K>::new(
                 CapabilityData::<K>::CAP_TYPE,
-                self.address.into(), cap_dep_val as u64);
+                self.address.into(),
+                cap_dep_val as u64,
+            );
             self.address = self.address.add(self.obj_size);
             self.num -= 1;
             Some(cap)

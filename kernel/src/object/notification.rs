@@ -1,6 +1,6 @@
 use core::num::NonZeroU64;
 
-use common::list::LinkedList;
+use crate::list::LinkedList;
 
 use super::tcb::{resume, ThreadControlBlock, ThreadInfo};
 

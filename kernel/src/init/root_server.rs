@@ -1,5 +1,5 @@
 use super::pm::BumpAllocator;
-use common::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
+use crate::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
 
 use crate::address::KernelVAddress;
 use crate::address::VirtAddr;
@@ -91,8 +91,7 @@ impl<'a> RootServerMemory<'a> {
         let vaddr = (cnode as *const CNode).into();
         let cap_dep_val = CNodeCap::create_cap_dep_val(vaddr, ROOT_CNODE_ENTRY_NUM_BITS);
         let cap_type = CNodeCap::CAP_TYPE;
-        let cap = CNodeCap::new(
-            cap_type, vaddr.into(), cap_dep_val as u64);
+        let cap = CNodeCap::new(cap_type, vaddr.into(), cap_dep_val as u64);
         let cap_in_slot = cap.replicate().up_cast();
         cnode.write_slot(cap_in_slot, ROOT_CNODE_IDX);
         cap
@@ -111,8 +110,7 @@ impl<'a> RootServerMemory<'a> {
         let vaddr = (root_page_table as *const PageTable).into();
         let cap_dep_val = CNodeCap::create_cap_dep_val(vaddr, ROOT_CNODE_ENTRY_NUM_BITS);
         let cap_type = PageTableCap::CAP_TYPE;
-        let mut cap = PageTableCap::new(
-            cap_type, vaddr.into(), cap_dep_val as u64);
+        let mut cap = PageTableCap::new(cap_type, vaddr.into(), cap_dep_val as u64);
         cap.root_map().unwrap();
         cnode_cap.write_slot(cap.replicate().up_cast(), ROOT_VSPACE_IDX);
         println!("map segments");

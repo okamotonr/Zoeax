@@ -10,12 +10,8 @@ use common::syscall::send_ipc;
 use common::syscall::send_signal;
 use common::syscall::set_ipc_buffer;
 use common::syscall::write_reg;
-use common::syscall::TYPE_CNODE;
-use common::syscall::TYPE_EP;
-use common::syscall::TYPE_NOTIFY;
-use common::syscall::TYPE_PAGE;
-use common::syscall::TYPE_PAGE_TABLE;
-use common::syscall::{configure_tcb, untyped_retype, TYPE_TCB};
+use common::syscall::CapabilityType;
+use common::syscall::{configure_tcb, untyped_retype};
 
 pub static mut STACK: [usize; 512] = [0; 512];
 const ROOT_CNODE_RADIX: u32 = 18;
@@ -27,19 +23,40 @@ pub fn main(untyped_cnode_idx: usize) {
     let root_vspace_idx: usize = 3;
     println!("parent: hello, world, {untyped_cnode_idx:}");
     let tcb_idx = untyped_cnode_idx + 1;
-    untyped_retype(untyped_cnode_idx, tcb_idx, 0, 1, TYPE_TCB).unwrap();
+    untyped_retype(untyped_cnode_idx, tcb_idx, 0, 1, CapabilityType::Tcb).unwrap();
     let notify_idx = tcb_idx + 1;
-    untyped_retype(untyped_cnode_idx, notify_idx, 0, 1, TYPE_NOTIFY).unwrap();
+    untyped_retype(
+        untyped_cnode_idx,
+        notify_idx,
+        0,
+        1,
+        CapabilityType::Notification,
+    )
+    .unwrap();
     let lv2_cnode_idx = notify_idx + 1;
-    untyped_retype(untyped_cnode_idx, lv2_cnode_idx, 1, 1, TYPE_CNODE).unwrap();
+    untyped_retype(
+        untyped_cnode_idx,
+        lv2_cnode_idx,
+        1,
+        1,
+        CapabilityType::CNode,
+    )
+    .unwrap();
 
     let page_idx = lv2_cnode_idx + 1;
-    untyped_retype(untyped_cnode_idx, page_idx, 0, 1, TYPE_PAGE).unwrap();
+    untyped_retype(untyped_cnode_idx, page_idx, 0, 1, CapabilityType::Page).unwrap();
     let page_table_idx = page_idx + 1;
-    untyped_retype(untyped_cnode_idx, page_table_idx, 0, 1, TYPE_PAGE_TABLE).unwrap();
+    untyped_retype(
+        untyped_cnode_idx,
+        page_table_idx,
+        0,
+        1,
+        CapabilityType::PageTable,
+    )
+    .unwrap();
     let ep_idx = page_table_idx + 3;
     let ep_mint_idx = page_table_idx + 4;
-    untyped_retype(untyped_cnode_idx, ep_idx, 0, 1, TYPE_EP).unwrap();
+    untyped_retype(untyped_cnode_idx, ep_idx, 0, 1, CapabilityType::EndPoint).unwrap();
 
     let vaddr = 0x0000000001000000 - 0x1000;
     map_page_table(page_table_idx, root_vspace_idx, vaddr).unwrap();
@@ -143,7 +160,7 @@ fn children(a0: usize, a1: usize, a2: usize) {
     let page_r = 2;
     let page_w = 4;
     let flags = page_r | page_w;
-    untyped_retype(a2, page_idx, 1, 1, TYPE_PAGE).unwrap();
+    untyped_retype(a2, page_idx, 1, 1, CapabilityType::Page).unwrap();
     map_page(page_idx, root_vspace_idx, vaddr, flags).unwrap();
     println!("child: call recv");
     recv_ipc(a1).unwrap();

@@ -15,7 +15,6 @@ impl KObject for CNode {}
 
 pub type CNodeCap = CapabilityData<CNode>;
 
-
 impl Capability for CNodeCap {
     const CAP_TYPE: CapabilityType = CapabilityType::CNode;
     type KernelObject = CNode;
@@ -28,9 +27,7 @@ impl Capability for CNodeCap {
     }
     fn derive(&self, _src_slot: &CNodeEntry<Something>) -> KernelResult<Self> {
         // unchecked
-        Ok(Self {
-            ..*self
-        })
+        Ok(Self { ..*self })
     }
 
     fn init_object(&mut self) {

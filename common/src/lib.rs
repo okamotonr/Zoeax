@@ -4,8 +4,6 @@ use core::fmt;
 
 use syscall::put_char;
 
-pub mod elf;
-pub mod list;
 pub mod syscall;
 
 #[macro_export]
