@@ -15,7 +15,6 @@ use crate::object::Notification;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
 use crate::object::Untyped;
-use crate::println;
 
 use super::Something;
 use crate::kerr;
@@ -77,7 +76,6 @@ impl UntypedCap {
         CapabilityData<K>: Capability,
     {
         // 1, can convert from device memory
-        println!("user size is {}", user_size);
         let is_device = self.is_device();
         if is_device {
             <CapabilityData<K>>::can_be_retyped_from_device_memory()
@@ -115,6 +113,7 @@ impl UntypedCap {
         new_type: CapabilityType,
     ) -> KernelResult<()> {
         let (untyped_cap, mdb) = src_slot.cap_and_mdb();
+
         let untyped_cap = untyped_cap.as_capability::<Untyped>()?;
         match new_type {
             CapabilityType::Tcb => {

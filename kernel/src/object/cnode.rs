@@ -2,6 +2,7 @@ use crate::{
     address::{KernelVAddress, PhysAddr},
     capability::{CapInSlot, Capability, CapabilityData, Something},
     common::KernelResult,
+    const_assert,
 };
 use core::{fmt::Debug, mem};
 
@@ -17,6 +18,11 @@ use super::KObject;
  * 64                          0
  *       48               16
  */
+
+const_assert!(
+    mem::size_of::<CNodeEntry<Something>>() == mem::size_of::<Option<CNodeEntry<Something>>>()
+);
+
 #[derive(Default, Debug)]
 pub struct ManagementDB([usize; 2]);
 

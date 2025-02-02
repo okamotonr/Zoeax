@@ -12,17 +12,21 @@ use common::syscall::set_ipc_buffer;
 use common::syscall::write_reg;
 use common::syscall::CapabilityType;
 use common::syscall::{configure_tcb, untyped_retype};
+use common::BootInfo;
 
 pub static mut STACK: [usize; 512] = [0; 512];
 const ROOT_CNODE_RADIX: u32 = 18;
 
 #[no_mangle]
-pub fn main(untyped_cnode_idx: usize) {
+pub fn main(boot_info: &BootInfo) {
     // same kernel::init::root_server::ROOT_*;
-    let root_cnode_idx: usize = 2;
-    let root_vspace_idx: usize = 3;
-    println!("parent: hello, world, {untyped_cnode_idx:}");
-    let tcb_idx = untyped_cnode_idx + 1;
+    let root_cnode_idx = boot_info.root_cnode_idx;
+    let root_vspace_idx = boot_info.root_vspace_idx;
+    let untyped_cnode_idx = boot_info.untyped_infos[0].idx;
+    println!("boot info: {:?}", boot_info);
+    println!("parent: hello, world, {untyped_cnode_idx:x}");
+    let first_empyt = boot_info.firtst_empty_idx;
+    let tcb_idx = first_empyt + 1;
     untyped_retype(untyped_cnode_idx, tcb_idx, 0, 1, CapabilityType::Tcb).unwrap();
     let notify_idx = tcb_idx + 1;
     untyped_retype(
@@ -140,7 +144,7 @@ pub fn main(untyped_cnode_idx: usize) {
     println!("parent: call recv");
     recv_ipc(ep_idx).unwrap();
     println!("parnet: recv done");
-    panic!()
+    panic!("iam parent");
 }
 
 #[allow(clippy::empty_loop)]
@@ -153,8 +157,6 @@ fn children(a0: usize, a1: usize, a2: usize) {
     println!("children: a2 is {a2}");
     send_signal(a0).unwrap();
     println!("children: send signal");
-    let v = recv_signal(a0);
-    println!("child: wake up {v:?}");
     let vaddr = 0x0000000001000000 - 0x2000;
     let page_idx = a1 + 1;
     let page_r = 2;
@@ -171,5 +173,5 @@ fn children(a0: usize, a1: usize, a2: usize) {
     println!("child: call send");
     send_ipc(a1).unwrap();
     println!("child: send done");
-    loop {}
+    panic!("iam child");
 }

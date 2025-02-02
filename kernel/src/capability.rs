@@ -1,7 +1,7 @@
 use crate::{
     address::{KernelVAddress, PhysAddr},
     common::{ErrKind, KernelResult},
-    kerr,
+    const_assert, kerr,
     object::{CNodeEntry, KObject},
 };
 
@@ -14,6 +14,8 @@ pub mod notification;
 pub mod page_table;
 pub mod tcb;
 pub mod untyped;
+
+const_assert!(mem::size_of::<CapabilityData<Something>>() == (mem::size_of::<u64>() * 2));
 
 #[derive(Clone, Copy, Debug)]
 #[allow(dead_code)]

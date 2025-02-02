@@ -1,5 +1,5 @@
 use core::convert::TryFrom;
-use core::{error::Error, fmt};
+use core::{error::Error, fmt, mem};
 
 pub fn is_aligned(value: usize, align: usize) -> bool {
     value % align == 0
@@ -13,6 +13,33 @@ pub fn align_up(value: usize, align: usize) -> usize {
 /// align should be power of 2.
 pub fn align_down(value: usize, align: usize) -> usize {
     (value) & !(align - 1)
+}
+#[macro_export]
+macro_rules! const_assert_single {
+    ($cond:expr, $msg:expr $(,)?) => {
+        const _: () = {
+            if !$cond {
+                panic!($msg);
+            }
+        };
+    };
+    ($cond:expr $(,)?) => {
+        const _: () = {
+            if !$cond {
+                panic!(concat!("Compile-time assertion failed: ", stringify!($cond)));
+            }
+        };
+    };
+}
+
+#[macro_export]
+macro_rules! const_assert {
+    ($($cond:expr),+ $(,)?) => {
+        $( $crate::const_assert_single!($cond); )+
+    };
+    ( $( $cond:expr => $msg:expr ),+ $(,)? ) => {
+        $( $crate::const_assert_single!($cond, $msg); )+
+    };
 }
 
 #[repr(u8)]
@@ -78,6 +105,29 @@ impl TryFrom<usize> for ErrKind {
 }
 
 pub type KernelResult<T> = Result<T, KernelError>;
+
+const_assert!(
+    mem::size_of::<BootInfo>() <= 4096
+);
+
+// bits, idx, is_device
+#[derive(Default, Debug)]
+pub struct UntypedInfo {
+    pub bits: usize,
+    pub idx: usize,
+    pub is_device: bool
+}
+
+#[derive(Default, Debug)]
+pub struct BootInfo {
+    pub ipc_buffer_addr: usize,
+    pub root_cnode_idx: usize,
+    pub root_vspace_idx: usize,
+    pub untyped_num: usize,
+    pub firtst_empty_idx: usize,
+    pub msg: [u8; 32],
+    pub untyped_infos : [UntypedInfo; 32]
+}
 
 //TODO: thiserror and anyhow
 #[derive(Debug)]

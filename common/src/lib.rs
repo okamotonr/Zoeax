@@ -4,6 +4,8 @@ use core::fmt;
 
 use syscall::put_char;
 
+pub use kernel::common::UntypedInfo;
+pub use kernel::common::BootInfo;
 pub mod syscall;
 
 #[macro_export]

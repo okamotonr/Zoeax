@@ -192,7 +192,6 @@ impl ThreadInfo {
     }
 
     pub unsafe fn activate_vspace(&mut self) {
-        println!("activate_vspace");
         if let Err(e) = self.activate_vspace_inner() {
             println!("{e:?}");
             PageTable::activate_kernel_table();
