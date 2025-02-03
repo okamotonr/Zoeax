@@ -1,8 +1,8 @@
 use super::{Capability, CapabilityData, CapabilityType, Something};
 use crate::address::KernelVAddress;
 use crate::common::{ErrKind, KernelResult};
-use crate::{kerr, println};
 use crate::object::{CNode, CNodeEntry, KObject};
+use crate::{kerr, println};
 
 use core::mem;
 

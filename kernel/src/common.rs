@@ -26,7 +26,10 @@ macro_rules! const_assert_single {
     ($cond:expr $(,)?) => {
         const _: () = {
             if !$cond {
-                panic!(concat!("Compile-time assertion failed: ", stringify!($cond)));
+                panic!(concat!(
+                    "Compile-time assertion failed: ",
+                    stringify!($cond)
+                ));
             }
         };
     };
@@ -64,6 +67,7 @@ pub enum ErrKind {
     InvalidOperation,
     CapNotFound,
     NotAligned,
+    UnknownSysCall,
 }
 
 impl TryFrom<usize> for ErrKind {
@@ -106,16 +110,14 @@ impl TryFrom<usize> for ErrKind {
 
 pub type KernelResult<T> = Result<T, KernelError>;
 
-const_assert!(
-    mem::size_of::<BootInfo>() <= 4096
-);
+const_assert!(mem::size_of::<BootInfo>() <= 4096);
 
 // bits, idx, is_device
 #[derive(Default, Debug)]
 pub struct UntypedInfo {
     pub bits: usize,
     pub idx: usize,
-    pub is_device: bool
+    pub is_device: bool,
 }
 
 #[derive(Default, Debug)]
@@ -126,7 +128,7 @@ pub struct BootInfo {
     pub untyped_num: usize,
     pub firtst_empty_idx: usize,
     pub msg: [u8; 32],
-    pub untyped_infos : [UntypedInfo; 32]
+    pub untyped_infos: [UntypedInfo; 32],
 }
 
 //TODO: thiserror and anyhow

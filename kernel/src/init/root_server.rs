@@ -46,7 +46,7 @@ impl CNode {
     fn write_slot(&mut self, cap: CapabilityData<Something>, index: usize) {
         let root = (self as *mut Self).cast::<Option<CNodeEntry<Something>>>();
         let entry = CNodeEntry::new_with_rawcap(cap);
-        assert!(unsafe {(*root.add(index)).is_none()});
+        assert!(unsafe { (*root.add(index)).is_none() });
         unsafe { *root.add(index) = Some(entry) }
     }
 }
@@ -65,7 +65,7 @@ struct RootServerMemory<'a> {
     vspace: &'a mut MaybeUninit<PageTable>,
     tcb: &'a mut MaybeUninit<ThreadControlBlock>,
     ipc_buf: &'a mut MaybeUninit<Page>,
-    boot_frame: &'a mut MaybeUninit<Page>
+    boot_frame: &'a mut MaybeUninit<Page>,
 }
 
 impl<'a> RootServerMemory<'a> {
@@ -95,7 +95,7 @@ impl<'a> RootServerMemory<'a> {
             vspace,
             tcb,
             ipc_buf,
-            boot_frame
+            boot_frame,
         }
     }
 
@@ -131,7 +131,14 @@ impl<'a> RootServerMemory<'a> {
                     .get_pheader(elf_header.cast::<usize>(), idx)
                     .unwrap();
                 let p_start_addr = elf_header.cast::<u8>().add((*p_header).p_offset);
-                allocate_p_segment(cnode_cap, &mut cap, bootstage_mbr, p_header, p_start_addr, &mut max_vaddr)
+                allocate_p_segment(
+                    cnode_cap,
+                    &mut cap,
+                    bootstage_mbr,
+                    p_header,
+                    p_start_addr,
+                    &mut max_vaddr,
+                )
             }
         }
         (cap, max_vaddr)
@@ -148,7 +155,14 @@ impl<'a> RootServerMemory<'a> {
         let ipc_buf_frame = self.ipc_buf.write(Page::new());
         let vaddr = (ipc_buf_frame as *const Page).into();
         let flags = PAGE_R | PAGE_W | PAGE_U;
-        let page_cap = create_mapped_page_cap(cnode_cap, vspace_cap, bootstage_mbr, vaddr, max_vaddr.add(PAGE_SIZE), flags);
+        let page_cap = create_mapped_page_cap(
+            cnode_cap,
+            vspace_cap,
+            bootstage_mbr,
+            vaddr,
+            max_vaddr.add(PAGE_SIZE),
+            flags,
+        );
         cnode_cap.write_slot(page_cap.up_cast(), ROOT_IPC_BUFFER);
         page_cap
     }
@@ -163,7 +177,14 @@ impl<'a> RootServerMemory<'a> {
         let boot_page = self.boot_frame.write(Page::new());
         let vaddr = (boot_page as *const Page).into();
         let flags = PAGE_R | PAGE_U;
-        let page_cap = create_mapped_page_cap(cnode_cap, vspace_cap, bootstage_mbr, vaddr, max_vaddr.add(PAGE_SIZE), flags);
+        let page_cap = create_mapped_page_cap(
+            cnode_cap,
+            vspace_cap,
+            bootstage_mbr,
+            vaddr,
+            max_vaddr.add(PAGE_SIZE),
+            flags,
+        );
         cnode_cap.write_slot(page_cap.up_cast(), ROOT_BOOT_INFO_PAGE);
         (page_cap, vaddr)
     }
@@ -214,7 +235,6 @@ impl<'a> RootServerMemory<'a> {
         );
         tcb.ipc_buffer = Some(new_entry);
 
-
         let cap = TCBCap::init((tcb as *const ThreadControlBlock).into(), 0);
         cnode_cap.write_slot(cap.replicate().up_cast(), ROOT_TCB_IDX);
         cap
@@ -252,14 +272,13 @@ impl BootStateManager {
         ret
     }
 
-
     pub fn finalize(self) -> UntypedCapGenerator {
         let (start_address, end_address) = self.bump_allocator.end_allocation();
         UntypedCapGenerator {
             start_address: start_address.into(),
             end_address: end_address.into(),
             idx_start: self.cnode_satrt_idx,
-            idx_max: self.cnode_idx_max
+            idx_max: self.cnode_idx_max,
         }
     }
 }
@@ -276,7 +295,7 @@ impl Iterator for UntypedCapGenerator {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.start_address.add(4096) >= self.end_address {
-            return None
+            return None;
         }
         assert!(self.idx_max >= self.idx_start);
         let block_size: usize = (self.end_address - self.start_address).into();
@@ -289,15 +308,13 @@ impl Iterator for UntypedCapGenerator {
     }
 }
 
-
-
 unsafe fn allocate_p_segment(
     cnode_cap: &mut CNodeCap,
     root_table_cap: &mut PageTableCap,
     bootstage_mbr: &mut BootStateManager,
     p_header: *const Elf64Phdr,
     p_start_addr: *const u8,
-    max_vaddr: &mut VirtAddr
+    max_vaddr: &mut VirtAddr,
 ) {
     if !((*p_header).p_type == ProgramType::Load) {
         return;
@@ -312,7 +329,14 @@ unsafe fn allocate_p_segment(
             *max_vaddr = vaddr_n;
         }
         let page_addr = bootstage_mbr.alloc_page();
-        let page_cap = create_mapped_page_cap(cnode_cap, root_table_cap, bootstage_mbr, page_addr, vaddr_n, flags);
+        let page_cap = create_mapped_page_cap(
+            cnode_cap,
+            root_table_cap,
+            bootstage_mbr,
+            page_addr,
+            vaddr_n,
+            flags,
+        );
         cnode_cap.write_slot(page_cap.up_cast(), bootstage_mbr.alloc_cnode_idx());
         if file_sz_rem != 0 {
             let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
@@ -401,9 +425,19 @@ fn create_initial_thread(
     let (mut vspace_cap, max_vaddr) =
         root_server_mem.create_address_space(&mut root_cnode_cap, elf_header, &mut bootstage_mbr);
     // 3, create ipc buffer frame
-    let mut ipc_page_cap = root_server_mem.create_ipc_buf_frame(&mut root_cnode_cap, &mut vspace_cap, max_vaddr, &mut bootstage_mbr);
+    let mut ipc_page_cap = root_server_mem.create_ipc_buf_frame(
+        &mut root_cnode_cap,
+        &mut vspace_cap,
+        max_vaddr,
+        &mut bootstage_mbr,
+    );
 
-    let (_, boot_info_addr) = root_server_mem.create_boot_info_frame(&mut root_cnode_cap, &mut vspace_cap, max_vaddr.add(PAGE_SIZE), &mut bootstage_mbr);
+    let (_, boot_info_addr) = root_server_mem.create_boot_info_frame(
+        &mut root_cnode_cap,
+        &mut vspace_cap,
+        max_vaddr.add(PAGE_SIZE),
+        &mut bootstage_mbr,
+    );
     // 4, create idle thread
     create_idle_thread(&raw const __stack_top as usize);
     // 5, create root server tcb,
@@ -412,10 +446,14 @@ fn create_initial_thread(
         *boot_info_ptr = BootInfo::default();
         boot_info_ptr.as_mut().unwrap()
     };
-    
+
     let entry_point = unsafe { (*elf_header).e_entry };
-    let mut root_tcb =
-        root_server_mem.create_root_tcb(&mut root_cnode_cap, &mut vspace_cap, &mut ipc_page_cap, entry_point.into());
+    let mut root_tcb = root_server_mem.create_root_tcb(
+        &mut root_cnode_cap,
+        &mut vspace_cap,
+        &mut ipc_page_cap,
+        entry_point.into(),
+    );
 
     // 6, convert rest of memory into untyped objects.
     let mut num = 0;
@@ -425,7 +463,7 @@ fn create_initial_thread(
         boot_info.untyped_infos[idx] = UntypedInfo {
             bits: untyped_cap.block_size(),
             idx: untyped_cap_idx,
-            is_device: false
+            is_device: false,
         };
         num += 1;
         boot_info.firtst_empty_idx = untyped_cap_idx + 1;
@@ -457,4 +495,3 @@ pub fn init_root_server(mut bump_allocator: BumpAllocator, elf_header: *const El
         schedule();
     }
 }
-

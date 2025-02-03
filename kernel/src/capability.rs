@@ -1,8 +1,11 @@
 use crate::{
     address::{KernelVAddress, PhysAddr},
     common::{ErrKind, KernelResult},
-    const_assert, kerr,
+    const_assert,
+    ipc_args::HasRegisters,
+    kerr,
     object::{CNodeEntry, KObject},
+    InvLabel,
 };
 
 use core::mem;

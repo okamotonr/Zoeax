@@ -7,7 +7,6 @@ use crate::capability::{Capability, CapabilityData, CapabilityType};
 use crate::common::{align_up, ErrKind, KernelResult};
 use crate::object::page_table::Page;
 use crate::object::CNode;
-use crate::object::CNodeEntry;
 use crate::object::Endpoint;
 use crate::object::KObject;
 use crate::object::ManagementDB;
@@ -16,7 +15,6 @@ use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
 use crate::object::Untyped;
 
-use super::Something;
 use crate::kerr;
 
 /*
@@ -28,6 +26,14 @@ use crate::kerr;
 impl KObject for Untyped {}
 
 pub type UntypedCap = CapabilityData<Untyped>;
+
+pub struct RetypeInvocationArgs<'a> {
+    mdb: &'a mut ManagementDB,
+    dest_cnode: &'a mut CNode,
+    user_size: usize,
+    num: usize,
+    new_type: CapabilityType,
+}
 
 impl Capability for UntypedCap {
     const CAP_TYPE: CapabilityType = CapabilityType::Untyped;
@@ -106,39 +112,35 @@ impl UntypedCap {
 
     #[allow(clippy::too_many_arguments)]
     pub fn invoke_retype(
-        src_slot: &mut CNodeEntry<Something>,
+        &mut self,
+        mdb: &mut ManagementDB,
         dest_cnode: &mut CNode,
         user_size: usize,
         num: usize,
         new_type: CapabilityType,
     ) -> KernelResult<()> {
-        let (untyped_cap, mdb) = src_slot.cap_and_mdb();
-
-        let untyped_cap = untyped_cap.as_capability::<Untyped>()?;
         match new_type {
             CapabilityType::Tcb => {
-                untyped_cap._invocation::<ThreadControlBlock>(mdb, dest_cnode, user_size, num)
+                self.retype_and_insert::<ThreadControlBlock>(mdb, dest_cnode, user_size, num)
             }
             CapabilityType::CNode => {
-                untyped_cap._invocation::<CNode>(mdb, dest_cnode, user_size, num)
+                self.retype_and_insert::<CNode>(mdb, dest_cnode, user_size, num)
             }
             CapabilityType::EndPoint => {
-                untyped_cap._invocation::<Endpoint>(mdb, dest_cnode, user_size, num)
+                self.retype_and_insert::<Endpoint>(mdb, dest_cnode, user_size, num)
             }
             CapabilityType::Notification => {
-                untyped_cap._invocation::<Notification>(mdb, dest_cnode, user_size, num)
+                self.retype_and_insert::<Notification>(mdb, dest_cnode, user_size, num)
             }
             CapabilityType::PageTable => {
-                untyped_cap._invocation::<PageTable>(mdb, dest_cnode, user_size, num)
+                self.retype_and_insert::<PageTable>(mdb, dest_cnode, user_size, num)
             }
-            CapabilityType::Page => {
-                untyped_cap._invocation::<Page>(mdb, dest_cnode, user_size, num)
-            }
+            CapabilityType::Page => self.retype_and_insert::<Page>(mdb, dest_cnode, user_size, num),
             _ => Err(kerr!(ErrKind::UnknownCapType)),
         }
     }
 
-    fn _invocation<K: KObject>(
+    fn retype_and_insert<K: KObject>(
         &mut self,
         src_slot: &mut ManagementDB,
         dest_cnode: &mut CNode,

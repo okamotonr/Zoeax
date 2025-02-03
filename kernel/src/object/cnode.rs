@@ -2,7 +2,7 @@ use crate::{
     address::{KernelVAddress, PhysAddr},
     capability::{CapInSlot, Capability, CapabilityData, Something},
     common::KernelResult,
-    const_assert,
+    const_assert, CapabilityType,
 };
 use core::{fmt::Debug, mem};
 
@@ -99,6 +99,9 @@ impl CNodeEntry<Something> {
             let ptr = self as *mut Self as *mut CNodeEntry<K>;
             Ok(ptr.as_mut().unwrap())
         }
+    }
+    pub fn get_cap_type(&self) -> KernelResult<CapabilityType> {
+        self.cap.get_cap_type()
     }
 }
 

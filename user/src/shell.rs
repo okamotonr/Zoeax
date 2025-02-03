@@ -27,10 +27,19 @@ pub fn main(boot_info: &BootInfo) {
     println!("parent: hello, world, {untyped_cnode_idx:x}");
     let first_empyt = boot_info.firtst_empty_idx;
     let tcb_idx = first_empyt + 1;
-    untyped_retype(untyped_cnode_idx, tcb_idx, 0, 1, CapabilityType::Tcb).unwrap();
+    untyped_retype(
+        untyped_cnode_idx,
+        ROOT_CNODE_RADIX,
+        tcb_idx,
+        0,
+        1,
+        CapabilityType::Tcb,
+    )
+    .unwrap();
     let notify_idx = tcb_idx + 1;
     untyped_retype(
         untyped_cnode_idx,
+        ROOT_CNODE_RADIX,
         notify_idx,
         0,
         1,
@@ -40,6 +49,7 @@ pub fn main(boot_info: &BootInfo) {
     let lv2_cnode_idx = notify_idx + 1;
     untyped_retype(
         untyped_cnode_idx,
+        ROOT_CNODE_RADIX,
         lv2_cnode_idx,
         1,
         1,
@@ -48,10 +58,19 @@ pub fn main(boot_info: &BootInfo) {
     .unwrap();
 
     let page_idx = lv2_cnode_idx + 1;
-    untyped_retype(untyped_cnode_idx, page_idx, 0, 1, CapabilityType::Page).unwrap();
+    untyped_retype(
+        untyped_cnode_idx,
+        ROOT_CNODE_RADIX,
+        page_idx,
+        0,
+        1,
+        CapabilityType::Page,
+    )
+    .unwrap();
     let page_table_idx = page_idx + 1;
     untyped_retype(
         untyped_cnode_idx,
+        ROOT_CNODE_RADIX,
         page_table_idx,
         0,
         1,
@@ -60,89 +79,117 @@ pub fn main(boot_info: &BootInfo) {
     .unwrap();
     let ep_idx = page_table_idx + 3;
     let ep_mint_idx = page_table_idx + 4;
-    untyped_retype(untyped_cnode_idx, ep_idx, 0, 1, CapabilityType::EndPoint).unwrap();
+    untyped_retype(
+        untyped_cnode_idx,
+        ROOT_CNODE_RADIX,
+        ep_idx,
+        0,
+        1,
+        CapabilityType::EndPoint,
+    )
+    .unwrap();
 
     let vaddr = 0x0000000001000000 - 0x1000;
-    map_page_table(page_table_idx, root_vspace_idx, vaddr).unwrap();
+    map_page_table(
+        page_table_idx,
+        ROOT_CNODE_RADIX,
+        root_vspace_idx,
+        ROOT_CNODE_RADIX,
+        vaddr,
+    )
+    .unwrap();
 
     let page_r = 2;
     let page_w = 4;
     let flags = page_r | page_w;
-    map_page(page_idx, root_vspace_idx, vaddr, flags).unwrap();
+    map_page(
+        page_idx,
+        ROOT_CNODE_RADIX,
+        root_vspace_idx,
+        ROOT_CNODE_RADIX,
+        vaddr,
+        flags,
+    )
+    .unwrap();
     let ptr = vaddr as *mut usize;
     unsafe {
         (*ptr) = 3;
     }
-    set_ipc_buffer(tcb_idx, page_idx).unwrap();
+    set_ipc_buffer(tcb_idx, ROOT_CNODE_RADIX, page_idx, ROOT_CNODE_RADIX).unwrap();
 
     let sp_val = unsafe {
         let stack_bottom = &mut STACK[511];
         stack_bottom as *mut usize as usize
     };
-    write_reg(tcb_idx, 0, sp_val).unwrap();
-    write_reg(tcb_idx, 1, children as usize).unwrap();
+    write_reg(tcb_idx, ROOT_CNODE_RADIX, 0, sp_val).unwrap();
+    write_reg(tcb_idx, ROOT_CNODE_RADIX, 1, children as usize).unwrap();
 
     let dest_idx = lv2_cnode_idx << 1;
-    println!("heyheyheyhey     copy");
-    println!("{:#b}", dest_idx);
-    println!("{:#b}", lv2_cnode_idx);
     cnode_copy(
         root_cnode_idx,
-        notify_idx,
         ROOT_CNODE_RADIX,
-        root_cnode_idx,
         dest_idx,
         ROOT_CNODE_RADIX + 1,
+        notify_idx,
+        ROOT_CNODE_RADIX,
     )
     .unwrap();
 
     cnode_mint(
         root_cnode_idx,
-        notify_idx,
         ROOT_CNODE_RADIX,
-        root_cnode_idx,
         page_table_idx + 1,
+        ROOT_CNODE_RADIX,
+        notify_idx,
         ROOT_CNODE_RADIX,
         0b100,
     )
     .unwrap();
     cnode_mint(
         root_cnode_idx,
-        notify_idx,
         ROOT_CNODE_RADIX,
-        root_cnode_idx,
         page_table_idx + 2,
+        ROOT_CNODE_RADIX,
+        notify_idx,
         ROOT_CNODE_RADIX,
         0b1000,
     )
     .unwrap();
     cnode_mint(
         root_cnode_idx,
-        ep_idx,
         ROOT_CNODE_RADIX,
-        root_cnode_idx,
         ep_mint_idx,
+        ROOT_CNODE_RADIX,
+        ep_idx,
         ROOT_CNODE_RADIX,
         0xdeadbeef,
     )
     .unwrap();
-    write_reg(tcb_idx, 2, page_table_idx + 1).unwrap();
-    write_reg(tcb_idx, 3, ep_mint_idx).unwrap();
-    write_reg(tcb_idx, 4, untyped_cnode_idx).unwrap();
-    configure_tcb(tcb_idx, root_cnode_idx, root_vspace_idx).unwrap();
-    resume_tcb(tcb_idx).unwrap();
+    write_reg(tcb_idx, ROOT_CNODE_RADIX, 2, page_table_idx + 1).unwrap();
+    write_reg(tcb_idx, ROOT_CNODE_RADIX, 3, ep_mint_idx).unwrap();
+    write_reg(tcb_idx, ROOT_CNODE_RADIX, 4, untyped_cnode_idx).unwrap();
+    configure_tcb(
+        tcb_idx,
+        ROOT_CNODE_RADIX,
+        root_cnode_idx,
+        ROOT_CNODE_RADIX,
+        root_vspace_idx,
+        ROOT_CNODE_RADIX,
+    )
+    .unwrap();
+    resume_tcb(tcb_idx, ROOT_CNODE_RADIX).unwrap();
     println!("parnet: wait");
-    let v = recv_signal(notify_idx).unwrap();
+    let v = recv_signal(notify_idx, ROOT_CNODE_RADIX).unwrap();
     println!("parent: wake up {v:?}");
-    send_signal(page_table_idx + 2).unwrap();
+    send_signal(page_table_idx + 2, ROOT_CNODE_RADIX).unwrap();
     println!("parent: call send");
-    send_ipc(ep_idx).unwrap();
+    send_ipc(ep_idx, ROOT_CNODE_RADIX).unwrap();
     println!("parnet: send done");
     println!("parent: call recv");
-    recv_ipc(ep_idx).unwrap();
+    recv_ipc(ep_idx, ROOT_CNODE_RADIX).unwrap();
     println!("parnet: recv done");
     println!("parent: call recv");
-    recv_ipc(ep_idx).unwrap();
+    recv_ipc(ep_idx, ROOT_CNODE_RADIX).unwrap();
     println!("parnet: recv done");
     panic!("iam parent");
 }
@@ -155,23 +202,31 @@ fn children(a0: usize, a1: usize, a2: usize) {
     println!("children: a0 is {a0}");
     println!("children: a1 is {a1}");
     println!("children: a2 is {a2}");
-    send_signal(a0).unwrap();
+    send_signal(a0, ROOT_CNODE_RADIX).unwrap();
     println!("children: send signal");
     let vaddr = 0x0000000001000000 - 0x2000;
     let page_idx = a1 + 1;
     let page_r = 2;
     let page_w = 4;
     let flags = page_r | page_w;
-    untyped_retype(a2, page_idx, 1, 1, CapabilityType::Page).unwrap();
-    map_page(page_idx, root_vspace_idx, vaddr, flags).unwrap();
+    untyped_retype(a2, ROOT_CNODE_RADIX, page_idx, 1, 1, CapabilityType::Page).unwrap();
+    map_page(
+        page_idx,
+        ROOT_CNODE_RADIX,
+        root_vspace_idx,
+        ROOT_CNODE_RADIX,
+        vaddr,
+        flags,
+    )
+    .unwrap();
     println!("child: call recv");
-    recv_ipc(a1).unwrap();
+    recv_ipc(a1, ROOT_CNODE_RADIX).unwrap();
     println!("child: recv done");
     println!("child: call send");
-    send_ipc(a1).unwrap();
+    send_ipc(a1, ROOT_CNODE_RADIX).unwrap();
     println!("child: send done");
     println!("child: call send");
-    send_ipc(a1).unwrap();
+    send_ipc(a1, ROOT_CNODE_RADIX).unwrap();
     println!("child: send done");
     panic!("iam child");
 }

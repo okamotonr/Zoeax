@@ -123,9 +123,9 @@ impl PageCap {
         self.get_address().into()
     }
 
-   pub fn get_mapped_address(&self) -> PhysAddr {
+    pub fn get_mapped_address(&self) -> PhysAddr {
         ((self.cap_dep_val & !(0xffff << 48)) as usize).into()
-}
+    }
 }
 
 impl Capability for PageTableCap {
