@@ -180,7 +180,6 @@ impl CapabilityType {
     }
 }
 
-// TODO: Change of capability should change raw_cap in slot.
 pub trait Capability
 where
     Self: Sized,

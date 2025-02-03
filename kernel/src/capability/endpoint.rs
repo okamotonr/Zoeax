@@ -16,7 +16,6 @@ pub type EndPointCap = CapabilityData<Endpoint>;
  */
 impl Capability for EndPointCap {
     const CAP_TYPE: CapabilityType = CapabilityType::EndPoint;
-    // TODO
     type KernelObject = Endpoint;
 
     fn init_object<'x>(&mut self) {

@@ -133,12 +133,10 @@ where
 
     pub fn replace(&mut self, src: &mut CNodeEntry<Something>) {
         if let Some(src_next) = src.get_next() {
-            // TODO: Down cast
             src_next.set_prev(self.up_cast_ref_mut());
             self.set_next(src_next);
         };
         if let Some(src_prev) = src.get_prev() {
-            // TODO: Down cast
             src_prev.set_next(self.up_cast_ref_mut());
             self.set_prev(src_prev);
         }

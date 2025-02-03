@@ -2,7 +2,6 @@ use crate::list::LinkedList;
 
 use super::tcb::{resume, ThreadControlBlock, ThreadInfo};
 
-// TODO: More efficiency
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum EndpointState {
     Send,

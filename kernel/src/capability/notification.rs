@@ -17,7 +17,6 @@ pub type NotificationCap = CapabilityData<Notification>;
 
 impl Capability for NotificationCap {
     const CAP_TYPE: CapabilityType = CapabilityType::Notification;
-    // TODO
     type KernelObject = Notification;
 
     fn create_cap_dep_val(_addr: KernelVAddress, _user_size: usize) -> usize {
