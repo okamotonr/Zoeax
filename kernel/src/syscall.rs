@@ -16,7 +16,7 @@ use crate::{
 
 #[repr(u8)]
 pub enum SysCallNo {
-    PutChar = 0,
+    Print = 0,
     Call = 1,
     Send = 2,
     Recv = 3,
@@ -26,7 +26,8 @@ pub enum SysCallNo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InvLabel {
     PutChar = 0,
-    UntypedRetype = 1,
+    CNodeTraverse = 1,
+    UntypedRetype = 2,
     TcbConfigure,
     TcbWriteReg,
     TcbResume,
@@ -49,6 +50,7 @@ impl TryFrom<usize> for InvLabel {
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         match value {
             inv if inv == Self::PutChar as usize => Ok(Self::PutChar),
+            inv if inv == Self::CNodeTraverse as usize => Ok(Self::CNodeTraverse),
             inv if inv == Self::UntypedRetype as usize => Ok(Self::UntypedRetype),
             inv if inv == Self::TcbConfigure as usize => Ok(Self::TcbConfigure),
             inv if inv == Self::TcbWriteReg as usize => Ok(Self::TcbWriteReg),
@@ -73,17 +75,31 @@ impl TryFrom<usize> for InvLabel {
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
     let cap_ptr = reg.a0;
     let depth = reg.a1;
-    let inv_label = reg.a2;
-    let syscall_ret = match syscall_n {
-        n if n == SysCallNo::PutChar as usize => {
-            let a0 = reg.a0;
-            putchar(a0 as u8);
-            Ok(())
+    let syscall_ret = if let Ok(inv_label) = InvLabel::try_from(reg.a2) {
+      match syscall_n {
+        n if n == SysCallNo::Print as usize => {
+            match inv_label {
+                InvLabel::PutChar => {
+                    let a0 = reg.a0;
+                    putchar(a0 as u8);
+                    Ok(())
+                },
+                InvLabel::CNodeTraverse => {
+                    let root_cnode = get_current_tcb_mut().root_cnode.as_ref().unwrap().cap();
+                    root_cnode.print_traverse();
+                    Ok(())
+                },
+                _ => Err(kerr!(ErrKind::UnknownSysCall))
+            }
         }
         _ => {
             // Why don't you use "?"?
             handle_invocation(cap_ptr, depth, inv_label, syscall_n, reg)
         }
+      }
+    } else {
+        println!("{}, {}", syscall_n, syscall_n);
+        Err(kerr!(ErrKind::UnknownInvocation))
     };
     if let Err(e) = syscall_ret {
         println!("system call failed, {:?}", e);
@@ -99,12 +115,11 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
 fn handle_invocation(
     cap_ptr: usize,
     depth: usize,
-    inv_label: usize,
+    inv_label: InvLabel,
     // TODO: Call or Send or Recv or NonBlocking Send or ..
     _syscall_n: usize,
     reg: &Registers,
 ) -> KernelResult<()> {
-    let inv_label = InvLabel::try_from(inv_label)?;
     let current_tcb = get_current_tcb_mut();
     let ipc_buffer = current_tcb.ipc_buffer_ref();
     let mut root_cnode = current_tcb.root_cnode.as_ref().unwrap().cap().replicate();

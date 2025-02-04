@@ -2,7 +2,7 @@ use super::{Capability, CapabilityData, CapabilityType, Something};
 use crate::address::KernelVAddress;
 use crate::common::{ErrKind, KernelResult};
 use crate::object::{CNode, CNodeEntry, KObject};
-use crate::{kerr, println};
+use crate::{kerr, println, print};
 
 use core::mem;
 
@@ -42,6 +42,11 @@ impl CNodeCap {
         unsafe { core::slice::from_raw_parts_mut(ptr, 2_usize.pow(self.radix())) }
     }
 
+    pub fn get_cnode_ref(&self) -> &[Option<CNodeEntry<Something>>] {
+        let ptr: KernelVAddress = self.get_address().into();
+        let ptr: *const Option<CNodeEntry<Something>> = ptr.into();
+        unsafe { core::slice::from_raw_parts(ptr, 2_usize.pow(self.radix())) }
+    }
     pub fn get_src_and_dest(
         &mut self,
         src: usize,
@@ -114,5 +119,37 @@ impl CNodeCap {
 
     fn radix(&self) -> u32 {
         self.cap_dep_val as u32
+    }
+    /// debug perpsoe
+    pub fn print_traverse(&self) {
+        self.print_level(0)
+    }
+
+    fn print_level(&self, level: usize) {
+        let c_node = self.get_cnode_ref();
+        for _ in 0..level {
+            print!("  ");
+        }
+        print!("|");
+        println!("level is {}, radix is {}", level, self.radix());
+        for (i, slot) in c_node.iter().enumerate() {
+            if let Some(ref entry) = slot {
+                for _ in 0..level {
+                    print!("   ");
+                }
+                print!("|");
+                // TODO: Prity print
+                print!("level is {}, index is {}, {:?}", level, i, entry);
+                if let Ok(cap) = entry.cap().as_capability_ref::<CNode>() {
+                    if cap.get_address() == self.get_address() {
+                        println!("  # same cnode of current");
+                    } else {
+                        cap.print_level(level + 1)
+                    };
+                } else {
+                    print!("\n");
+                }
+            }
+        }
     }
 }

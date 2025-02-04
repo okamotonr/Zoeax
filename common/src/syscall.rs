@@ -55,8 +55,14 @@ pub fn put_char(char: u8) -> SysCallRes {
             0,
             0,
             0,
-            SysCallNo::PutChar,
+            SysCallNo::Print,
         )
+    }
+}
+
+pub fn traverse() -> SysCallRes {
+    unsafe {
+        syscall(0, 0, InvLabel::CNodeTraverse, 0, 0, 0, 0, SysCallNo::Print)
     }
 }
 
@@ -88,15 +94,7 @@ pub fn write_reg<F>(cap_ptr: usize, cap_depth: u32, register: F, buffer: &mut IP
   where 
       F: FnOnce() -> Registers
 {
-    put_char('h' as u8);
-    put_char('e' as u8);
-    put_char('l' as u8);
-    put_char('\n' as u8);
     buffer.write_as(register).unwrap();
-    put_char('h' as u8);
-    put_char('e' as u8);
-    put_char('l' as u8);
-    put_char('\n' as u8);
 
     unsafe {
         syscall(

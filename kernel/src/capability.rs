@@ -39,6 +39,7 @@ pub struct CapabilityData<K: KObject> {
  */
 
 // This represents in slot capability.
+#[derive(Debug)]
 pub struct Something;
 impl KObject for Something {}
 
@@ -57,6 +58,21 @@ impl CapInSlot {
         unsafe {
             let ptr = self as *mut CapabilityData<Something> as *mut CapabilityData<NK>;
             Ok(ptr.as_mut().unwrap())
+        }
+    }
+
+    pub fn as_capability_ref<NK>(&self) -> KernelResult<&CapabilityData<NK>>
+    where
+        NK: KObject,
+        CapabilityData<NK>: Capability,
+    {
+        let cap_type = self.get_cap_type()?;
+        (CapabilityData::<NK>::CAP_TYPE == cap_type)
+            .then_some(())
+            .ok_or(kerr!(ErrKind::UnexpectedCapType))?;
+        unsafe {
+            let ptr = self as *const CapabilityData<Something> as *const CapabilityData<NK>;
+            Ok(ptr.as_ref().unwrap())
         }
     }
 }

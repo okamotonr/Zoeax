@@ -9,6 +9,7 @@ use common::syscall::resume_tcb;
 use common::syscall::send_ipc;
 use common::syscall::send_signal;
 use common::syscall::set_ipc_buffer;
+use common::syscall::traverse;
 use common::syscall::write_reg;
 use common::syscall::CapabilityType;
 use common::syscall::{configure_tcb, untyped_retype};
@@ -189,6 +190,7 @@ pub fn main(boot_info: &BootInfo) {
         ROOT_CNODE_RADIX,
     )
     .unwrap();
+    traverse().unwrap();
     resume_tcb(tcb_idx, ROOT_CNODE_RADIX).unwrap();
     println!("parnet: wait");
     let v = recv_signal(notify_idx, ROOT_CNODE_RADIX).unwrap();
