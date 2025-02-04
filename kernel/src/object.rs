@@ -4,11 +4,11 @@ mod notification;
 pub mod page_table;
 mod tcb;
 
-pub use crate::object::cnode::{CNode, CNodeEntry, ManagementDB, CSlot};
+pub use crate::object::cnode::{CNode, CNodeEntry, CSlot, ManagementDB};
 pub use crate::object::endpoint::Endpoint;
 pub use crate::object::notification::Notification;
 pub use crate::object::page_table::PageTable;
-pub use crate::object::tcb::{resume, Registers, Register, ThreadControlBlock, ThreadInfo};
+pub use crate::object::tcb::{resume, Register, Registers, ThreadControlBlock, ThreadInfo};
 
 pub struct Untyped;
 

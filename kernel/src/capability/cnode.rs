@@ -43,12 +43,7 @@ impl CNodeCap {
     fn get_cnode_with_offset_mut(&mut self, offset: u32, size: usize) -> &mut [CSlot] {
         let ptr: KernelVAddress = self.get_address().into();
         let ptr: *mut CSlot = ptr.into();
-        unsafe {
-            core::slice::from_raw_parts_mut(
-                ptr.add(offset as usize),
-                size
-            )
-        }
+        unsafe { core::slice::from_raw_parts_mut(ptr.add(offset as usize), size) }
     }
 
     pub fn get_cnode_ref(&self) -> &[CSlot] {
@@ -58,31 +53,39 @@ impl CNodeCap {
     }
 
     pub fn get_writable(&mut self, num: u32, index: u32) -> KernelResult<&mut CNode> {
-        (!(num as usize + index as usize >= 2_usize.pow(self.radix()))).then_some(()).ok_or(kerr!(ErrKind::InvalidOperation))?;
+        (2_usize.pow(self.radix()) > num as usize + index as usize)
+            .then_some(())
+            .ok_or(kerr!(ErrKind::InvalidOperation))?;
         let cnode = self.get_cnode_with_offset_mut(index, num as usize);
-        cnode.iter().all(|slot| slot.is_none()).then_some(()).ok_or(kerr!(ErrKind::NotEmptySlot))?;
+        cnode
+            .iter()
+            .all(|slot| slot.is_none())
+            .then_some(())
+            .ok_or(kerr!(ErrKind::NotEmptySlot))?;
         unsafe {
             let cnode = &mut cnode[0] as *mut CSlot as *mut CNode;
             Ok(cnode.as_mut().unwrap())
         }
     }
 
-    pub fn lookup_two_entries_mut(&mut self, capptr: usize, depth_bits: u32, capptr2: usize, depth_bits2: u32) -> KernelResult<(&mut CSlot, &mut CSlot)> {
-        let entry_1_ptr = {
-            self.lookup_entry_mut(capptr, depth_bits)? as *mut CSlot
-        };
+    pub fn lookup_two_entries_mut(
+        &mut self,
+        capptr: usize,
+        depth_bits: u32,
+        capptr2: usize,
+        depth_bits2: u32,
+    ) -> KernelResult<(&mut CSlot, &mut CSlot)> {
+        let entry_1_ptr = { self.lookup_entry_mut(capptr, depth_bits)? as *mut CSlot };
         let entry_2 = self.lookup_entry_mut(capptr2, depth_bits2)?;
         // safety check not to return mutable reference of same memory area
-        (!ptr::eq(entry_1_ptr, entry_2)).then_some(()).ok_or(kerr!(ErrKind::InvalidOperation))?;
+        (!ptr::eq(entry_1_ptr, entry_2))
+            .then_some(())
+            .ok_or(kerr!(ErrKind::InvalidOperation))?;
         let entry_1 = unsafe { entry_1_ptr.as_mut().unwrap() };
         Ok((entry_1, entry_2))
     }
 
-    pub fn lookup_entry_mut(
-        &mut self,
-        capptr: usize,
-        depth_bits: u32,
-    ) -> KernelResult<&mut CSlot> {
+    pub fn lookup_entry_mut(&mut self, capptr: usize, depth_bits: u32) -> KernelResult<&mut CSlot> {
         let mut cnode_cap = self;
         let mut depth_bits = depth_bits;
         loop {
@@ -107,10 +110,7 @@ impl CNodeCap {
         }
     }
 
-    pub fn lookup_entry_mut_one_level(
-        &mut self,
-        capptr: usize,
-    ) -> KernelResult<&mut CSlot> {
+    pub fn lookup_entry_mut_one_level(&mut self, capptr: usize) -> KernelResult<&mut CSlot> {
         self.lookup_entry_mut(capptr, self.radix())
     }
 

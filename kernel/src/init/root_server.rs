@@ -14,11 +14,11 @@ use crate::capability::CapabilityData;
 use crate::capability::Something;
 use crate::common::{align_up, BootInfo, ErrKind, UntypedInfo};
 use crate::object::page_table::{Page, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
-use crate::object::{CNode, CSlot, Register};
 use crate::object::CNodeEntry;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
 use crate::object::ThreadInfo;
+use crate::object::{CNode, CSlot, Register};
 use crate::println;
 
 use crate::riscv::SSTATUS_SPIE;

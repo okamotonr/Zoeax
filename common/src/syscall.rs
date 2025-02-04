@@ -63,6 +63,7 @@ pub fn traverse() -> SysCallRes {
     unsafe { syscall(0, 0, InvLabel::CNodeTraverse, 0, 0, 0, 0, SysCallNo::Print) }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn untyped_retype(
     cap_ptr: usize,
     cap_depth: u32,

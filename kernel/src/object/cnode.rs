@@ -19,9 +19,7 @@ use super::KObject;
  *       48               16
  */
 
-const_assert!(
-    mem::size_of::<CNodeEntry<Something>>() == mem::size_of::<CSlot>()
-);
+const_assert!(mem::size_of::<CNodeEntry<Something>>() == mem::size_of::<CSlot>());
 
 #[derive(Default, Debug)]
 pub struct ManagementDB([usize; 2]);

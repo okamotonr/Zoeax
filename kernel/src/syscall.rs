@@ -140,12 +140,21 @@ fn handle_invocation(
             let user_size = user_size_and_num >> 32;
             let num = user_size_and_num as u32;
             let new_type = CapabilityType::try_from_u8(reg.a6 as u8)?;
-            let dest_cnode_cap = root_cnode.lookup_entry_mut(dest_cnode_ptr, dest_depth)?.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?.as_capability::<CNode>()?.cap_ref_mut();
+            let dest_cnode_cap = root_cnode
+                .lookup_entry_mut(dest_cnode_ptr, dest_depth)?
+                .as_mut()
+                .ok_or(kerr!(ErrKind::SlotIsEmpty))?
+                .as_capability::<CNode>()?
+                .cap_ref_mut();
             let dest_cnode = dest_cnode_cap.get_writable(num, index as u32)?;
             let (src_cap, src_mdb) = slot.cap_and_mdb();
-            src_cap
-                .as_capability::<Untyped>()?
-                .invoke_retype(src_mdb, dest_cnode, user_size, num as usize, new_type)
+            src_cap.as_capability::<Untyped>()?.invoke_retype(
+                src_mdb,
+                dest_cnode,
+                user_size,
+                num as usize,
+                new_type,
+            )
         }
         CapabilityType::CNode => {
             let src_index = reg.a3;
@@ -186,7 +195,12 @@ fn handle_invocation(
                     let cnode_depth = reg.a4 as u32;
                     let vspace_ptr = reg.a5;
                     let vspace_depth = reg.a6 as u32;
-                    let (cnode_slot, vspace_slot) = root_cnode.lookup_two_entries_mut(cnode_ptr, cnode_depth, vspace_ptr, vspace_depth)?;
+                    let (cnode_slot, vspace_slot) = root_cnode.lookup_two_entries_mut(
+                        cnode_ptr,
+                        cnode_depth,
+                        vspace_ptr,
+                        vspace_depth,
+                    )?;
                     let cspace_slot = cnode_slot
                         .as_mut()
                         .ok_or(kerr!(ErrKind::SlotIsEmpty))?

@@ -1,4 +1,3 @@
-
 use crate::list::LinkedList;
 
 use super::tcb::{resume, ThreadControlBlock, ThreadInfo};
@@ -6,7 +5,7 @@ use super::tcb::{resume, ThreadControlBlock, ThreadInfo};
 pub struct Notification {
     notify_bit: u64,
     wait_queue: LinkedList<ThreadInfo>,
-    bit_is_set: bool
+    bit_is_set: bool,
 }
 
 impl Notification {
@@ -14,7 +13,7 @@ impl Notification {
         Notification {
             notify_bit: 0,
             wait_queue: LinkedList::new(),
-            bit_is_set: false
+            bit_is_set: false,
         }
     }
 

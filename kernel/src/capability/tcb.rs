@@ -2,7 +2,9 @@ use crate::address::KernelVAddress;
 use crate::capability::{Capability, CapabilityType};
 use crate::common::KernelResult;
 use crate::object::page_table::Page;
-use crate::object::{resume, CNode, CNodeEntry, PageTable, ThreadControlBlock, ThreadInfo, Register};
+use crate::object::{
+    resume, CNode, CNodeEntry, PageTable, Register, ThreadControlBlock, ThreadInfo,
+};
 use crate::Registers;
 use core::mem;
 
