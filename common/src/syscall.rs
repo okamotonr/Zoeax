@@ -61,9 +61,7 @@ pub fn put_char(char: u8) -> SysCallRes {
 }
 
 pub fn traverse() -> SysCallRes {
-    unsafe {
-        syscall(0, 0, InvLabel::CNodeTraverse, 0, 0, 0, 0, SysCallNo::Print)
-    }
+    unsafe { syscall(0, 0, InvLabel::CNodeTraverse, 0, 0, 0, 0, SysCallNo::Print) }
 }
 
 pub fn untyped_retype(
@@ -90,9 +88,14 @@ pub fn untyped_retype(
     }
 }
 
-pub fn write_reg<F>(cap_ptr: usize, cap_depth: u32, register: F, buffer: &mut IPCBuffer) -> SysCallRes
-  where 
-      F: FnOnce() -> Registers
+pub fn write_reg<F>(
+    cap_ptr: usize,
+    cap_depth: u32,
+    register: F,
+    buffer: &mut IPCBuffer,
+) -> SysCallRes
+where
+    F: FnOnce() -> Registers,
 {
     buffer.write_as(register).unwrap();
 
@@ -339,4 +342,3 @@ pub fn recv_ipc(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
         )
     }
 }
-

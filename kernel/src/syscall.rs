@@ -76,27 +76,25 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
     let cap_ptr = reg.a0;
     let depth = reg.a1;
     let syscall_ret = if let Ok(inv_label) = InvLabel::try_from(reg.a2) {
-      match syscall_n {
-        n if n == SysCallNo::Print as usize => {
-            match inv_label {
+        match syscall_n {
+            n if n == SysCallNo::Print as usize => match inv_label {
                 InvLabel::PutChar => {
                     let a0 = reg.a0;
                     putchar(a0 as u8);
                     Ok(())
-                },
+                }
                 InvLabel::CNodeTraverse => {
                     let root_cnode = get_current_tcb_mut().root_cnode.as_ref().unwrap().cap();
                     root_cnode.print_traverse();
                     Ok(())
-                },
-                _ => Err(kerr!(ErrKind::UnknownSysCall))
+                }
+                _ => Err(kerr!(ErrKind::UnknownSysCall)),
+            },
+            _ => {
+                // Why don't you use "?"?
+                handle_invocation(cap_ptr, depth, inv_label, syscall_n, reg)
             }
         }
-        _ => {
-            // Why don't you use "?"?
-            handle_invocation(cap_ptr, depth, inv_label, syscall_n, reg)
-        }
-      }
     } else {
         println!("{}, {}", syscall_n, syscall_n);
         Err(kerr!(ErrKind::UnknownInvocation))

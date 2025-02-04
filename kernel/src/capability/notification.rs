@@ -56,6 +56,7 @@ impl NotificationCap {
         self.cap_dep_val
     }
 
+    #[allow(dead_code)]
     pub fn set_badge(&mut self, _val: u64) -> KernelResult<()> {
         todo!()
     }

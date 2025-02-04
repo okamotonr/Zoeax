@@ -134,6 +134,7 @@ pub struct BootInfo {
 }
 
 impl BootInfo {
+    #[allow(clippy::mut_from_ref)]
     pub fn ipc_buffer(&self) -> &mut IPCBuffer {
         let ptr = self.ipc_buffer_addr as *mut IPCBuffer;
         unsafe { ptr.as_mut().unwrap() }
@@ -203,12 +204,14 @@ pub struct IPCBuffer {
 }
 
 impl IPCBuffer {
-    pub fn write_as<F, T>(&mut self, write_fn: F) -> Result<(), ()>
-        where 
-            F: FnOnce() -> T,
-            T: Sized
+    pub fn write_as<F, T>(&mut self, write_fn: F) -> Result<(), ErrKind>
+    where
+        F: FnOnce() -> T,
+        T: Sized,
     {
-        (size_of_val(&self.message) >= mem::size_of::<T>()).then_some(()).ok_or(())?;
+        (size_of_val(&self.message) >= mem::size_of::<T>())
+            .then_some(())
+            .ok_or(ErrKind::InvalidOperation)?;
         let ptr = &mut self.message[0] as *mut usize as *mut T;
         unsafe {
             *ptr = write_fn();
@@ -216,15 +219,17 @@ impl IPCBuffer {
         Ok(())
     }
 
-    pub fn read_as<T: Sized>(&self) -> Result<&T, ()> {
-        (size_of_val(&self.message) >= mem::size_of::<T>()).then_some(()).ok_or(())?;
+    pub fn read_as<T: Sized>(&self) -> Result<&T, ErrKind> {
+        (size_of_val(&self.message) >= mem::size_of::<T>())
+            .then_some(())
+            .ok_or(ErrKind::InvalidOperation)?;
         let ptr = &self.message[0] as *const usize as *const T;
-        unsafe {
-            Ok(ptr.as_ref().unwrap())
-        }
+        unsafe { Ok(ptr.as_ref().unwrap()) }
     }
-
 }
 
-const_assert!(mem::size_of::<BootInfo>() <= 4096, mem::size_of::<IPCBuffer>() <= 4096);
+const_assert!(
+    mem::size_of::<BootInfo>() <= 4096,
+    mem::size_of::<IPCBuffer>() <= 4096
+);
 const_assert!(mem::size_of::<Registers>() <= mem::size_of::<[usize; MESSAGE_LEN]>());

@@ -135,6 +135,7 @@ pub struct ThreadInfo {
     pub vspace: Option<CNodeEntry<PageTable>>,
     pub registers: Registers,
     pub ipc_buffer: Option<CNodeEntry<Page>>,
+    pub badge: usize,
     #[cfg(debug_assertions)]
     pub tid: usize,
 }
@@ -186,6 +187,7 @@ impl ThreadInfo {
             vspace: None,
             registers: Registers::null(),
             ipc_buffer: None,
+            badge: 0,
             #[cfg(debug_assertions)]
             tid: 0,
         }

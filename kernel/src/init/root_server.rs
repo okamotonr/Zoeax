@@ -224,8 +224,6 @@ impl<'a> RootServerMemory<'a> {
         );
         tcb.vspace = Some(new_entry);
         let mut new_entry = CNodeEntry::new_with_rawcap(ipc_buf_cap.replicate());
-        let vaddr = ipc_buf_cap.get_address();
-        let mapped = ipc_buf_cap.get_mapped_address();
         new_entry.insert(
             cnode_cap
                 .lookup_entry_mut_one_level(ROOT_IPC_BUFFER)
@@ -299,7 +297,7 @@ impl Iterator for UntypedCapGenerator {
         }
         assert!(self.idx_max >= self.idx_start);
         let block_size: usize = (self.end_address - self.start_address).into();
-        let untyped_cap = UntypedCap::init(self.start_address.into(), block_size);
+        let untyped_cap = UntypedCap::init(self.start_address, block_size);
         let acctual_size = untyped_cap.block_size();
         self.start_address = self.start_address.add(acctual_size);
         let ret = Some((self.idx_start, untyped_cap));

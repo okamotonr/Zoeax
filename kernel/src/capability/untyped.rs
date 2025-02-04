@@ -27,14 +27,6 @@ impl KObject for Untyped {}
 
 pub type UntypedCap = CapabilityData<Untyped>;
 
-pub struct RetypeInvocationArgs<'a> {
-    mdb: &'a mut ManagementDB,
-    dest_cnode: &'a mut CNode,
-    user_size: usize,
-    num: usize,
-    new_type: CapabilityType,
-}
-
 impl Capability for UntypedCap {
     const CAP_TYPE: CapabilityType = CapabilityType::Untyped;
     type KernelObject = Untyped;

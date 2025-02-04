@@ -30,6 +30,7 @@ impl Capability for EndPointCap {
 impl EndPointCap {
     /// return should be resche (because of blocking)
     pub fn send(&mut self, tcb: &mut ThreadControlBlock) -> bool {
+        tcb.badge = self.get_badge() as usize;
         self.get_ep().send(tcb)
     }
 
@@ -44,10 +45,11 @@ impl EndPointCap {
         unsafe { &mut *ptr }
     }
 
-    pub fn get_batch(&self) -> u64 {
+    pub fn get_badge(&self) -> u64 {
         self.cap_dep_val
     }
 
+    #[allow(dead_code)]
     pub fn set_badge(&mut self, _val: u64) -> KernelResult<()> {
         todo!()
     }

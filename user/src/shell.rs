@@ -129,17 +129,20 @@ pub fn main(boot_info: &BootInfo) {
         let stack_bottom = &mut STACK[511];
         stack_bottom as *mut usize as usize
     };
-    write_reg(tcb_idx, ROOT_CNODE_RADIX,
-        | | {
-            let mut registers = Registers::default();
-            registers.sp = sp_val;
-            registers.sepc = children as usize;
-            registers.a0 = page_table_idx + 1;
-            registers.a1 = ep_mint_idx;
-            registers.a2 = untyped_cnode_idx;
-            registers
+    write_reg(
+        tcb_idx,
+        ROOT_CNODE_RADIX,
+        || Registers {
+            sp: sp_val,
+            sepc: children as usize,
+            a0: page_table_idx + 1,
+            a1: ep_mint_idx,
+            a2: untyped_cnode_idx,
+            ..Default::default()
         },
-    boot_info.ipc_buffer()).unwrap();
+        boot_info.ipc_buffer(),
+    )
+    .unwrap();
 
     let dest_idx = lv2_cnode_idx << 1;
     cnode_copy(
@@ -223,7 +226,16 @@ fn children(a0: usize, a1: usize, a2: usize) {
     let page_r = 2;
     let page_w = 4;
     let flags = page_r | page_w;
-    untyped_retype(a2, ROOT_CNODE_RADIX, page_idx, ROOT_CNODE_RADIX, 1, 1, CapabilityType::Page).unwrap();
+    untyped_retype(
+        a2,
+        ROOT_CNODE_RADIX,
+        page_idx,
+        ROOT_CNODE_RADIX,
+        1,
+        1,
+        CapabilityType::Page,
+    )
+    .unwrap();
     map_page(
         page_idx,
         ROOT_CNODE_RADIX,

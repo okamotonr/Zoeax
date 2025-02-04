@@ -2,7 +2,7 @@ use super::{Capability, CapabilityData, CapabilityType, Something};
 use crate::address::KernelVAddress;
 use crate::common::{ErrKind, KernelResult};
 use crate::object::{CNode, CNodeEntry, KObject};
-use crate::{kerr, println, print};
+use crate::{kerr, print, println};
 
 use core::mem;
 

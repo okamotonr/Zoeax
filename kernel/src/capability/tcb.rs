@@ -3,8 +3,8 @@ use crate::capability::{Capability, CapabilityType};
 use crate::common::KernelResult;
 use crate::object::page_table::Page;
 use crate::object::{resume, CNode, CNodeEntry, PageTable, ThreadControlBlock, ThreadInfo};
-use core::mem;
 use crate::Registers;
+use core::mem;
 
 use super::CapabilityData;
 

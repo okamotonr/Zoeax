@@ -4,10 +4,9 @@ use core::fmt;
 
 use syscall::put_char;
 
-
 pub use kernel::common::BootInfo;
-pub use kernel::common::UntypedInfo;
 pub use kernel::common::IPCBuffer;
+pub use kernel::common::UntypedInfo;
 pub use kernel::Registers;
 pub mod syscall;
 pub mod syszoea;
