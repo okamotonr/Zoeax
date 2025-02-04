@@ -20,7 +20,7 @@ use super::KObject;
  */
 
 const_assert!(
-    mem::size_of::<CNodeEntry<Something>>() == mem::size_of::<Option<CNodeEntry<Something>>>()
+    mem::size_of::<CNodeEntry<Something>>() == mem::size_of::<CSlot>()
 );
 
 #[derive(Default, Debug)]
@@ -76,6 +76,8 @@ impl ManagementDB {
         self.0[index] |= (node as *const CNodeEntry<Something> as usize) << 16;
     }
 }
+
+pub type CSlot<T = Something> = Option<CNodeEntry<T>>;
 
 #[derive(Debug)]
 pub struct CNodeEntry<K: KObject>

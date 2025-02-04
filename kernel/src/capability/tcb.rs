@@ -2,14 +2,14 @@ use crate::address::KernelVAddress;
 use crate::capability::{Capability, CapabilityType};
 use crate::common::KernelResult;
 use crate::object::page_table::Page;
-use crate::object::{resume, CNode, CNodeEntry, PageTable, ThreadControlBlock, ThreadInfo};
+use crate::object::{resume, CNode, CNodeEntry, PageTable, ThreadControlBlock, ThreadInfo, Register};
 use crate::Registers;
 use core::mem;
 
 use super::CapabilityData;
 
 impl TCBCap {
-    pub fn set_register(&mut self, registers: &[(usize, usize)]) {
+    pub fn set_register(&mut self, registers: &[(Register, usize)]) {
         let tcb = self.get_tcb();
         for (r_id, val) in registers {
             tcb.registers[*r_id] = *val

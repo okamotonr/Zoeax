@@ -9,7 +9,7 @@ pub use kernel::common::IPCBuffer;
 pub use kernel::common::UntypedInfo;
 pub use kernel::Registers;
 pub mod syscall;
-pub mod syszoea;
+//pub mod syszoea;
 
 #[macro_export]
 macro_rules! print {

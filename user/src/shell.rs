@@ -32,8 +32,9 @@ pub fn main(boot_info: &BootInfo) {
     untyped_retype(
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
-        tcb_idx,
+        root_cnode_idx,
         ROOT_CNODE_RADIX,
+        tcb_idx as u32,
         0,
         1,
         CapabilityType::Tcb,
@@ -43,8 +44,9 @@ pub fn main(boot_info: &BootInfo) {
     untyped_retype(
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
-        notify_idx,
+        root_cnode_idx,
         ROOT_CNODE_RADIX,
+        notify_idx as u32,
         0,
         1,
         CapabilityType::Notification,
@@ -54,8 +56,9 @@ pub fn main(boot_info: &BootInfo) {
     untyped_retype(
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
-        lv2_cnode_idx,
+        root_cnode_idx,
         ROOT_CNODE_RADIX,
+        lv2_cnode_idx as u32,
         1,
         1,
         CapabilityType::CNode,
@@ -66,8 +69,9 @@ pub fn main(boot_info: &BootInfo) {
     untyped_retype(
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
-        page_idx,
+        root_cnode_idx,
         ROOT_CNODE_RADIX,
+        page_idx as u32,
         0,
         1,
         CapabilityType::Page,
@@ -77,8 +81,9 @@ pub fn main(boot_info: &BootInfo) {
     untyped_retype(
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
-        page_table_idx,
+        root_cnode_idx,
         ROOT_CNODE_RADIX,
+        page_table_idx as u32,
         0,
         1,
         CapabilityType::PageTable,
@@ -89,8 +94,9 @@ pub fn main(boot_info: &BootInfo) {
     untyped_retype(
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
-        ep_idx,
+        root_cnode_idx,
         ROOT_CNODE_RADIX,
+        ep_idx as u32,
         0,
         1,
         CapabilityType::EndPoint,
@@ -213,7 +219,7 @@ pub fn main(boot_info: &BootInfo) {
 
 #[allow(clippy::empty_loop)]
 fn children(a0: usize, a1: usize, a2: usize) {
-    let _root_cnode_idx: usize = 2;
+    let root_cnode_idx: usize = 2;
     let root_vspace_idx: usize = 3;
     println!("children: hello from children");
     println!("children: a0 is {a0}");
@@ -229,8 +235,9 @@ fn children(a0: usize, a1: usize, a2: usize) {
     untyped_retype(
         a2,
         ROOT_CNODE_RADIX,
-        page_idx,
+        root_cnode_idx,
         ROOT_CNODE_RADIX,
+        page_idx as u32,
         1,
         1,
         CapabilityType::Page,

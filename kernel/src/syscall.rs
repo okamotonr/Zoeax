@@ -133,27 +133,28 @@ fn handle_invocation(
     match cap_type {
         CapabilityType::Untyped => {
             let dest_cnode_ptr = reg.a3;
-            let user_size = reg.a4;
-            let num_and_dest_depth = reg.a5;
-            let _dest_depth = num_and_dest_depth as u32;
-            let num = num_and_dest_depth >> 32;
+            let index_and_depth = reg.a4;
+            let user_size_and_num = reg.a5;
+            let dest_depth = index_and_depth as u32;
+            let index = index_and_depth >> 32;
+            let user_size = user_size_and_num >> 32;
+            let num = user_size_and_num as u32;
             let new_type = CapabilityType::try_from_u8(reg.a6 as u8)?;
-            let (_, dest_cnode) = root_cnode.get_src_and_dest(cap_ptr, dest_cnode_ptr, num)?;
+            let dest_cnode_cap = root_cnode.lookup_entry_mut(dest_cnode_ptr, dest_depth)?.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?.as_capability::<CNode>()?.cap_ref_mut();
+            let dest_cnode = dest_cnode_cap.get_writable(num, index as u32)?;
             let (src_cap, src_mdb) = slot.cap_and_mdb();
             src_cap
                 .as_capability::<Untyped>()?
-                .invoke_retype(src_mdb, dest_cnode, user_size, num, new_type)
+                .invoke_retype(src_mdb, dest_cnode, user_size, num as usize, new_type)
         }
         CapabilityType::CNode => {
             let src_index = reg.a3;
             let src_depth = (reg.a4 >> 32) as u32;
             let dest_depth = reg.a4 as u32;
             let dest_index = reg.a5;
-            // TODO: get 2 ref
 
-            let mut dest_root = slot.cap_ref_mut().as_capability::<CNode>()?.replicate();
-            let mut src_root = root_cnode.replicate();
-            let src_slot = src_root.lookup_entry_mut(src_index, src_depth)?;
+            let dest_root = slot.cap_ref_mut().as_capability::<CNode>()?;
+            let src_slot = root_cnode.lookup_entry_mut(src_index, src_depth)?;
             let src_entry = src_slot.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
             let dest_slot = dest_root.lookup_entry_mut(dest_index, dest_depth)?;
             if dest_slot.is_some() {
@@ -185,15 +186,12 @@ fn handle_invocation(
                     let cnode_depth = reg.a4 as u32;
                     let vspace_ptr = reg.a5;
                     let vspace_depth = reg.a6 as u32;
-                    // TODO: Impl get 2 entry from cnode with safety check
-                    let mut todo_root_cnode = root_cnode.replicate();
-                    let cspace_slot = root_cnode
-                        .lookup_entry_mut(cnode_ptr, cnode_depth)?
+                    let (cnode_slot, vspace_slot) = root_cnode.lookup_two_entries_mut(cnode_ptr, cnode_depth, vspace_ptr, vspace_depth)?;
+                    let cspace_slot = cnode_slot
                         .as_mut()
                         .ok_or(kerr!(ErrKind::SlotIsEmpty))?
                         .as_capability::<CNode>()?;
-                    let vspace_slot = todo_root_cnode
-                        .lookup_entry_mut(vspace_ptr, vspace_depth)?
+                    let vspace_slot = vspace_slot
                         .as_mut()
                         .ok_or(kerr!(ErrKind::SlotIsEmpty))?
                         .as_capability::<PageTable>()?;

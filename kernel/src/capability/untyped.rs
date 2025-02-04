@@ -6,7 +6,7 @@ use crate::capability::PhysAddr;
 use crate::capability::{Capability, CapabilityData, CapabilityType};
 use crate::common::{align_up, ErrKind, KernelResult};
 use crate::object::page_table::Page;
-use crate::object::CNode;
+use crate::object::{CNode, CNodeEntry};
 use crate::object::Endpoint;
 use crate::object::KObject;
 use crate::object::ManagementDB;
@@ -16,6 +16,8 @@ use crate::object::ThreadControlBlock;
 use crate::object::Untyped;
 
 use crate::kerr;
+
+use super::Something;
 
 /*
  * RawCapability[0]

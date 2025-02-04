@@ -8,7 +8,6 @@ use kernel::Registers;
 use kernel::SysCallNo;
 
 pub use kernel::CapabilityType;
-// TODO: use kernel::common
 pub type SysCallRes = KernelResult<usize>;
 
 #[allow(clippy::too_many_arguments)]
@@ -69,19 +68,21 @@ pub fn untyped_retype(
     cap_depth: u32,
     dest_ptr: usize,
     dest_depth: u32,
-    user_size: usize,
+    index: u32,
+    user_size: u32,
     num: u32,
     cap_type: CapabilityType,
 ) -> SysCallRes {
-    let num_and_dest_depth = ((num as usize) << 32) | dest_depth as usize;
+    let index_and_depth = ((index as usize) << 32) | dest_depth as usize;
+    let user_size_and_num = ((user_size as usize) << 32) | num as usize;
     unsafe {
         syscall(
             cap_ptr,
             cap_depth,
             InvLabel::UntypedRetype,
             dest_ptr,
-            user_size,
-            num_and_dest_depth,
+            index_and_depth,
+            user_size_and_num,
             cap_type as usize,
             SysCallNo::Call,
         )

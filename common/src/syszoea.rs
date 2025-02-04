@@ -51,8 +51,6 @@ impl UntypedCapability {
     where
         T: Cap,
     {
-        // TODO: adapt multi number capabilities
-        // TODO: use depth,
         untyped_retype(
             self.cap_ptr,
             self.cap_depth,

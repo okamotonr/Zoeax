@@ -13,13 +13,52 @@ use core::ptr;
 
 use super::cnode::CNodeEntry;
 use super::page_table::Page;
-use super::{CNode, KObject};
+use super::{CNode, CSlot, KObject};
 #[cfg(debug_assertions)]
 static mut TCBIDX: usize = 0;
 
 pub type ThreadControlBlock = ListItem<ThreadInfo>;
 
 impl KObject for ListItem<ThreadInfo> {}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Register {
+    Ra,
+    Sp,
+    Gp,
+    Tp,
+    T0,
+    T1,
+    T2,
+    S0,
+    S1,
+    A0,
+    A1,
+    A2,
+    A3,
+    A4,
+    A5,
+    A6,
+    A7,
+    S2,
+    S3,
+    S4,
+    S5,
+    S6,
+    S7,
+    S8,
+    S9,
+    S10,
+    S11,
+    T3,
+    T4,
+    T5,
+    T6,
+
+    SCause,
+    SStatus,
+    SEpc
+}
 
 pub fn resume(thread: &mut ThreadControlBlock) {
     thread.resume();
@@ -131,10 +170,10 @@ impl Registers {
 pub struct ThreadInfo {
     pub status: ThreadState,
     pub time_slice: usize,
-    pub root_cnode: Option<CNodeEntry<CNode>>,
-    pub vspace: Option<CNodeEntry<PageTable>>,
+    pub root_cnode: CSlot<CNode>,
+    pub vspace: CSlot<PageTable>,
     pub registers: Registers,
-    pub ipc_buffer: Option<CNodeEntry<Page>>,
+    pub ipc_buffer: CSlot<Page>,
     pub badge: usize,
     #[cfg(debug_assertions)]
     pub tid: usize,
@@ -239,92 +278,86 @@ impl ThreadInfo {
     }
 }
 
-// TODO: use enum instead of usize
-impl Index<usize> for Registers {
+impl Index<Register> for Registers {
     type Output = usize;
-    fn index(&self, index: usize) -> &Self::Output {
-        match index {
-            1 => &self.ra,
-            2 => &self.sp,
-            3 => &self.gp,
-            4 => &self.tp,
-            5 => &self.t0,
-            6 => &self.t1,
-            7 => &self.t2,
-            8 => &self.s0,
-            9 => &self.s1,
-            10 => &self.a0,
-            11 => &self.a1,
-            12 => &self.a2,
-            13 => &self.a3,
-            14 => &self.a4,
-            15 => &self.a5,
-            16 => &self.a6,
-            17 => &self.a7,
-            18 => &self.s2,
-            19 => &self.s3,
-            20 => &self.s4,
-            21 => &self.s5,
-            22 => &self.s6,
-            23 => &self.s7,
-            24 => &self.s8,
-            25 => &self.s9,
-            26 => &self.s10,
-            27 => &self.s11,
-            28 => &self.t3,
-            29 => &self.t4,
-            30 => &self.t5,
-            31 => &self.t6,
 
-            // end of gp rs
-            32 => &self.scause,
-            33 => &self.sstatus,
-            34 => &self.sepc,
-            _ => panic!("Unknown Index"),
+    fn index(&self, reg: Register) -> &Self::Output {
+        match reg {
+            Register::Ra   => &self.ra,
+            Register::Sp   => &self.sp,
+            Register::Gp   => &self.gp,
+            Register::Tp   => &self.tp,
+            Register::T0   => &self.t0,
+            Register::T1   => &self.t1,
+            Register::T2   => &self.t2,
+            Register::T3   => &self.t3,
+            Register::T4   => &self.t4,
+            Register::T5   => &self.t5,
+            Register::T6   => &self.t6,
+            Register::A0   => &self.a0,
+            Register::A1   => &self.a1,
+            Register::A2   => &self.a2,
+            Register::A3   => &self.a3,
+            Register::A4   => &self.a4,
+            Register::A5   => &self.a5,
+            Register::A6   => &self.a6,
+            Register::A7   => &self.a7,
+            Register::S0   => &self.s0,
+            Register::S1   => &self.s1,
+            Register::S2   => &self.s2,
+            Register::S3   => &self.s3,
+            Register::S4   => &self.s4,
+            Register::S5   => &self.s5,
+            Register::S6   => &self.s6,
+            Register::S7   => &self.s7,
+            Register::S8   => &self.s8,
+            Register::S9   => &self.s9,
+            Register::S10  => &self.s10,
+            Register::S11  => &self.s11,
+            Register::SCause => &self.scause,
+            Register::SStatus => &self.sstatus,
+            Register::SEpc => &self.sepc
         }
     }
 }
 
-impl IndexMut<usize> for Registers {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        match index {
-            1 => &mut self.ra,
-            2 => &mut self.sp,
-            3 => &mut self.gp,
-            4 => &mut self.tp,
-            5 => &mut self.t0,
-            6 => &mut self.t1,
-            7 => &mut self.t2,
-            8 => &mut self.s0,
-            9 => &mut self.s1,
-            10 => &mut self.a0,
-            11 => &mut self.a1,
-            12 => &mut self.a2,
-            13 => &mut self.a3,
-            14 => &mut self.a4,
-            15 => &mut self.a5,
-            16 => &mut self.a6,
-            17 => &mut self.a7,
-            18 => &mut self.s2,
-            19 => &mut self.s3,
-            20 => &mut self.s4,
-            21 => &mut self.s5,
-            22 => &mut self.s6,
-            23 => &mut self.s7,
-            24 => &mut self.s8,
-            25 => &mut self.s9,
-            26 => &mut self.s10,
-            27 => &mut self.s11,
-            28 => &mut self.t3,
-            29 => &mut self.t4,
-            30 => &mut self.t5,
-            31 => &mut self.t6,
-
-            // end of gp rs
-            32 => &mut self.scause,
-            33 => &mut self.sstatus,
-            34 => &mut self.sepc,
-            _ => panic!("Unknown Index"),
+impl IndexMut<Register> for Registers {
+    fn index_mut(&mut self, reg: Register) -> &mut Self::Output {
+        match reg {
+            Register::Ra   => &mut self.ra,
+            Register::Sp   => &mut self.sp,
+            Register::Gp   => &mut self.gp,
+            Register::Tp   => &mut self.tp,
+            Register::T0   => &mut self.t0,
+            Register::T1   => &mut self.t1,
+            Register::T2   => &mut self.t2,
+            Register::T3   => &mut self.t3,
+            Register::T4   => &mut self.t4,
+            Register::T5   => &mut self.t5,
+            Register::T6   => &mut self.t6,
+            Register::A0   => &mut self.a0,
+            Register::A1   => &mut self.a1,
+            Register::A2   => &mut self.a2,
+            Register::A3   => &mut self.a3,
+            Register::A4   => &mut self.a4,
+            Register::A5   => &mut self.a5,
+            Register::A6   => &mut self.a6,
+            Register::A7   => &mut self.a7,
+            Register::S0   => &mut self.s0,
+            Register::S1   => &mut self.s1,
+            Register::S2   => &mut self.s2,
+            Register::S3   => &mut self.s3,
+            Register::S4   => &mut self.s4,
+            Register::S5   => &mut self.s5,
+            Register::S6   => &mut self.s6,
+            Register::S7   => &mut self.s7,
+            Register::S8   => &mut self.s8,
+            Register::S9   => &mut self.s9,
+            Register::S10  => &mut self.s10,
+            Register::S11  => &mut self.s11,
+            Register::SCause => &mut self.scause,
+            Register::SStatus => &mut self.sstatus,
+            Register::SEpc => &mut self.sepc
         }
     }
 }

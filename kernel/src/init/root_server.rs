@@ -14,7 +14,7 @@ use crate::capability::CapabilityData;
 use crate::capability::Something;
 use crate::common::{align_up, BootInfo, ErrKind, UntypedInfo};
 use crate::object::page_table::{Page, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
-use crate::object::CNode;
+use crate::object::{CNode, CSlot, Register};
 use crate::object::CNodeEntry;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
@@ -29,7 +29,6 @@ use core::cmp::min;
 use core::mem::MaybeUninit;
 use core::ptr;
 
-// TODO
 const ROOT_CNODE_ENTRY_NUM_BITS: usize = 18; // 2^18
 const ROOT_TCB_IDX: usize = 1;
 const ROOT_CNODE_IDX: usize = 2;
@@ -44,7 +43,7 @@ extern "C" {
 impl CNode {
     // todo: broken
     fn write_slot(&mut self, cap: CapabilityData<Something>, index: usize) {
-        let root = (self as *mut Self).cast::<Option<CNodeEntry<Something>>>();
+        let root = (self as *mut Self).cast::<CSlot>();
         let entry = CNodeEntry::new_with_rawcap(cap);
         assert!(unsafe { (*root.add(index)).is_none() });
         unsafe { *root.add(index) = Some(entry) }
@@ -199,7 +198,6 @@ impl<'a> RootServerMemory<'a> {
         let tcb = self
             .tcb
             .write(ThreadControlBlock::new(ThreadInfo::default()));
-        // TODO: per arch
         tcb.registers.sstatus = SSTATUS_SPIE;
         tcb.registers.sepc = entry_point.into();
 
@@ -474,7 +472,7 @@ fn create_initial_thread(
     boot_info.root_vspace_idx = ROOT_VSPACE_IDX;
     boot_info.ipc_buffer_addr = max_vaddr.add(PAGE_SIZE).into();
     // 7, set initial thread into current thread
-    root_tcb.set_register(&[(10, max_vaddr.add(PAGE_SIZE * 2).into())]);
+    root_tcb.set_register(&[(Register::A0, max_vaddr.add(PAGE_SIZE * 2).into())]);
     root_tcb.make_runnable();
     println!("root process initialization finished");
 }
