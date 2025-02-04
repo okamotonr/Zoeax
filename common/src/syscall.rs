@@ -1,63 +1,34 @@
 use core::arch::asm;
-#[repr(usize)]
-pub enum SysNo {
-    PutChar = PUTCHAR,
-    Call = CALL,
-    Send = SEND,
-    Recv = RECV,
-}
+use kernel::common::IPCBuffer;
+use kernel::kerr;
+use kernel::ErrKind;
+use kernel::InvLabel;
+use kernel::KernelResult;
+use kernel::Registers;
+use kernel::SysCallNo;
 
-pub const PUTCHAR: usize = 0;
-pub const CALL: usize = 1;
-pub const SEND: usize = 2;
-pub const RECV: usize = 3;
-
-/// inv label
-pub const UNTYPED_RETYPE: usize = 1;
-pub const TCB_CONFIGURE: usize = 2;
-pub const TCB_WRITE_REG: usize = 3;
-pub const TCB_RESUME: usize = 4;
-pub const TCB_SET_IPC_BUFFER: usize = 5;
-pub const NOTIFY_WAIT: usize = 6;
-pub const NOTIFY_SEND: usize = 7;
-pub const CNODE_COPY: usize = 8;
-pub const CNODE_MINT: usize = 9;
-pub const CNODE_MOVE: usize = 10;
-pub const PAGE_MAP: usize = 11;
-pub const PAGE_TABLE_MAP: usize = 12;
-pub const EP_SEND: usize = 13;
-pub const EP_RECV: usize = 14;
-
-// TODO: same kernel::capability::CapabilityType
-pub const TYPE_TCB: usize = 3;
-pub const TYPE_EP: usize = 5;
-pub const TYPE_CNODE: usize = 7;
-pub const TYPE_NOTIFY: usize = 9;
-pub const TYPE_PAGE_TABLE: usize = 2;
-pub const TYPE_PAGE: usize = 4;
-
-// TODO: use kernel::common
-pub type SysCallRes = Result<usize, (usize, usize)>;
+pub use kernel::CapabilityType;
+pub type SysCallRes = KernelResult<usize>;
 
 #[allow(clippy::too_many_arguments)]
 unsafe fn syscall(
-    src_ptr: usize,
-    inv_label: usize,
-    arg2: usize,
+    cap_ptr: usize,
+    cap_depth: u32,
+    inv_label: InvLabel,
     arg3: usize,
     arg4: usize,
     arg5: usize,
     arg6: usize,
-    sysno: SysNo,
+    sysno: SysCallNo,
 ) -> SysCallRes {
     let mut is_error: usize;
     let mut val: usize;
 
     asm!(
         "ecall",
-        inout("a0") src_ptr => is_error,
-        inout("a1") inv_label => val,
-        in("a2") arg2,
+        inout("a0") cap_ptr => is_error,
+        inout("a1") cap_depth as usize => val,
+        in("a2") inv_label as usize,
         in("a3") arg3,
         in("a4") arg4,
         in("a5") arg5,
@@ -68,182 +39,308 @@ unsafe fn syscall(
     if is_error == 0 {
         Ok(val)
     } else {
-        Err((is_error, val))
+        let e_kind = ErrKind::try_from(is_error).unwrap();
+        Err(kerr!(e_kind, val as u16))
     }
 }
 
 pub fn put_char(char: u8) -> SysCallRes {
-    unsafe { syscall(char as usize, 0, 0, 0, 0, 0, 0, SysNo::PutChar) }
+    unsafe {
+        syscall(
+            char as usize,
+            0,
+            InvLabel::PutChar,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Print,
+        )
+    }
 }
 
+pub fn traverse() -> SysCallRes {
+    unsafe { syscall(0, 0, InvLabel::CNodeTraverse, 0, 0, 0, 0, SysCallNo::Print) }
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn untyped_retype(
-    src_ptr: usize,
+    cap_ptr: usize,
+    cap_depth: u32,
     dest_ptr: usize,
-    user_size: usize,
-    num: usize,
-    cap_type: usize,
+    dest_depth: u32,
+    index: u32,
+    user_size: u32,
+    num: u32,
+    cap_type: CapabilityType,
+) -> SysCallRes {
+    let index_and_depth = ((index as usize) << 32) | dest_depth as usize;
+    let user_size_and_num = ((user_size as usize) << 32) | num as usize;
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::UntypedRetype,
+            dest_ptr,
+            index_and_depth,
+            user_size_and_num,
+            cap_type as usize,
+            SysCallNo::Call,
+        )
+    }
+}
+
+pub fn write_reg<F>(
+    cap_ptr: usize,
+    cap_depth: u32,
+    register: F,
+    buffer: &mut IPCBuffer,
+) -> SysCallRes
+where
+    F: FnOnce() -> Registers,
+{
+    buffer.write_as(register).unwrap();
+
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::TcbWriteReg,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Call,
+        )
+    }
+}
+
+pub fn set_ipc_buffer(
+    cap_ptr: usize,
+    cap_depth: u32,
+    page_cap_ptr: usize,
+    page_depth: u32,
 ) -> SysCallRes {
     unsafe {
         syscall(
-            src_ptr,
-            UNTYPED_RETYPE,
-            dest_ptr,
-            user_size,
-            num,
-            cap_type,
-            0,
-            SysNo::Call,
-        )
-    }
-}
-
-pub fn write_reg(src_ptr: usize, is_ip: usize, value: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, TCB_WRITE_REG, is_ip, value, 0, 0, 0, SysNo::Call) }
-}
-
-pub fn set_ipc_buffer(src_ptr: usize, page_cap_ptr: usize) -> SysCallRes {
-    unsafe {
-        syscall(
-            src_ptr,
-            TCB_SET_IPC_BUFFER,
+            cap_ptr,
+            cap_depth,
+            InvLabel::TcbSetIpcBuffer,
             page_cap_ptr,
+            page_depth as usize,
             0,
             0,
-            0,
-            0,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
 
-pub fn configure_tcb(src_ptr: usize, cnode_ptr: usize, vspace_ptr: usize) -> SysCallRes {
+pub fn configure_tcb(
+    cap_ptr: usize,
+    cap_depth: u32,
+    cnode_ptr: usize,
+    cnode_depth: u32,
+    vspace_ptr: usize,
+    vspace_depth: u32,
+) -> SysCallRes {
     unsafe {
         syscall(
-            src_ptr,
-            TCB_CONFIGURE,
+            cap_ptr,
+            cap_depth,
+            InvLabel::TcbConfigure,
             cnode_ptr,
+            cnode_depth as usize,
             vspace_ptr,
-            0,
-            0,
-            0,
-            SysNo::Call,
+            vspace_depth as usize,
+            SysCallNo::Call,
         )
     }
 }
 
-pub fn resume_tcb(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, TCB_RESUME, 0, 0, 0, 0, 0, SysNo::Call) }
+pub fn resume_tcb(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::TcbResume,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Call,
+        )
+    }
 }
 
-pub fn send_signal(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, NOTIFY_SEND, 0, 0, 0, 0, 0, SysNo::Send) }
+pub fn send_signal(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::NotifySend,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Send,
+        )
+    }
 }
 
-pub fn recv_signal(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, NOTIFY_WAIT, 0, 0, 0, 0, 0, SysNo::Recv) }
+pub fn recv_signal(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::NotifyWait,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Recv,
+        )
+    }
 }
 
 pub fn cnode_copy(
-    src_root: usize,
-    src_index: usize,
-    src_depth: u32,
-    dest_root: usize,
+    cap_ptr: usize,
+    cap_depth: u32,
     dest_index: usize,
     dest_depth: u32,
+    src_index: usize,
+    src_depth: u32,
 ) -> SysCallRes {
-    let depth = ((src_depth as usize) << 31) | dest_depth as usize;
+    let depth = ((src_depth as usize) << 32) | dest_depth as usize;
     unsafe {
         syscall(
-            src_root,
-            CNODE_COPY,
+            cap_ptr,
+            cap_depth,
+            InvLabel::CNodeCopy,
             src_index,
             depth,
-            dest_root,
             dest_index,
             0,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
 
 pub fn cnode_mint(
-    src_root: usize,
-    src_index: usize,
-    src_depth: u32,
-    dest_root: usize,
+    cap_ptr: usize,
+    cap_depth: u32,
     dest_index: usize,
     dest_depth: u32,
+    src_index: usize,
+    src_depth: u32,
     cap_val: usize,
 ) -> SysCallRes {
-    let depth = ((src_depth as usize) << 31) | dest_depth as usize;
+    let depth = ((src_depth as usize) << 32) | dest_depth as usize;
     unsafe {
         syscall(
-            src_root,
-            CNODE_MINT,
+            cap_ptr,
+            cap_depth,
+            InvLabel::CNodeMint,
             src_index,
             depth,
-            dest_root,
             dest_index,
             cap_val,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
 
 pub fn cnode_move(
-    src_root: usize,
+    cap_ptr: usize,
+    cap_depth: u32,
+    dest_depth: u32,
+    dest_index: usize,
     src_index: usize,
     src_depth: u32,
-    dest_root: usize,
-    dest_index: usize,
-    dest_depth: u32,
 ) -> SysCallRes {
-    let depth = ((src_depth as usize) << 31) | dest_depth as usize;
+    let depth = ((src_depth as usize) << 32) | dest_depth as usize;
     unsafe {
         syscall(
-            src_root,
-            CNODE_MOVE,
+            cap_ptr,
+            cap_depth,
+            InvLabel::CNodeMove,
             src_index,
             depth,
-            dest_root,
             dest_index,
             0,
-            SysNo::Call,
+            SysCallNo::Call,
         )
     }
 }
 
-pub fn map_page(src_ptr: usize, dest_ptr: usize, vaddr: usize, flags: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, PAGE_MAP, dest_ptr, vaddr, flags, 0, 0, SysNo::Call) }
-}
-
-pub fn map_page_table(src_ptr: usize, dest_ptr: usize, vaddr: usize) -> SysCallRes {
+pub fn map_page(
+    cap_ptr: usize,
+    cap_depth: u32,
+    dest_ptr: usize,
+    dest_depth: u32,
+    vaddr: usize,
+    flags: usize,
+) -> SysCallRes {
     unsafe {
         syscall(
-            src_ptr,
-            PAGE_TABLE_MAP,
+            cap_ptr,
+            cap_depth,
+            InvLabel::PageMap,
             dest_ptr,
+            dest_depth as usize,
             vaddr,
-            0,
-            0,
-            0,
-            SysNo::Call,
+            flags,
+            SysCallNo::Call,
         )
     }
 }
 
-pub fn send_ipc(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, EP_SEND, 0, 0, 0, 0, 0, SysNo::Send) }
+pub fn map_page_table(
+    cap_ptr: usize,
+    cap_depth: u32,
+    dest_ptr: usize,
+    dest_depth: u32,
+    vaddr: usize,
+) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::PageTableMap,
+            dest_ptr,
+            dest_depth as usize,
+            vaddr,
+            0,
+            SysCallNo::Call,
+        )
+    }
 }
 
-pub fn recv_ipc(src_ptr: usize) -> SysCallRes {
-    unsafe { syscall(src_ptr, EP_RECV, 0, 0, 0, 0, 0, SysNo::Recv) }
+pub fn send_ipc(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::EpSend,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Send,
+        )
+    }
 }
 
-pub const MESSAGE_LEN: usize = 128;
-
-pub struct IPCBuffer {
-    pub tag: usize,
-    pub message: [usize; MESSAGE_LEN],
-    pub user_data: usize,
+pub fn recv_ipc(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::EpRecv,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Recv,
+        )
+    }
 }

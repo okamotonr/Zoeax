@@ -4,9 +4,12 @@ use core::fmt;
 
 use syscall::put_char;
 
-pub mod elf;
-pub mod list;
+pub use kernel::common::BootInfo;
+pub use kernel::common::IPCBuffer;
+pub use kernel::common::UntypedInfo;
+pub use kernel::Registers;
 pub mod syscall;
+//pub mod syszoea;
 
 #[macro_export]
 macro_rules! print {

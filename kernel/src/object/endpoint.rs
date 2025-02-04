@@ -1,8 +1,7 @@
-use common::list::LinkedList;
+use crate::list::LinkedList;
 
 use super::tcb::{resume, ThreadControlBlock, ThreadInfo};
 
-// TODO: More efficiency
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum EndpointState {
     Send,
@@ -45,6 +44,7 @@ impl Endpoint {
     pub fn send(&mut self, thread: &mut ThreadControlBlock) -> bool {
         if let Some(reciever_thread) = self.pop_from_queue(EndpointState::Send) {
             reciever_thread.set_ipc_msg(thread.ipc_buffer_ref());
+            reciever_thread.registers.a1 = thread.badge;
             wake_up_thread(reciever_thread);
             false
         } else {
@@ -57,6 +57,7 @@ impl Endpoint {
     pub fn recv(&mut self, thread: &mut ThreadControlBlock) -> bool {
         if let Some(send_thread) = self.pop_from_queue(EndpointState::Recv) {
             thread.set_ipc_msg(send_thread.ipc_buffer_ref());
+            thread.registers.a1 = send_thread.badge;
             wake_up_thread(send_thread);
             false
         } else {

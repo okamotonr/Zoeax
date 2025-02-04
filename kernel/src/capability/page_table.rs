@@ -1,23 +1,26 @@
-use core::fmt;
-
-use crate::address::PhysAddr;
 use crate::address::PAGE_SIZE;
 use crate::common::ErrKind;
 use crate::kerr;
 use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
+use crate::object::KObject;
 use crate::{
     address::{KernelVAddress, VirtAddr},
-    capability::{Capability, CapabilityType, RawCapability},
+    capability::{Capability, CapabilityData, CapabilityType},
     common::KernelResult,
 };
+
+use super::Something;
 
 /*
  * RawCapability[0]
  * | padding 15 | is_mapped 1 | mapped_address 48 |
  * 64                                            0
  */
-pub struct PageTableCap(RawCapability);
+
+impl KObject for PageTable {}
+
+pub type PageTableCap = CapabilityData<PageTable>;
 
 impl PageTableCap {
     pub fn map(&mut self, root_table: &mut Self, vaddr: VirtAddr) -> KernelResult<usize> {
@@ -32,7 +35,7 @@ impl PageTableCap {
     }
 
     pub fn get_pagetable(&mut self) -> &mut PageTable {
-        let address = self.0.get_address();
+        let address = self.get_address();
         let ptr: *mut PageTable = KernelVAddress::from(address).into();
         unsafe { ptr.as_mut().unwrap() }
     }
@@ -49,7 +52,7 @@ impl PageTableCap {
     }
 
     fn set_mapped(&mut self, vaddr: VirtAddr) {
-        self.0.cap_dep_val |=
+        self.cap_dep_val |=
             (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff) as u64
     }
 
@@ -64,11 +67,7 @@ impl PageTableCap {
     }
 
     fn is_mapped(&self) -> bool {
-        ((self.0.cap_dep_val >> 48) & 0x1) == 1
-    }
-
-    fn get_mapped_address(&self) -> PhysAddr {
-        ((self.0.cap_dep_val & !(0xffff << 48)) as usize).into()
+        ((self.cap_dep_val >> 48) & 0x1) == 1
     }
 }
 
@@ -77,25 +76,15 @@ impl Default for PageTable {
         Self::new()
     }
 }
-
-impl fmt::Debug for PageTableCap {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let raw_cap = self.get_raw_cap();
-        let is_mapped = self.is_mapped();
-        let mapped_address = self.get_mapped_address();
-        write!(
-            f,
-            "{raw_cap:?}\nis_mapped {is_mapped:?}\nmapped_address {mapped_address:?}"
-        )
-    }
-}
-
 /*
  * RawCapability[0]
  * | padding 11 | right 3 | is_device 1 | is_mapped 1 | mapped_address 48 |
  * 64                                                                    0
  */
-pub struct PageCap(RawCapability);
+
+impl KObject for Page {}
+
+pub type PageCap = CapabilityData<Page>;
 
 impl PageCap {
     pub fn map(
@@ -115,37 +104,31 @@ impl PageCap {
     }
 
     pub fn get_page(&mut self) -> &mut Page {
-        let address = self.0.get_address();
+        let address = self.get_address();
         let ptr: *mut Page = KernelVAddress::from(address).into();
         unsafe { ptr.as_mut().unwrap() }
     }
 
     fn set_mapped(&mut self, vaddr: VirtAddr) {
-        self.0.cap_dep_val |=
+        self.cap_dep_val |=
             (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff) as u64
     }
 
     fn is_mapped(&self) -> bool {
-        ((self.0.cap_dep_val >> 48) & 0x1) == 1
+        ((self.cap_dep_val >> 48) & 0x1) == 1
     }
-    pub fn get_address(&self) -> KernelVAddress {
-        self.0.get_address().into()
+
+    pub fn get_address_virtual(&self) -> KernelVAddress {
+        self.get_address().into()
     }
 }
 
 impl Capability for PageTableCap {
     const CAP_TYPE: CapabilityType = CapabilityType::PageTable;
     type KernelObject = PageTable;
-    fn get_raw_cap(&self) -> RawCapability {
-        self.0
-    }
-
-    fn new(raw_cap: RawCapability) -> Self {
-        Self(raw_cap)
-    }
 
     fn init_object(&mut self) {
-        let addr = KernelVAddress::from(self.0.get_address());
+        let addr = KernelVAddress::from(self.get_address());
         let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr);
         unsafe {
             *ptr = PageTable::new();
@@ -154,27 +137,20 @@ impl Capability for PageTableCap {
     fn get_object_size<'a>(_user_size: usize) -> usize {
         PAGE_SIZE // page size, bytes
     }
-    fn derive(&self, _src_slot: &crate::object::CNodeEntry) -> KernelResult<Self> {
+    fn derive(&self, _src_slot: &crate::object::CNodeEntry<Something>) -> KernelResult<Self> {
         self.is_mapped()
             .then_some(())
             .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
-        Ok(Self::new(self.get_raw_cap()))
+        Ok(self.replicate())
     }
 }
 
 impl Capability for PageCap {
     const CAP_TYPE: CapabilityType = CapabilityType::Page;
     type KernelObject = Page;
-    fn get_raw_cap(&self) -> RawCapability {
-        self.0
-    }
-
-    fn new(raw_cap: RawCapability) -> Self {
-        Self(raw_cap)
-    }
 
     fn init_object(&mut self) {
-        let addr = KernelVAddress::from(self.0.get_address());
+        let addr = KernelVAddress::from(self.get_address());
         let ptr = <KernelVAddress as Into<*mut Self::KernelObject>>::into(addr);
         unsafe {
             *ptr = Page::new();
@@ -185,10 +161,11 @@ impl Capability for PageCap {
         PAGE_SIZE // page size, bytes
     }
 
-    fn derive(&self, _src_slot: &crate::object::CNodeEntry) -> KernelResult<Self> {
+    fn derive(&self, _src_slot: &crate::object::CNodeEntry<Something>) -> KernelResult<Self> {
         self.is_mapped()
             .then_some(())
             .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
-        Ok(Self::new(self.get_raw_cap()))
+
+        Ok(self.replicate())
     }
 }
