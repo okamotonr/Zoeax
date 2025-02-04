@@ -100,17 +100,18 @@ fn handle_invocation(
     cap_ptr: usize,
     depth: usize,
     inv_label: usize,
+    // TODO: Call or Send or Recv or NonBlocking Send or ..
     _syscall_n: usize,
     reg: &Registers,
 ) -> KernelResult<()> {
     let inv_label = InvLabel::try_from(inv_label)?;
     let current_tcb = get_current_tcb_mut();
+    let ipc_buffer = current_tcb.ipc_buffer_ref();
     let mut root_cnode = current_tcb.root_cnode.as_ref().unwrap().cap().replicate();
-    let slot = current_tcb
-        .root_cnode
-        .as_mut()
-        .ok_or(kerr!(ErrKind::NoMemory))?
-        .cap_ref_mut()
+    // Hack
+    let mut root_cnode_2 = root_cnode.replicate();
+
+    let slot = root_cnode_2
         .lookup_entry_mut(cap_ptr, depth as u32)?
         .as_mut()
         .ok_or(kerr!(ErrKind::SlotIsEmpty))?;
@@ -120,7 +121,9 @@ fn handle_invocation(
         CapabilityType::Untyped => {
             let dest_cnode_ptr = reg.a3;
             let user_size = reg.a4;
-            let num = reg.a5;
+            let num_and_dest_depth = reg.a5;
+            let _dest_depth = num_and_dest_depth as u32;
+            let num = num_and_dest_depth >> 32;
             let new_type = CapabilityType::try_from_u8(reg.a6 as u8)?;
             let (_, dest_cnode) = root_cnode.get_src_and_dest(cap_ptr, dest_cnode_ptr, num)?;
             let (src_cap, src_mdb) = slot.cap_and_mdb();
@@ -186,16 +189,8 @@ fn handle_invocation(
                     Ok(())
                 }
                 InvLabel::TcbWriteReg => {
-                    let reg_id = match reg.a3 {
-                        0 => 2,  // stack pointer
-                        1 => 34, // sepc
-                        2 => 10, // a0
-                        3 => 11, // a1
-                        4 => 12, // a2
-                        _ => panic!("cannot set reg {:x}", reg.a2),
-                    };
-                    let value = reg.a4;
-                    tcb_cap.set_registers(&[(reg_id, value)]);
+                    let registers = ipc_buffer.unwrap().read_as::<Registers>().unwrap();
+                    tcb_cap.set_registers(registers);
                     Ok(())
                 }
                 InvLabel::TcbSetIpcBuffer => {

@@ -1,8 +1,10 @@
 use core::arch::asm;
+use kernel::common::IPCBuffer;
 use kernel::kerr;
 use kernel::ErrKind;
 use kernel::InvLabel;
 use kernel::KernelResult;
+use kernel::Registers;
 use kernel::SysCallNo;
 
 pub use kernel::CapabilityType;
@@ -62,10 +64,12 @@ pub fn untyped_retype(
     cap_ptr: usize,
     cap_depth: u32,
     dest_ptr: usize,
+    dest_depth: u32,
     user_size: usize,
-    num: usize,
+    num: u32,
     cap_type: CapabilityType,
 ) -> SysCallRes {
+    let num_and_dest_depth = ((num as usize) << 32) | dest_depth as usize;
     unsafe {
         syscall(
             cap_ptr,
@@ -73,21 +77,34 @@ pub fn untyped_retype(
             InvLabel::UntypedRetype,
             dest_ptr,
             user_size,
-            num,
+            num_and_dest_depth,
             cap_type as usize,
             SysCallNo::Call,
         )
     }
 }
 
-pub fn write_reg(cap_ptr: usize, cap_depth: u32, is_ip: usize, value: usize) -> SysCallRes {
+pub fn write_reg<F>(cap_ptr: usize, cap_depth: u32, register: F, buffer: &mut IPCBuffer) -> SysCallRes
+  where 
+      F: FnOnce() -> Registers
+{
+    put_char('h' as u8);
+    put_char('e' as u8);
+    put_char('l' as u8);
+    put_char('\n' as u8);
+    buffer.write_as(register).unwrap();
+    put_char('h' as u8);
+    put_char('e' as u8);
+    put_char('l' as u8);
+    put_char('\n' as u8);
+
     unsafe {
         syscall(
             cap_ptr,
             cap_depth,
             InvLabel::TcbWriteReg,
-            is_ip,
-            value,
+            0,
+            0,
             0,
             0,
             SysCallNo::Call,
@@ -325,10 +342,3 @@ pub fn recv_ipc(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
     }
 }
 
-pub const MESSAGE_LEN: usize = 128;
-
-pub struct IPCBuffer {
-    pub tag: usize,
-    pub message: [usize; MESSAGE_LEN],
-    pub user_data: usize,
-}

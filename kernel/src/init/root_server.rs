@@ -476,7 +476,7 @@ fn create_initial_thread(
     boot_info.root_vspace_idx = ROOT_VSPACE_IDX;
     boot_info.ipc_buffer_addr = max_vaddr.add(PAGE_SIZE).into();
     // 7, set initial thread into current thread
-    root_tcb.set_registers(&[(10, max_vaddr.add(PAGE_SIZE * 2).into())]);
+    root_tcb.set_register(&[(10, max_vaddr.add(PAGE_SIZE * 2).into())]);
     root_tcb.make_runnable();
     println!("root process initialization finished");
 }

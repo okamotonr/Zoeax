@@ -13,6 +13,7 @@ use common::syscall::write_reg;
 use common::syscall::CapabilityType;
 use common::syscall::{configure_tcb, untyped_retype};
 use common::BootInfo;
+use common::Registers;
 
 pub static mut STACK: [usize; 512] = [0; 512];
 const ROOT_CNODE_RADIX: u32 = 18;
@@ -23,7 +24,7 @@ pub fn main(boot_info: &BootInfo) {
     let root_cnode_idx = boot_info.root_cnode_idx;
     let root_vspace_idx = boot_info.root_vspace_idx;
     let untyped_cnode_idx = boot_info.untyped_infos[0].idx;
-    println!("boot info: {:?}", boot_info);
+    println!("boot info: {:x?}", boot_info);
     println!("parent: hello, world, {untyped_cnode_idx:x}");
     let first_empyt = boot_info.firtst_empty_idx;
     let tcb_idx = first_empyt + 1;
@@ -31,6 +32,7 @@ pub fn main(boot_info: &BootInfo) {
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
         tcb_idx,
+        ROOT_CNODE_RADIX,
         0,
         1,
         CapabilityType::Tcb,
@@ -41,6 +43,7 @@ pub fn main(boot_info: &BootInfo) {
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
         notify_idx,
+        ROOT_CNODE_RADIX,
         0,
         1,
         CapabilityType::Notification,
@@ -51,6 +54,7 @@ pub fn main(boot_info: &BootInfo) {
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
         lv2_cnode_idx,
+        ROOT_CNODE_RADIX,
         1,
         1,
         CapabilityType::CNode,
@@ -62,6 +66,7 @@ pub fn main(boot_info: &BootInfo) {
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
         page_idx,
+        ROOT_CNODE_RADIX,
         0,
         1,
         CapabilityType::Page,
@@ -72,6 +77,7 @@ pub fn main(boot_info: &BootInfo) {
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
         page_table_idx,
+        ROOT_CNODE_RADIX,
         0,
         1,
         CapabilityType::PageTable,
@@ -83,6 +89,7 @@ pub fn main(boot_info: &BootInfo) {
         untyped_cnode_idx,
         ROOT_CNODE_RADIX,
         ep_idx,
+        ROOT_CNODE_RADIX,
         0,
         1,
         CapabilityType::EndPoint,
@@ -121,8 +128,17 @@ pub fn main(boot_info: &BootInfo) {
         let stack_bottom = &mut STACK[511];
         stack_bottom as *mut usize as usize
     };
-    write_reg(tcb_idx, ROOT_CNODE_RADIX, 0, sp_val).unwrap();
-    write_reg(tcb_idx, ROOT_CNODE_RADIX, 1, children as usize).unwrap();
+    write_reg(tcb_idx, ROOT_CNODE_RADIX,
+        | | {
+            let mut registers = Registers::default();
+            registers.sp = sp_val;
+            registers.sepc = children as usize;
+            registers.a0 = page_table_idx + 1;
+            registers.a1 = ep_mint_idx;
+            registers.a2 = untyped_cnode_idx;
+            registers
+        },
+    boot_info.ipc_buffer()).unwrap();
 
     let dest_idx = lv2_cnode_idx << 1;
     cnode_copy(
@@ -134,7 +150,6 @@ pub fn main(boot_info: &BootInfo) {
         ROOT_CNODE_RADIX,
     )
     .unwrap();
-
     cnode_mint(
         root_cnode_idx,
         ROOT_CNODE_RADIX,
@@ -165,9 +180,6 @@ pub fn main(boot_info: &BootInfo) {
         0xdeadbeef,
     )
     .unwrap();
-    write_reg(tcb_idx, ROOT_CNODE_RADIX, 2, page_table_idx + 1).unwrap();
-    write_reg(tcb_idx, ROOT_CNODE_RADIX, 3, ep_mint_idx).unwrap();
-    write_reg(tcb_idx, ROOT_CNODE_RADIX, 4, untyped_cnode_idx).unwrap();
     configure_tcb(
         tcb_idx,
         ROOT_CNODE_RADIX,
@@ -209,7 +221,7 @@ fn children(a0: usize, a1: usize, a2: usize) {
     let page_r = 2;
     let page_w = 4;
     let flags = page_r | page_w;
-    untyped_retype(a2, ROOT_CNODE_RADIX, page_idx, 1, 1, CapabilityType::Page).unwrap();
+    untyped_retype(a2, ROOT_CNODE_RADIX, page_idx, ROOT_CNODE_RADIX, 1, 1, CapabilityType::Page).unwrap();
     map_page(
         page_idx,
         ROOT_CNODE_RADIX,

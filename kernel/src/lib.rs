@@ -27,3 +27,4 @@ pub use handler::return_to_user;
 pub use init::init_kernel;
 pub use syscall::InvLabel;
 pub use syscall::SysCallNo;
+pub use object::Registers;

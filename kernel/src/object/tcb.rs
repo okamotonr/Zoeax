@@ -1,7 +1,7 @@
 use crate::address::KernelVAddress;
 use crate::capability::page_table::PageCap;
 use crate::capability::{cnode::CNodeCap, page_table::PageTableCap};
-use crate::common::{ErrKind, KernelResult};
+use crate::common::{ErrKind, IPCBuffer, KernelResult};
 use crate::kerr;
 use crate::list::ListItem;
 use crate::object::PageTable;
@@ -46,7 +46,7 @@ pub enum ThreadState {
 }
 
 #[repr(C)]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Registers {
     pub ra: usize,
     pub sp: usize,
@@ -161,16 +161,16 @@ impl ThreadInfo {
         self.status == ThreadState::Runnable
     }
 
-    pub fn set_ipc_msg(&mut self, ipc_buffer_ref: Option<&mut [u64; 512]>) {
+    pub fn set_ipc_msg(&mut self, ipc_buffer_ref: Option<&mut IPCBuffer>) {
         if let (Some(reciever_ref), Some(sender_ref)) = (self.ipc_buffer_ref(), ipc_buffer_ref) {
             unsafe { ptr::copy(sender_ref, reciever_ref, 1) }
         }
     }
 
-    pub fn ipc_buffer_ref(&self) -> Option<&mut [u64; 512]> {
+    pub fn ipc_buffer_ref(&self) -> Option<&mut IPCBuffer> {
         self.ipc_buffer.as_ref().map(|page_cap_e| {
             let page_cap = page_cap_e.cap();
-            let address: *mut [u64; 512] = KernelVAddress::from(page_cap.get_address()).into();
+            let address: *mut IPCBuffer = KernelVAddress::from(page_cap.get_address()).into();
             unsafe { &mut *{ address } }
         })
     }
