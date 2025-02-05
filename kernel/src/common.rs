@@ -1,7 +1,7 @@
 use core::{error::Error, fmt};
 pub use shared::err_kind::ErrKind;
-pub use shared::types::IPCBuffer;
 pub use shared::types::BootInfo;
+pub use shared::types::IPCBuffer;
 pub use shared::types::UntypedInfo;
 
 pub fn is_aligned(value: usize, align: usize) -> bool {
@@ -19,7 +19,6 @@ pub fn align_down(value: usize, align: usize) -> usize {
 }
 
 pub type KernelResult<T> = Result<T, KernelError>;
-
 
 //TODO: thiserror and anyhow
 #[derive(Debug)]

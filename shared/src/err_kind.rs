@@ -62,4 +62,3 @@ impl TryFrom<usize> for ErrKind {
         }
     }
 }
-

@@ -5,4 +5,3 @@ pub enum SysCallNo {
     Send = 2,
     Recv = 3,
 }
-

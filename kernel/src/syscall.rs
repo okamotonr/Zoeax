@@ -1,6 +1,6 @@
 use crate::{
     address::PAGE_SIZE,
-    capability::{CapabilityType, cap_try_from_u8},
+    capability::{cap_try_from_u8, CapabilityType},
     common::{is_aligned, ErrKind, KernelResult},
     kerr,
     object::{
@@ -12,8 +12,8 @@ use crate::{
     scheduler::{get_current_tcb_mut, require_schedule},
     uart::putchar,
 };
-pub use shared::syscall_no::SysCallNo;
 pub use shared::inv_labels::InvLabel;
+pub use shared::syscall_no::SysCallNo;
 
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
     let cap_ptr = reg.a0;

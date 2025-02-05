@@ -1,11 +1,11 @@
 #![no_std]
 
-pub mod registers;
-pub mod types;
 pub mod cap_type;
 pub mod err_kind;
-pub mod syscall_no;
 pub mod inv_labels;
+pub mod registers;
+pub mod syscall_no;
+pub mod types;
 
 #[macro_export]
 macro_rules! const_assert_single {

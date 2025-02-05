@@ -24,8 +24,7 @@ impl TryFrom<u8> for CapabilityType {
             x if x == Self::Notification as u8 => Ok(Self::Notification),
             x if x == Self::Page as u8 => Ok(Self::Page),
             x if x == Self::PageTable as u8 => Ok(Self::PageTable),
-            _ => Err(ErrKind::UnknownCapType)
+            _ => Err(ErrKind::UnknownCapType),
         }
     }
 }
-

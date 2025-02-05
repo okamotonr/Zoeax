@@ -1,9 +1,9 @@
-use core::arch::asm;
-use crate::IPCBuffer;
 use crate::ErrKind;
+use crate::IPCBuffer;
 use crate::InvLabel;
 use crate::Registers;
 use crate::SysCallNo;
+use core::arch::asm;
 pub use shared::cap_type::CapabilityType;
 
 pub type SysCallRes = Result<usize, (ErrKind, u16)>;

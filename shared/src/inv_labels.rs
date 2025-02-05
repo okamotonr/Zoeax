@@ -49,4 +49,3 @@ impl TryFrom<usize> for InvLabel {
         }
     }
 }
-

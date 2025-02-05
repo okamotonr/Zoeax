@@ -1,8 +1,7 @@
 use crate::const_assert;
-use crate::registers::Registers;
 use crate::err_kind::ErrKind;
+use crate::registers::Registers;
 use core::mem;
-
 
 pub struct IPCBuffer {
     pub tag: usize,
@@ -60,8 +59,6 @@ impl BootInfo {
         unsafe { ptr.as_mut().unwrap() }
     }
 }
-
-
 
 pub const MESSAGE_LEN: usize = 128;
 const_assert!(

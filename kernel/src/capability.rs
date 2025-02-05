@@ -5,8 +5,8 @@ use crate::{
     object::{CNodeEntry, KObject},
 };
 
-use shared::const_assert;
 pub use shared::cap_type::CapabilityType;
+use shared::const_assert;
 
 use core::mem;
 use core::{marker::PhantomData, num::NonZeroU8};
@@ -169,7 +169,7 @@ where
 
 pub fn cap_try_from_u8(val: u8) -> KernelResult<CapabilityType> {
     CapabilityType::try_from(val).map_err(|_| kerr!(ErrKind::UnknownCapType))
-} 
+}
 
 pub trait Capability
 where

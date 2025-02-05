@@ -13,8 +13,8 @@ use core::ptr;
 use super::cnode::CNodeEntry;
 use super::page_table::Page;
 use super::{CNode, CSlot, KObject};
-pub use shared::registers::Registers;
 pub use shared::registers::Register;
+pub use shared::registers::Registers;
 #[cfg(debug_assertions)]
 static mut TCBIDX: usize = 0;
 
@@ -45,7 +45,6 @@ pub enum ThreadState {
     Blocked,
     Idle,
 }
-
 
 #[derive(Debug, Default)]
 pub struct ThreadInfo {
@@ -158,4 +157,3 @@ impl ThreadInfo {
         self.ipc_buffer = Some(new_entry)
     }
 }
-
