@@ -2,9 +2,10 @@ use crate::{
     address::{KernelVAddress, PhysAddr},
     capability::{CapInSlot, Capability, CapabilityData, Something},
     common::KernelResult,
-    const_assert, CapabilityType,
+    CapabilityType,
 };
 use core::{fmt::Debug, mem};
+use shared::const_assert;
 
 use super::KObject;
 

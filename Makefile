@@ -31,15 +31,12 @@ QEMUFLAGS += -drive id=drive0,file=lorem.txt,format=raw,if=none
 QEMUFLAGS += -device virtio-blk-device,drive=drive0,bus=virtio-mmio-bus.0
 
 kernel_elf    := $(BUILD_DIR)/kernel
-user_elf      := $(BUILD_DIR)/user
-pong_elf      := $(BUILD_DIR)/pong
+rootserver_elf      := $(BUILD_DIR)/rootserver
 
 .PHONY: build
 build:
-	pushd user && cargo build $(CARGO_FLAGS) && popd
-	pushd pong && cargo build $(CARGO_FLAGS) && popd
-	cp $(pong_elf) kernel/pong
-	cp $(user_elf) kernel/rootserver
+	pushd rootserver && cargo build $(CARGO_FLAGS) && popd
+	cp $(rootserver_elf) kernel/rootserver
 	pushd kernel && cargo build $(CARGO_FLAGS) && popd
 
 .PHONY: clean

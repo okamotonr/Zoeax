@@ -4,10 +4,13 @@ use core::fmt;
 
 use syscall::put_char;
 
-pub use kernel::common::BootInfo;
-pub use kernel::common::IPCBuffer;
-pub use kernel::common::UntypedInfo;
-pub use kernel::Registers;
+pub use shared::types::BootInfo;
+pub use shared::types::IPCBuffer;
+pub use shared::registers::Registers;
+pub use shared::types::UntypedInfo;
+pub use shared::err_kind::ErrKind;
+pub use shared::inv_labels::InvLabel;
+pub use shared::syscall_no::SysCallNo;
 pub mod syscall;
 //pub mod syszoea;
 

@@ -3,26 +3,26 @@
 version = 4
 
 [[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "kernel",
-]
-
-[[package]]
 name = "kernel"
 version = "0.1.0"
+dependencies = [
+ "shared",
+]
 
 [[package]]
-name = "pong"
+name = "libzoea"
 version = "0.1.0"
 dependencies = [
- "common",
+ "shared",
 ]
+
+[[package]]
+name = "shared"
+version = "0.1.0"
 
 [[package]]
 name = "user"
 version = "0.1.0"
 dependencies = [
- "common",
+ "libzoea",
 ]

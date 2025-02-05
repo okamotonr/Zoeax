@@ -1,3 +1,3 @@
 [workspace]
-members = ["kernel", "user", "common", "pong"]
+members = ["kernel", "rootserver", "libzoea", "shared"]
 resolver = "2"

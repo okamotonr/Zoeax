@@ -1,14 +1,12 @@
 use core::arch::asm;
-use kernel::common::IPCBuffer;
-use kernel::kerr;
-use kernel::ErrKind;
-use kernel::InvLabel;
-use kernel::KernelResult;
-use kernel::Registers;
-use kernel::SysCallNo;
+use crate::IPCBuffer;
+use crate::ErrKind;
+use crate::InvLabel;
+use crate::Registers;
+use crate::SysCallNo;
+pub use shared::cap_type::CapabilityType;
 
-pub use kernel::CapabilityType;
-pub type SysCallRes = KernelResult<usize>;
+pub type SysCallRes = Result<usize, (ErrKind, u16)>;
 
 #[allow(clippy::too_many_arguments)]
 unsafe fn syscall(
@@ -40,7 +38,7 @@ unsafe fn syscall(
         Ok(val)
     } else {
         let e_kind = ErrKind::try_from(is_error).unwrap();
-        Err(kerr!(e_kind, val as u16))
+        Err((e_kind, val as u16))
     }
 }
 
