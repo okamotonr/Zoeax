@@ -1,6 +1,7 @@
 #![no_std]
 
 pub mod cap_type;
+pub mod elf;
 pub mod err_kind;
 pub mod inv_labels;
 pub mod registers;

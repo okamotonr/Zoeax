@@ -1,4 +1,4 @@
-use crate::elf::Elf64Hdr;
+use shared::elf::Elf64Hdr;
 
 mod pm;
 mod root_server;

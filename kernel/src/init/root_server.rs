@@ -1,5 +1,5 @@
 use super::pm::BumpAllocator;
-use crate::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
+use shared::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
 
 use crate::address::KernelVAddress;
 use crate::address::VirtAddr;

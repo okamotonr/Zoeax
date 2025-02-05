@@ -7,7 +7,6 @@
 mod address;
 mod capability;
 pub mod common;
-pub mod elf;
 mod handler;
 mod init;
 pub mod list;
