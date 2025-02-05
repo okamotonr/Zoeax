@@ -4,7 +4,7 @@
 
 use core::{arch::naked_asm, panic::PanicInfo};
 
-use common::println;
+use libzoea::println;
 
 mod shell;
 

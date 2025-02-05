@@ -1,14 +1,12 @@
+use crate::ErrKind;
+use crate::IPCBuffer;
+use crate::InvLabel;
+use crate::Registers;
+use crate::SysCallNo;
 use core::arch::asm;
-use kernel::common::IPCBuffer;
-use kernel::kerr;
-use kernel::ErrKind;
-use kernel::InvLabel;
-use kernel::KernelResult;
-use kernel::Registers;
-use kernel::SysCallNo;
+pub use shared::cap_type::CapabilityType;
 
-pub use kernel::CapabilityType;
-pub type SysCallRes = KernelResult<usize>;
+pub type SysCallRes = Result<usize, (ErrKind, u16)>;
 
 #[allow(clippy::too_many_arguments)]
 unsafe fn syscall(
@@ -40,7 +38,7 @@ unsafe fn syscall(
         Ok(val)
     } else {
         let e_kind = ErrKind::try_from(is_error).unwrap();
-        Err(kerr!(e_kind, val as u16))
+        Err((e_kind, val as u16))
     }
 }
 
@@ -289,6 +287,21 @@ pub fn map_page(
             dest_depth as usize,
             vaddr,
             flags,
+            SysCallNo::Call,
+        )
+    }
+}
+
+pub fn unmap_page(cap_ptr: usize, cap_depth: u32, dest_ptr: usize, dest_depth: u32) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::PageUnMap,
+            dest_ptr,
+            dest_depth as usize,
+            0,
+            0,
             SysCallNo::Call,
         )
     }

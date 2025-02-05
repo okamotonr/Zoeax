@@ -5,10 +5,10 @@
 use core::{panic::PanicInfo, ptr};
 
 use core::arch::global_asm;
-use kernel::elf::*;
 use kernel::init_kernel;
 use kernel::println;
 use kernel::return_to_user;
+use shared::elf::Elf64Hdr;
 
 extern "C" {
     static mut __bss: u8;

@@ -1,6 +1,6 @@
 use crate::{
     address::PAGE_SIZE,
-    capability::CapabilityType,
+    capability::{cap_try_from_u8, CapabilityType},
     common::{is_aligned, ErrKind, KernelResult},
     kerr,
     object::{
@@ -11,66 +11,9 @@ use crate::{
     println,
     scheduler::{get_current_tcb_mut, require_schedule},
     uart::putchar,
-    KernelError,
 };
-
-#[repr(u8)]
-pub enum SysCallNo {
-    Print = 0,
-    Call = 1,
-    Send = 2,
-    Recv = 3,
-}
-
-#[repr(usize)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InvLabel {
-    PutChar = 0,
-    CNodeTraverse = 1,
-    UntypedRetype = 2,
-    TcbConfigure,
-    TcbWriteReg,
-    TcbResume,
-    TcbSetIpcBuffer,
-    NotifyWait,
-    NotifySend,
-    CNodeCopy,
-    CNodeMint,
-    CNodeMove,
-    PageMap,
-    PageUnMap,
-    PageTableMap,
-    PageTableUnMap,
-    EpSend,
-    EpRecv,
-}
-
-impl TryFrom<usize> for InvLabel {
-    type Error = KernelError;
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        match value {
-            inv if inv == Self::PutChar as usize => Ok(Self::PutChar),
-            inv if inv == Self::CNodeTraverse as usize => Ok(Self::CNodeTraverse),
-            inv if inv == Self::UntypedRetype as usize => Ok(Self::UntypedRetype),
-            inv if inv == Self::TcbConfigure as usize => Ok(Self::TcbConfigure),
-            inv if inv == Self::TcbWriteReg as usize => Ok(Self::TcbWriteReg),
-            inv if inv == Self::TcbResume as usize => Ok(Self::TcbResume),
-            inv if inv == Self::TcbSetIpcBuffer as usize => Ok(Self::TcbSetIpcBuffer),
-            inv if inv == Self::NotifyWait as usize => Ok(Self::NotifyWait),
-            inv if inv == Self::NotifySend as usize => Ok(Self::NotifySend),
-            inv if inv == Self::CNodeCopy as usize => Ok(Self::CNodeCopy),
-            inv if inv == Self::CNodeMint as usize => Ok(Self::CNodeMint),
-            inv if inv == Self::CNodeMove as usize => Ok(Self::CNodeMove),
-            inv if inv == Self::PageMap as usize => Ok(Self::PageMap),
-            inv if inv == Self::PageUnMap as usize => Ok(Self::PageUnMap),
-            inv if inv == Self::PageTableMap as usize => Ok(Self::PageTableMap),
-            inv if inv == Self::PageTableUnMap as usize => Ok(Self::PageTableUnMap),
-            inv if inv == Self::EpSend as usize => Ok(Self::EpSend),
-            inv if inv == Self::EpRecv as usize => Ok(Self::EpRecv),
-            _ => Err(kerr!(ErrKind::UnknownInvocation)),
-        }
-    }
-}
+pub use shared::inv_labels::InvLabel;
+pub use shared::syscall_no::SysCallNo;
 
 pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
     let cap_ptr = reg.a0;
@@ -139,7 +82,7 @@ fn handle_invocation(
             let index = index_and_depth >> 32;
             let user_size = user_size_and_num >> 32;
             let num = user_size_and_num as u32;
-            let new_type = CapabilityType::try_from_u8(reg.a6 as u8)?;
+            let new_type = cap_try_from_u8(reg.a6 as u8)?;
             let dest_cnode_cap = root_cnode
                 .lookup_entry_mut(dest_cnode_ptr, dest_depth)?
                 .as_mut()
@@ -294,7 +237,15 @@ fn handle_invocation(
                     page_cap.map(root_page_table, vaddr.into(), flags)
                 }
                 InvLabel::PageUnMap => {
-                    todo!()
+                    let page_table_ptr = reg.a3;
+                    let page_table_depth = reg.a4 as u32;
+                    let root_page_table = root_cnode
+                        .lookup_entry_mut(page_table_ptr, page_table_depth)?
+                        .as_mut()
+                        .ok_or(kerr!(ErrKind::SlotIsEmpty))?
+                        .cap_ref_mut()
+                        .as_capability::<PageTable>()?;
+                    page_cap.unmap(root_page_table)
                 }
                 _ => Err(kerr!(ErrKind::UnknownInvocation)),
             }
@@ -324,6 +275,5 @@ fn handle_invocation(
                 _ => Err(kerr!(ErrKind::UnknownInvocation)),
             }
         }
-        CapabilityType::Anything => unreachable!(""),
     }
 }

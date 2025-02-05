@@ -1,20 +1,21 @@
-use common::println;
-use common::syscall::cnode_copy;
-use common::syscall::cnode_mint;
-use common::syscall::map_page;
-use common::syscall::map_page_table;
-use common::syscall::recv_ipc;
-use common::syscall::recv_signal;
-use common::syscall::resume_tcb;
-use common::syscall::send_ipc;
-use common::syscall::send_signal;
-use common::syscall::set_ipc_buffer;
-use common::syscall::traverse;
-use common::syscall::write_reg;
-use common::syscall::CapabilityType;
-use common::syscall::{configure_tcb, untyped_retype};
-use common::BootInfo;
-use common::Registers;
+use libzoea::println;
+use libzoea::syscall::cnode_copy;
+use libzoea::syscall::cnode_mint;
+use libzoea::syscall::map_page;
+use libzoea::syscall::map_page_table;
+use libzoea::syscall::recv_ipc;
+use libzoea::syscall::recv_signal;
+use libzoea::syscall::resume_tcb;
+use libzoea::syscall::send_ipc;
+use libzoea::syscall::send_signal;
+use libzoea::syscall::set_ipc_buffer;
+use libzoea::syscall::traverse;
+use libzoea::syscall::unmap_page;
+use libzoea::syscall::write_reg;
+use libzoea::syscall::CapabilityType;
+use libzoea::syscall::{configure_tcb, untyped_retype};
+use libzoea::BootInfo;
+use libzoea::Registers;
 
 pub static mut STACK: [usize; 512] = [0; 512];
 const ROOT_CNODE_RADIX: u32 = 18;
@@ -250,6 +251,13 @@ fn children(a0: usize, a1: usize, a2: usize) {
         ROOT_CNODE_RADIX,
         vaddr,
         flags,
+    )
+    .unwrap();
+    unmap_page(
+        page_idx,
+        ROOT_CNODE_RADIX,
+        root_vspace_idx,
+        ROOT_CNODE_RADIX,
     )
     .unwrap();
     println!("child: call recv");

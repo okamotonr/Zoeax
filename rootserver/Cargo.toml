@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "user"
-path = "src/user.rs"
+name = "rootserver"
+path = "src/rootserver.rs"
 
 [dependencies]
-common = { path = "../common"}
+libzoea = { path = "../libzoea"}

@@ -1,9 +1,12 @@
 use crate::{
     address::{KernelVAddress, PhysAddr},
     common::{ErrKind, KernelResult},
-    const_assert, kerr,
+    kerr,
     object::{CNodeEntry, KObject},
 };
+
+pub use shared::cap_type::CapabilityType;
+use shared::const_assert;
 
 use core::mem;
 use core::{marker::PhantomData, num::NonZeroU8};
@@ -76,7 +79,7 @@ impl CapInSlot {
 
 // Or don't have to implement cap trait.
 impl Capability for CapInSlot {
-    const CAP_TYPE: CapabilityType = CapabilityType::Anything;
+    const CAP_TYPE: CapabilityType = unimplemented!();
     type KernelObject = Something;
     fn derive(&self, _src_slot: &CNodeEntry<Something>) -> KernelResult<Self> {
         todo!()
@@ -119,7 +122,7 @@ where
     }
 
     pub fn get_cap_type(&self) -> KernelResult<CapabilityType> {
-        CapabilityType::try_from_u8(self.cap_type.get())
+        cap_try_from_u8(self.cap_type.get())
     }
 
     // TODO: u64 and usize
@@ -164,33 +167,8 @@ where
     }
 }
 
-#[repr(u8)]
-#[derive(Debug, PartialEq, Eq)]
-pub enum CapabilityType {
-    Anything = 11,
-    Untyped = 1,
-    Tcb = 3,
-    EndPoint = 5,
-    CNode = 7,
-    Notification = 9,
-    // Arch
-    PageTable = 2,
-    Page = 4,
-}
-
-impl CapabilityType {
-    pub fn try_from_u8(val: u8) -> KernelResult<Self> {
-        match val {
-            val if val == Self::Untyped as u8 => Ok(Self::Untyped),
-            val if val == Self::Tcb as u8 => Ok(Self::Tcb),
-            val if val == Self::EndPoint as u8 => Ok(Self::EndPoint),
-            val if val == Self::CNode as u8 => Ok(Self::CNode),
-            val if val == Self::Notification as u8 => Ok(Self::Notification),
-            2 => Ok(Self::PageTable),
-            4 => Ok(Self::Page),
-            _ => Err(kerr!(ErrKind::UnknownCapType)),
-        }
-    }
+pub fn cap_try_from_u8(val: u8) -> KernelResult<CapabilityType> {
+    CapabilityType::try_from(val).map_err(|_| kerr!(ErrKind::UnknownCapType))
 }
 
 pub trait Capability

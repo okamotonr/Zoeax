@@ -139,6 +139,7 @@ impl Page {
     pub fn new() -> Self {
         Self
     }
+
     pub fn map(&self, parent: &mut PageTable, vaddr: VirtAddr, flags: usize) -> KernelResult<()> {
         let (level, entry) = parent.walk(vaddr);
         if level != 0 {
@@ -147,6 +148,23 @@ impl Page {
             Err(kerr!(ErrKind::VaddressAlreadyMapped))
         } else {
             entry.write(KernelVAddress::from(self as *const _), flags | PAGE_V);
+            Ok(())
+        }
+    }
+
+    // FIXME: get page table from self,
+    // currently we can unmap another process page accidentally, which has same vaddr as self.
+    // consider using asid pool.
+    pub fn unmap(&mut self, parent: &mut PageTable, vaddr: VirtAddr) -> KernelResult<()> {
+        let (level, entry) = parent.walk(vaddr);
+        if level != 0 {
+            Err(kerr!(ErrKind::PageTableNotMappedYet, level as u16))
+        } else if !entry.is_valid() {
+            Err(kerr!(ErrKind::PageNotMappedYet))
+        } else if KernelVAddress::from(self as *mut Page) != entry.get_address().into() {
+            Err(kerr!(ErrKind::InvalidOperation))
+        } else {
+            entry.clear();
             Ok(())
         }
     }
@@ -160,14 +178,22 @@ impl Pte {
         self.0 & PAGE_V != 0
     }
 
+    pub fn get_address(&self) -> PhysAddr {
+        PhysAddr::from((self.0 << 2) & !0xfff)
+    }
+
     pub fn write<A: Into<PhysAddr>>(&mut self, addr: A, flags: usize) {
         let phys: PhysAddr = addr.into();
         let addr = phys.addr;
         self.0 = ((addr >> 12) << 10) | flags;
     }
 
+    pub fn clear(&mut self) {
+        self.0 = 0
+    }
+
     pub fn as_page_table(&mut self) -> &mut PageTable {
-        let phys_addr = PhysAddr::from((self.0 << 2) & !0xfff);
+        let phys_addr = self.get_address();
         let raw: *mut PageTable = KernelVAddress::from(phys_addr).into();
         unsafe { &mut *raw }
     }
