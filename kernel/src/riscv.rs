@@ -119,3 +119,8 @@ pub fn r_time() -> usize {
 pub fn r_satp() -> usize {
     read_csr!("satp")
 }
+
+#[inline]
+pub fn sfence() {
+    unsafe { asm!("sfence.vma x0, x0") }
+}

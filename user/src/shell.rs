@@ -10,6 +10,7 @@ use common::syscall::send_ipc;
 use common::syscall::send_signal;
 use common::syscall::set_ipc_buffer;
 use common::syscall::traverse;
+use common::syscall::unmap_page;
 use common::syscall::write_reg;
 use common::syscall::CapabilityType;
 use common::syscall::{configure_tcb, untyped_retype};
@@ -250,6 +251,13 @@ fn children(a0: usize, a1: usize, a2: usize) {
         ROOT_CNODE_RADIX,
         vaddr,
         flags,
+    )
+    .unwrap();
+    unmap_page(
+        page_idx,
+        ROOT_CNODE_RADIX,
+        root_vspace_idx,
+        ROOT_CNODE_RADIX,
     )
     .unwrap();
     println!("child: call recv");

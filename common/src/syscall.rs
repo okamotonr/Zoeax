@@ -294,6 +294,21 @@ pub fn map_page(
     }
 }
 
+pub fn unmap_page(cap_ptr: usize, cap_depth: u32, dest_ptr: usize, dest_depth: u32) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::PageUnMap,
+            dest_ptr,
+            dest_depth as usize,
+            0,
+            0,
+            SysCallNo::Call,
+        )
+    }
+}
+
 pub fn map_page_table(
     cap_ptr: usize,
     cap_depth: u32,

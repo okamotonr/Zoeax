@@ -294,7 +294,15 @@ fn handle_invocation(
                     page_cap.map(root_page_table, vaddr.into(), flags)
                 }
                 InvLabel::PageUnMap => {
-                    todo!()
+                    let page_table_ptr = reg.a3;
+                    let page_table_depth = reg.a4 as u32;
+                    let root_page_table = root_cnode
+                        .lookup_entry_mut(page_table_ptr, page_table_depth)?
+                        .as_mut()
+                        .ok_or(kerr!(ErrKind::SlotIsEmpty))?
+                        .cap_ref_mut()
+                        .as_capability::<PageTable>()?;
+                    page_cap.unmap(root_page_table)
                 }
                 _ => Err(kerr!(ErrKind::UnknownInvocation)),
             }

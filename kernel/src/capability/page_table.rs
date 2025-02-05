@@ -4,6 +4,7 @@ use crate::kerr;
 use crate::object::page_table::Page;
 use crate::object::page_table::PageTable;
 use crate::object::KObject;
+use crate::riscv::sfence;
 use crate::{
     address::{KernelVAddress, VirtAddr},
     capability::{Capability, CapabilityData, CapabilityType},
@@ -100,6 +101,21 @@ impl PageCap {
         let page = self.get_page();
         page.map(parent_table, vaddr, flags)?;
         self.set_mapped(vaddr);
+        sfence();
+        // TODO:
+        // sfence_vma_vaddr()
+        Ok(())
+    }
+
+    pub fn unmap(&mut self, root_table: &mut PageTableCap) -> KernelResult<()> {
+        self.is_mapped()
+            .then_some(())
+            .ok_or(kerr!(ErrKind::PageNotMappedYet))?;
+        let vaddr = self.get_mapped_address();
+        let page = self.get_page();
+        let root_table = root_table.get_pagetable();
+        page.unmap(root_table, vaddr)?;
+        self.set_unmapped();
         Ok(())
     }
 
@@ -114,12 +130,21 @@ impl PageCap {
             (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff) as u64
     }
 
+    fn set_unmapped(&mut self) {
+        // clear flag, right and mapped address
+        self.cap_dep_val = 0
+    }
+
     fn is_mapped(&self) -> bool {
         ((self.cap_dep_val >> 48) & 0x1) == 1
     }
 
     pub fn get_address_virtual(&self) -> KernelVAddress {
         self.get_address().into()
+    }
+
+    pub fn get_mapped_address(&self) -> VirtAddr {
+        ((self.cap_dep_val & !(0xffff << 48)) as usize).into()
     }
 }
 

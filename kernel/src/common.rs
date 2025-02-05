@@ -62,8 +62,9 @@ pub enum ErrKind {
     SlotIsEmpty,
     VaddressAlreadyMapped,
     PageTableAlreadyMapped,
-    PageAlreadyMapped,
     PageTableNotMappedYet,
+    PageAlreadyMapped,
+    PageNotMappedYet,
     UnknownInvocation,
     CanNotDerivable,
     InvalidOperation,
@@ -94,6 +95,7 @@ impl TryFrom<usize> for ErrKind {
                 Ok(ErrKind::VaddressAlreadyMapped)
             }
             e_val if e_val == ErrKind::PageAlreadyMapped as usize => Ok(ErrKind::PageAlreadyMapped),
+            e_val if e_val == ErrKind::PageNotMappedYet as usize => Ok(ErrKind::PageNotMappedYet),
             e_val if e_val == ErrKind::PageTableAlreadyMapped as usize => {
                 Ok(ErrKind::PageTableAlreadyMapped)
             }
