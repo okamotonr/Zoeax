@@ -40,20 +40,38 @@ impl Elf64Hdr {
             }
         }
     }
+}
 
-    #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn get_pheader(
-        &self,
-        elf_header_addr: *const usize,
-        idx: u16,
-    ) -> Option<*const Elf64Phdr> {
-        if self.e_phnum <= idx {
+pub struct PHeaders<'a> {
+    header: &'a Elf64Hdr,
+    index: u16,
+}
+
+impl<'a> PHeaders<'a> {
+    pub fn new(header: &'a Elf64Hdr) -> Self {
+        Self { header, index: 0 }
+    }
+}
+
+impl<'a> Iterator for PHeaders<'a> {
+    type Item = (&'a Elf64Phdr, *const u8);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.header.e_phnum <= self.index {
             None
         } else {
-            unsafe {
-                let base_addr = elf_header_addr.byte_add(self.e_phoff) as *const Elf64Phdr;
-                Some(base_addr.add(idx as usize))
-            }
+            let header_addr = self.header as *const Elf64Hdr as *const u8;
+            let ret = unsafe {
+                let phdr = header_addr
+                    .add(self.header.e_phoff)
+                    .cast::<Elf64Phdr>()
+                    .add(self.index as usize)
+                    .as_ref()
+                    .unwrap();
+                let p_start_addr = header_addr.add(phdr.p_offset);
+                (phdr, p_start_addr)
+            };
+            self.index += 1;
+            Some(ret)
         }
     }
 }

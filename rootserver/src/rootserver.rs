@@ -6,6 +6,7 @@ use core::{arch::naked_asm, panic::PanicInfo};
 
 use libzoea::println;
 
+mod elf;
 mod shell;
 
 extern "C" {

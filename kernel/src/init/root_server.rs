@@ -1,4 +1,5 @@
 use super::pm::BumpAllocator;
+use shared::elf::PHeaders;
 use shared::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
 
 use crate::address::KernelVAddress;
@@ -122,12 +123,8 @@ impl<'a> RootServerMemory<'a> {
         let mut cap = PageTableCap::init(vaddr, 0);
         cap.root_map().unwrap();
         cnode_cap.write_slot(cap.replicate(), ROOT_VSPACE_IDX);
-        unsafe {
-            for idx in 0..(*elf_header).e_phnum {
-                let p_header = (*elf_header)
-                    .get_pheader(elf_header.cast::<usize>(), idx)
-                    .unwrap();
-                let p_start_addr = elf_header.cast::<u8>().add((*p_header).p_offset);
+        for (p_header, p_start_addr) in PHeaders::new(unsafe { &*elf_header }) {
+            unsafe {
                 allocate_p_segment(
                     cnode_cap,
                     &mut cap,
@@ -306,17 +303,17 @@ unsafe fn allocate_p_segment(
     cnode_cap: &mut CNodeCap,
     root_table_cap: &mut PageTableCap,
     bootstage_mbr: &mut BootStateManager,
-    p_header: *const Elf64Phdr,
+    p_header: &Elf64Phdr,
     p_start_addr: *const u8,
     max_vaddr: &mut VirtAddr,
 ) {
-    if !((*p_header).p_type == ProgramType::Load) {
+    if !((p_header.p_type) == ProgramType::Load) {
         return;
     }
-    let flags = get_flags((*p_header).p_flags) | PAGE_U;
-    let vaddr = VirtAddr::new((*p_header).p_vaddr);
-    let page_num = (align_up((*p_header).p_memsz, PAGE_SIZE)) / PAGE_SIZE;
-    let mut file_sz_rem = (*p_header).p_filesz;
+    let flags = get_flags(p_header.p_flags) | PAGE_U;
+    let vaddr = VirtAddr::new(p_header.p_vaddr);
+    let page_num = (align_up(p_header.p_memsz, PAGE_SIZE)) / PAGE_SIZE;
+    let mut file_sz_rem = p_header.p_filesz;
     for page_idx in 0..page_num {
         let vaddr_n = vaddr.add(PAGE_SIZE * page_idx);
         if *max_vaddr < vaddr_n {

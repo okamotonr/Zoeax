@@ -1,22 +1,11 @@
 use core::{error::Error, fmt};
+pub use shared::align_down;
+pub use shared::align_up;
 pub use shared::err_kind::ErrKind;
+pub use shared::is_aligned;
 pub use shared::types::BootInfo;
 pub use shared::types::IPCBuffer;
 pub use shared::types::UntypedInfo;
-
-pub fn is_aligned(value: usize, align: usize) -> bool {
-    value % align == 0
-}
-
-/// align should be power of 2.
-pub fn align_up(value: usize, align: usize) -> usize {
-    (value + align - 1) & !(align - 1)
-}
-
-/// align should be power of 2.
-pub fn align_down(value: usize, align: usize) -> usize {
-    (value) & !(align - 1)
-}
 
 pub type KernelResult<T> = Result<T, KernelError>;
 

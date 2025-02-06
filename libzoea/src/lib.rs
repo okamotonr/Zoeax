@@ -3,14 +3,15 @@
 use core::fmt;
 
 use syscall::put_char;
+pub mod shared;
 
-pub use shared::err_kind::ErrKind;
-pub use shared::inv_labels::InvLabel;
-pub use shared::registers::Registers;
-pub use shared::syscall_no::SysCallNo;
-pub use shared::types::BootInfo;
-pub use shared::types::IPCBuffer;
-pub use shared::types::UntypedInfo;
+pub use crate::shared::err_kind::ErrKind;
+pub use crate::shared::inv_labels::InvLabel;
+pub use crate::shared::registers::Registers;
+pub use crate::shared::syscall_no::SysCallNo;
+pub use crate::shared::types::BootInfo;
+pub use crate::shared::types::IPCBuffer;
+pub use crate::shared::types::UntypedInfo;
 pub mod syscall;
 //pub mod syszoea;
 
