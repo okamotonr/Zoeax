@@ -35,21 +35,21 @@ impl TCBCap {
     }
 
     pub fn set_cspace(&mut self, src: &mut CNodeEntry<CNode>) -> KernelResult<()> {
-        let cspace_src = src.cap();
-        let cspace_new = cspace_src.derive(src.up_cast_ref())?;
+        let cspace_src = src.cap_ref();
+        let cspace_new = cspace_src.derive(src.as_ref())?;
         self.get_tcb().set_root_cspace(cspace_new, src);
         Ok(())
     }
 
     pub fn set_vspace(&mut self, src: &mut CNodeEntry<PageTable>) -> KernelResult<()> {
-        let vspace = src.cap();
-        let vspace_new = vspace.derive(src.up_cast_ref())?;
+        let vspace = src.cap_ref();
+        let vspace_new = vspace.derive(src.as_ref())?;
         self.get_tcb().set_root_vspace(vspace_new, src);
         Ok(())
     }
     pub fn set_ipc_buffer(&mut self, src: &mut CNodeEntry<Page>) -> KernelResult<()> {
-        let page_cap = src.cap();
-        let page_cap_new = page_cap.derive(src.up_cast_ref())?;
+        let page_cap = src.cap_ref();
+        let page_cap_new = page_cap.derive(src.as_ref())?;
         self.get_tcb().set_ipc_buffer(page_cap_new, src);
         Ok(())
     }

@@ -32,6 +32,28 @@ pub struct CapabilityData<K: KObject> {
     _obj_type: PhantomData<K>,
 }
 
+impl<K: KObject> CapabilityData<K> {
+    pub fn get_cap_type(&self) -> KernelResult<CapabilityType> {
+        cap_try_from_u8(self.cap_type.get())
+    }
+
+    pub fn replicate(&self) -> Self {
+        Self {
+            cap_type: self.cap_type,
+            cap_right: self.cap_right,
+            address_top: self.address_top,
+            address_bottom: self.address_bottom,
+            cap_dep_val: self.cap_dep_val,
+            _obj_type: self._obj_type,
+        }
+    }
+
+    // TODO: u64 and usize
+    pub fn set_cap_dep_val(&mut self, val: usize) {
+        self.cap_dep_val = val as u64;
+    }
+}
+
 /*
  * RawCapability[1]
  * | cap_type | cap_right | padding | address or none |
@@ -46,7 +68,7 @@ impl KObject for Something {}
 pub type CapInSlot = CapabilityData<Something>;
 
 impl CapInSlot {
-    pub fn as_capability<NK>(&mut self) -> KernelResult<&mut CapabilityData<NK>>
+    pub fn try_as_ref_mut<NK>(&mut self) -> KernelResult<&mut CapabilityData<NK>>
     where
         NK: KObject,
         CapabilityData<NK>: Capability,
@@ -61,7 +83,7 @@ impl CapInSlot {
         }
     }
 
-    pub fn as_capability_ref<NK>(&self) -> KernelResult<&CapabilityData<NK>>
+    pub fn try_as_ref<NK>(&self) -> KernelResult<&CapabilityData<NK>>
     where
         NK: KObject,
         CapabilityData<NK>: Capability,
@@ -77,24 +99,20 @@ impl CapInSlot {
     }
 }
 
-// Or don't have to implement cap trait.
-impl Capability for CapInSlot {
-    const CAP_TYPE: CapabilityType = unimplemented!();
-    type KernelObject = Something;
-    fn derive(&self, _src_slot: &CNodeEntry<Something>) -> KernelResult<Self> {
-        todo!()
-    }
-    fn init_object(&mut self) {
-        todo!()
-    }
-    fn get_object_size(_user_size: usize) -> usize {
-        todo!()
-    }
-    fn create_cap_dep_val(_addr: KernelVAddress, _user_size: usize) -> usize {
-        todo!()
-    }
-    fn can_be_retyped_from_device_memory() -> bool {
-        todo!()
+impl<K> From<CapabilityData<K>> for CapInSlot
+where
+    K: KObject,
+    CapabilityData<K>: Capability,
+{
+    fn from(value: CapabilityData<K>) -> Self {
+        Self {
+            cap_type: value.cap_type,
+            cap_dep_val: value.cap_dep_val,
+            cap_right: value.cap_right,
+            address_bottom: value.address_bottom,
+            address_top: value.address_top,
+            _obj_type: PhantomData,
+        }
     }
 }
 
@@ -121,15 +139,6 @@ where
         ret
     }
 
-    pub fn get_cap_type(&self) -> KernelResult<CapabilityType> {
-        cap_try_from_u8(self.cap_type.get())
-    }
-
-    // TODO: u64 and usize
-    pub fn set_cap_dep_val(&mut self, val: usize) {
-        self.cap_dep_val = val as u64;
-    }
-
     pub fn get_address(&self) -> PhysAddr {
         // TODO: u64 and usize
         let addr = (((self.address_top as u64) << 32) | self.address_bottom as u64) as usize;
@@ -142,28 +151,6 @@ where
         let address_bottom = (address & u32::MAX as usize) as u32;
         self.address_top = address_top;
         self.address_bottom = address_bottom
-    }
-
-    pub fn replicate(&self) -> Self {
-        Self {
-            cap_type: self.cap_type,
-            cap_right: self.cap_right,
-            address_top: self.address_top,
-            address_bottom: self.address_bottom,
-            cap_dep_val: self.cap_dep_val,
-            _obj_type: self._obj_type,
-        }
-    }
-
-    pub fn up_cast(self) -> CapInSlot {
-        CapInSlot {
-            cap_type: self.cap_type,
-            cap_dep_val: self.cap_dep_val,
-            cap_right: self.cap_right,
-            address_bottom: self.address_bottom,
-            address_top: self.address_top,
-            _obj_type: PhantomData,
-        }
     }
 }
 

@@ -145,8 +145,7 @@ impl UntypedCap {
         let cap_gen = self.retype::<K>(user_size, num)?;
         for (i, mut cap) in cap_gen.enumerate() {
             cap.init_object();
-            let cap_in_slot = cap.up_cast();
-            dest_cnode.insert_cap(src_slot, cap_in_slot, i);
+            dest_cnode.insert_cap(src_slot, cap, i);
         }
         Ok(())
     }

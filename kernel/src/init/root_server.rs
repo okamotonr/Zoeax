@@ -9,9 +9,8 @@ use crate::capability::page_table::PageCap;
 use crate::capability::page_table::PageTableCap;
 use crate::capability::tcb::TCBCap;
 use crate::capability::untyped::UntypedCap;
+use crate::capability::CapInSlot;
 use crate::capability::Capability;
-use crate::capability::CapabilityData;
-use crate::capability::Something;
 use crate::common::{align_up, BootInfo, ErrKind, UntypedInfo};
 use crate::object::page_table::{Page, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use crate::object::CNodeEntry;
@@ -42,18 +41,18 @@ extern "C" {
 
 impl CNode {
     // todo: broken
-    fn write_slot(&mut self, cap: CapabilityData<Something>, index: usize) {
+    fn write_slot<C: Into<CapInSlot>>(&mut self, cap: C, index: usize) {
         let root = (self as *mut Self).cast::<CSlot>();
-        let entry = CNodeEntry::new_with_rawcap(cap);
+        let entry = CNodeEntry::new_with_rawcap(cap.into());
         assert!(unsafe { (*root.add(index)).is_none() });
         unsafe { *root.add(index) = Some(entry) }
     }
 }
 
 impl CNodeCap {
-    fn write_slot(&mut self, cap: CapabilityData<Something>, index: usize) {
+    fn write_slot<C: Into<CapInSlot>>(&mut self, cap: C, index: usize) {
         let cnode = self.get_cnode();
-        let entry = CNodeEntry::new_with_rawcap(cap);
+        let entry = CNodeEntry::new_with_rawcap(cap.into());
         assert!(cnode[index].is_none());
         cnode[index] = Some(entry);
     }
@@ -104,8 +103,7 @@ impl<'a> RootServerMemory<'a> {
         let cap_dep_val = CNodeCap::create_cap_dep_val(vaddr, ROOT_CNODE_ENTRY_NUM_BITS);
         let cap_type = CNodeCap::CAP_TYPE;
         let cap = CNodeCap::new(cap_type, vaddr.into(), cap_dep_val as u64);
-        let cap_in_slot = cap.replicate().up_cast();
-        cnode.write_slot(cap_in_slot, ROOT_CNODE_IDX);
+        cnode.write_slot(cap.replicate(), ROOT_CNODE_IDX);
         cap
     }
 
@@ -123,7 +121,7 @@ impl<'a> RootServerMemory<'a> {
         let vaddr = (root_page_table as *const PageTable).into();
         let mut cap = PageTableCap::init(vaddr, 0);
         cap.root_map().unwrap();
-        cnode_cap.write_slot(cap.replicate().up_cast(), ROOT_VSPACE_IDX);
+        cnode_cap.write_slot(cap.replicate(), ROOT_VSPACE_IDX);
         unsafe {
             for idx in 0..(*elf_header).e_phnum {
                 let p_header = (*elf_header)
@@ -162,7 +160,7 @@ impl<'a> RootServerMemory<'a> {
             max_vaddr.add(PAGE_SIZE),
             flags,
         );
-        cnode_cap.write_slot(page_cap.up_cast(), ROOT_IPC_BUFFER);
+        cnode_cap.write_slot(page_cap, ROOT_IPC_BUFFER);
         page_cap
     }
 
@@ -184,7 +182,7 @@ impl<'a> RootServerMemory<'a> {
             max_vaddr.add(PAGE_SIZE),
             flags,
         );
-        cnode_cap.write_slot(page_cap.up_cast(), ROOT_BOOT_INFO_PAGE);
+        cnode_cap.write_slot(page_cap, ROOT_BOOT_INFO_PAGE);
         (page_cap, vaddr)
     }
 
@@ -232,7 +230,7 @@ impl<'a> RootServerMemory<'a> {
         tcb.ipc_buffer = Some(new_entry);
 
         let cap = TCBCap::init((tcb as *const ThreadControlBlock).into(), 0);
-        cnode_cap.write_slot(cap.replicate().up_cast(), ROOT_TCB_IDX);
+        cnode_cap.write_slot(cap.replicate(), ROOT_TCB_IDX);
         cap
     }
 }
@@ -333,7 +331,7 @@ unsafe fn allocate_p_segment(
             vaddr_n,
             flags,
         );
-        cnode_cap.write_slot(page_cap.up_cast(), bootstage_mbr.alloc_cnode_idx());
+        cnode_cap.write_slot(page_cap, bootstage_mbr.alloc_cnode_idx());
         if file_sz_rem != 0 {
             let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
             let copy_dst = page_cap.get_address_virtual().addr as *mut u8;
@@ -378,10 +376,7 @@ fn map_page_tables(
 ) {
     loop {
         let mut page_table_cap = PageTableCap::init(bootstage_mbr.alloc_page(), 0);
-        cnode_cap.write_slot(
-            page_table_cap.replicate().up_cast(),
-            bootstage_mbr.alloc_cnode_idx(),
-        );
+        cnode_cap.write_slot(page_table_cap.replicate(), bootstage_mbr.alloc_cnode_idx());
         if let Ok(level) = page_table_cap.map(root_table_cap, vaddr_n) {
             if level == 0 {
                 break;
@@ -455,7 +450,7 @@ fn create_initial_thread(
     let mut num = 0;
     for (idx, (untyped_cap_idx, untyped_cap)) in bootstage_mbr.finalize().enumerate() {
         assert!(num < 32);
-        root_cnode_cap.write_slot(untyped_cap.replicate().up_cast(), untyped_cap_idx);
+        root_cnode_cap.write_slot(untyped_cap.replicate(), untyped_cap_idx);
         boot_info.untyped_infos[idx] = UntypedInfo {
             bits: untyped_cap.block_size(),
             idx: untyped_cap_idx,

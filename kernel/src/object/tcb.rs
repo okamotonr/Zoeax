@@ -89,7 +89,7 @@ impl ThreadInfo {
 
     pub fn ipc_buffer_ref(&self) -> Option<&mut IPCBuffer> {
         self.ipc_buffer.as_ref().map(|page_cap_e| {
-            let page_cap = page_cap_e.cap();
+            let page_cap = page_cap_e.cap_ref();
             let address: *mut IPCBuffer = KernelVAddress::from(page_cap.get_address()).into();
             unsafe { &mut *{ address } }
         })
@@ -132,7 +132,7 @@ impl ThreadInfo {
         // TODO: you should consider when already set.
         assert!(self.root_cnode.is_none(), "{:?}", self.root_cnode);
         let mut new_entry = CNodeEntry::new_with_rawcap(cspace_cap);
-        new_entry.insert(parent.up_cast_ref_mut());
+        new_entry.insert(parent.as_mut());
         self.root_cnode = Some(new_entry)
     }
 
@@ -144,7 +144,7 @@ impl ThreadInfo {
         // TODO: you should consider when already set.
         assert!(self.vspace.is_none(), "{:?}", self.vspace);
         let mut new_entry = CNodeEntry::new_with_rawcap(vspace_cap);
-        new_entry.insert(parent.up_cast_ref_mut());
+        new_entry.insert(parent.as_mut());
         self.vspace = Some(new_entry)
     }
 
@@ -153,7 +153,7 @@ impl ThreadInfo {
         // TODO: you should consider when already set.
         assert!(self.ipc_buffer.is_none());
         let mut new_entry = CNodeEntry::new_with_rawcap(page_cap);
-        new_entry.insert(parent.up_cast_ref_mut());
+        new_entry.insert(parent);
         self.ipc_buffer = Some(new_entry)
     }
 }

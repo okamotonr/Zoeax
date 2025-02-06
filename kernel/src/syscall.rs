@@ -27,7 +27,7 @@ pub fn handle_syscall(syscall_n: usize, reg: &mut Registers) {
                     Ok(())
                 }
                 InvLabel::CNodeTraverse => {
-                    let root_cnode = get_current_tcb_mut().root_cnode.as_ref().unwrap().cap();
+                    let root_cnode = get_current_tcb_mut().root_cnode.as_ref().unwrap().cap_ref();
                     root_cnode.print_traverse();
                     Ok(())
                 }
@@ -63,7 +63,12 @@ fn handle_invocation(
 ) -> KernelResult<()> {
     let current_tcb = get_current_tcb_mut();
     let ipc_buffer = current_tcb.ipc_buffer_ref();
-    let mut root_cnode = current_tcb.root_cnode.as_ref().unwrap().cap().replicate();
+    let mut root_cnode = current_tcb
+        .root_cnode
+        .as_ref()
+        .unwrap()
+        .cap_ref()
+        .replicate();
     // Hack
     let mut root_cnode_2 = root_cnode.replicate();
 
@@ -90,8 +95,8 @@ fn handle_invocation(
                 .as_capability::<CNode>()?
                 .cap_ref_mut();
             let dest_cnode = dest_cnode_cap.get_writable(num, index as u32)?;
-            let (src_cap, src_mdb) = slot.cap_and_mdb();
-            src_cap.as_capability::<Untyped>()?.invoke_retype(
+            let (src_cap, src_mdb) = slot.cap_and_mdb_ref_mut();
+            src_cap.try_as_ref_mut::<Untyped>()?.invoke_retype(
                 src_mdb,
                 dest_cnode,
                 user_size,
@@ -105,7 +110,7 @@ fn handle_invocation(
             let dest_depth = reg.a4 as u32;
             let dest_index = reg.a5;
 
-            let dest_root = slot.cap_ref_mut().as_capability::<CNode>()?;
+            let dest_root = slot.cap_ref_mut().try_as_ref_mut::<CNode>()?;
             let src_slot = root_cnode.lookup_entry_mut(src_index, src_depth)?;
             let src_entry = src_slot.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
             let dest_slot = dest_root.lookup_entry_mut(dest_index, dest_depth)?;
@@ -113,7 +118,7 @@ fn handle_invocation(
                 Err(kerr!(ErrKind::NotEmptySlot))
             } else {
                 // TODO: Whether this cap is derivable
-                let raw_cap = src_entry.cap().replicate();
+                let raw_cap = src_entry.cap_ref().replicate();
                 let mut cap = raw_cap;
                 if inv_label == InvLabel::CNodeMint {
                     let cap_val = reg.a6;
@@ -131,7 +136,7 @@ fn handle_invocation(
             }
         }
         CapabilityType::Tcb => {
-            let tcb_cap = slot.cap_ref_mut().as_capability::<ThreadControlBlock>()?;
+            let tcb_cap = slot.cap_ref_mut().try_as_ref_mut::<ThreadControlBlock>()?;
             match inv_label {
                 InvLabel::TcbConfigure => {
                     let cnode_ptr = reg.a3;
@@ -182,7 +187,7 @@ fn handle_invocation(
             // replicate is enough because send or wait operation will never change cap data.
             let mut notify_cap = slot
                 .cap_ref_mut()
-                .as_capability::<Notification>()?
+                .try_as_ref_mut::<Notification>()?
                 .replicate();
             match inv_label {
                 InvLabel::NotifySend => {
@@ -200,7 +205,7 @@ fn handle_invocation(
         }
         CapabilityType::EndPoint => {
             // replicate is enough because send or recv operation will never change cap data.
-            let mut ep_cap = slot.cap_ref_mut().as_capability::<Endpoint>()?.replicate();
+            let mut ep_cap = slot.cap_ref_mut().try_as_ref_mut::<Endpoint>()?.replicate();
             match inv_label {
                 InvLabel::EpSend => {
                     if ep_cap.send(current_tcb) {
@@ -218,7 +223,7 @@ fn handle_invocation(
             }
         }
         CapabilityType::Page => {
-            let page_cap = slot.cap_ref_mut().as_capability::<Page>()?;
+            let page_cap = slot.cap_ref_mut().try_as_ref_mut::<Page>()?;
             match inv_label {
                 InvLabel::PageMap => {
                     let page_table_ptr = reg.a3;
@@ -232,7 +237,7 @@ fn handle_invocation(
                         .as_mut()
                         .ok_or(kerr!(ErrKind::SlotIsEmpty))?
                         .cap_ref_mut()
-                        .as_capability::<PageTable>()?;
+                        .try_as_ref_mut::<PageTable>()?;
                     let flags = PAGE_U | reg.a6;
                     page_cap.map(root_page_table, vaddr.into(), flags)
                 }
@@ -244,14 +249,14 @@ fn handle_invocation(
                         .as_mut()
                         .ok_or(kerr!(ErrKind::SlotIsEmpty))?
                         .cap_ref_mut()
-                        .as_capability::<PageTable>()?;
+                        .try_as_ref_mut::<PageTable>()?;
                     page_cap.unmap(root_page_table)
                 }
                 _ => Err(kerr!(ErrKind::UnknownInvocation)),
             }
         }
         CapabilityType::PageTable => {
-            let page_table_cap = slot.cap_ref_mut().as_capability::<PageTable>()?;
+            let page_table_cap = slot.cap_ref_mut().try_as_ref_mut::<PageTable>()?;
             match inv_label {
                 InvLabel::PageTableMap => {
                     let page_table_ptr = reg.a3;
@@ -265,7 +270,7 @@ fn handle_invocation(
                         .as_mut()
                         .ok_or(kerr!(ErrKind::SlotIsEmpty))?
                         .cap_ref_mut()
-                        .as_capability::<PageTable>()?;
+                        .try_as_ref_mut::<PageTable>()?;
                     page_table_cap.map(root_page_table, vaddr.into())?;
                     Ok(())
                 }
