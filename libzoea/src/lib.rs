@@ -13,7 +13,7 @@ pub use crate::shared::types::BootInfo;
 pub use crate::shared::types::IPCBuffer;
 pub use crate::shared::types::UntypedInfo;
 pub mod syscall;
-//pub mod syszoea;
+pub mod caps;
 
 #[macro_export]
 macro_rules! print {

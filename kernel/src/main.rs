@@ -8,7 +8,7 @@ use core::arch::global_asm;
 use kernel::init_kernel;
 use kernel::println;
 use kernel::return_to_user;
-use shared::elf::Elf64Hdr;
+use shared::elf::def::Elf64Hdr;
 
 extern "C" {
     static mut __bss: u8;

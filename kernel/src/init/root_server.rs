@@ -1,6 +1,6 @@
 use super::pm::BumpAllocator;
-use shared::elf::PHeaders;
-use shared::elf::{Elf64Hdr, Elf64Phdr, ProgramFlags, ProgramType};
+use shared::elf::def::{Elf64Hdr, ProgramFlags};
+use shared::elf::ProgramMapper;
 
 use crate::address::KernelVAddress;
 use crate::address::VirtAddr;
@@ -12,37 +12,31 @@ use crate::capability::tcb::TCBCap;
 use crate::capability::untyped::UntypedCap;
 use crate::capability::CapInSlot;
 use crate::capability::Capability;
-use crate::common::{align_up, BootInfo, ErrKind, UntypedInfo};
+use crate::common::{align_up, ErrKind};
 use crate::object::page_table::{Page, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use crate::object::CNodeEntry;
 use crate::object::PageTable;
 use crate::object::ThreadControlBlock;
 use crate::object::ThreadInfo;
-use crate::object::{CNode, CSlot, Register};
-use crate::println;
+use crate::object::{CNode, CSlot};
 
 use crate::riscv::SSTATUS_SPIE;
-use crate::scheduler::create_idle_thread;
-use crate::scheduler::require_schedule;
-use crate::scheduler::schedule;
+use crate::KernelError;
 use core::cmp::min;
 use core::mem::MaybeUninit;
 use core::ptr;
 
-const ROOT_CNODE_ENTRY_NUM_BITS: usize = 18; // 2^18
-const ROOT_TCB_IDX: usize = 1;
-const ROOT_CNODE_IDX: usize = 2;
-const ROOT_VSPACE_IDX: usize = 3;
-const ROOT_IPC_BUFFER: usize = 4;
-const ROOT_BOOT_INFO_PAGE: usize = 5;
+pub const ROOT_TCB_IDX: usize = 1;
+pub const ROOT_CNODE_IDX: usize = 2;
+pub const ROOT_VSPACE_IDX: usize = 3;
+pub const ROOT_IPC_BUFFER: usize = 4;
+pub const ROOT_BOOT_INFO_PAGE: usize = 5;
+pub const ROOT_CNODE_ENTRY_NUM_BITS: usize = 18; // 2^18
 
-extern "C" {
-    static __stack_top: u8;
-}
 
 impl CNode {
     // todo: broken
-    fn write_slot<C: Into<CapInSlot>>(&mut self, cap: C, index: usize) {
+    pub(in crate::init) fn write_slot<C: Into<CapInSlot>>(&mut self, cap: C, index: usize) {
         let root = (self as *mut Self).cast::<CSlot>();
         let entry = CNodeEntry::new_with_rawcap(cap.into());
         assert!(unsafe { (*root.add(index)).is_none() });
@@ -51,7 +45,7 @@ impl CNode {
 }
 
 impl CNodeCap {
-    fn write_slot<C: Into<CapInSlot>>(&mut self, cap: C, index: usize) {
+    pub fn write_slot<C: Into<CapInSlot>>(&mut self, cap: C, index: usize) {
         let cnode = self.get_cnode();
         let entry = CNodeEntry::new_with_rawcap(cap.into());
         assert!(cnode[index].is_none());
@@ -59,7 +53,7 @@ impl CNodeCap {
     }
 }
 
-struct RootServerMemory<'a> {
+pub(in crate::init) struct RootServerMemory<'a> {
     cnode: &'a mut MaybeUninit<CNode>,
     vspace: &'a mut MaybeUninit<PageTable>,
     tcb: &'a mut MaybeUninit<ThreadControlBlock>,
@@ -83,7 +77,7 @@ impl<'a> RootServerMemory<'a> {
         unsafe { cnode_ptr.as_uninit_mut().unwrap() }
     }
 
-    fn init_with_uninit(bump_allocator: &mut BumpAllocator) -> Self {
+    pub fn init_with_uninit(bump_allocator: &mut BumpAllocator) -> Self {
         let cnode = Self::alloc_obj::<CNodeCap>(bump_allocator, ROOT_CNODE_ENTRY_NUM_BITS);
         let vspace = Self::alloc_obj::<PageTableCap>(bump_allocator, 0);
         let tcb = Self::alloc_obj::<TCBCap>(bump_allocator, 0);
@@ -98,7 +92,7 @@ impl<'a> RootServerMemory<'a> {
         }
     }
 
-    fn create_root_cnode(&mut self) -> CNodeCap {
+    pub fn create_root_cnode(&mut self) -> CNodeCap {
         let cnode = self.cnode.write(CNode::new());
         let vaddr = (cnode as *const CNode).into();
         let cap_dep_val = CNodeCap::create_cap_dep_val(vaddr, ROOT_CNODE_ENTRY_NUM_BITS);
@@ -109,42 +103,34 @@ impl<'a> RootServerMemory<'a> {
     }
 
     /// create address space of initial server.
-    fn create_address_space(
+    pub fn create_address_space(
         &mut self,
         cnode_cap: &mut CNodeCap,
         elf_header: *const Elf64Hdr,
-        bootstage_mbr: &mut BootStateManager,
+        root_rsc_mgr: &mut RootServerResourceManager,
     ) -> (PageTableCap, VirtAddr) {
         let root_page_table = self.vspace.write(PageTable::new());
 
-        let mut max_vaddr = VirtAddr::new(0);
         root_page_table.copy_global_mapping();
         let vaddr = (root_page_table as *const PageTable).into();
         let mut cap = PageTableCap::init(vaddr, 0);
         cap.root_map().unwrap();
         cnode_cap.write_slot(cap.replicate(), ROOT_VSPACE_IDX);
-        for (p_header, p_start_addr) in PHeaders::new(unsafe { &*elf_header }) {
-            unsafe {
-                allocate_p_segment(
-                    cnode_cap,
-                    &mut cap,
-                    bootstage_mbr,
-                    p_header,
-                    p_start_addr,
-                    &mut max_vaddr,
-                )
-            }
+        let mut mapper = RootServerElfMapper::new(root_rsc_mgr, &mut cap, cnode_cap);
+        unsafe {
+            (*elf_header).map_self(&mut mapper).unwrap();
         }
+        let max_vaddr = mapper.max_vaddr_of_elf();
         (cap, max_vaddr)
     }
 
     /// create ipc buffer frame
-    fn create_ipc_buf_frame(
+    pub fn create_ipc_buf_frame(
         &mut self,
         cnode_cap: &mut CNodeCap,
         vspace_cap: &mut PageTableCap,
         max_vaddr: VirtAddr,
-        bootstage_mbr: &mut BootStateManager,
+        bootstage_mbr: &mut RootServerResourceManager,
     ) -> PageCap {
         let ipc_buf_frame = self.ipc_buf.write(Page::new());
         let vaddr = (ipc_buf_frame as *const Page).into();
@@ -161,12 +147,12 @@ impl<'a> RootServerMemory<'a> {
         page_cap
     }
 
-    fn create_boot_info_frame(
+    pub fn create_boot_info_frame(
         &mut self,
         cnode_cap: &mut CNodeCap,
         vspace_cap: &mut PageTableCap,
         max_vaddr: VirtAddr,
-        bootstage_mbr: &mut BootStateManager,
+        bootstage_mbr: &mut RootServerResourceManager,
     ) -> (PageCap, KernelVAddress) {
         let boot_page = self.boot_frame.write(Page::new());
         let vaddr = (boot_page as *const Page).into();
@@ -183,7 +169,7 @@ impl<'a> RootServerMemory<'a> {
         (page_cap, vaddr)
     }
 
-    fn create_root_tcb(
+    pub fn create_root_tcb(
         &mut self,
         cnode_cap: &mut CNodeCap,
         vspace_cap: &mut PageTableCap,
@@ -232,13 +218,13 @@ impl<'a> RootServerMemory<'a> {
     }
 }
 
-struct BootStateManager {
+pub(in crate::init) struct RootServerResourceManager {
     bump_allocator: BumpAllocator,
     cnode_satrt_idx: usize,
     cnode_idx_max: usize,
 }
 
-impl BootStateManager {
+impl RootServerResourceManager {
     pub fn new(
         bump_allocator: BumpAllocator,
         cnode_start_idx: usize,
@@ -274,7 +260,7 @@ impl BootStateManager {
     }
 }
 
-struct UntypedCapGenerator {
+pub(in crate::init) struct UntypedCapGenerator {
     start_address: KernelVAddress,
     end_address: KernelVAddress,
     idx_start: usize,
@@ -299,50 +285,76 @@ impl Iterator for UntypedCapGenerator {
     }
 }
 
-unsafe fn allocate_p_segment(
-    cnode_cap: &mut CNodeCap,
-    root_table_cap: &mut PageTableCap,
-    bootstage_mbr: &mut BootStateManager,
-    p_header: &Elf64Phdr,
-    p_start_addr: *const u8,
-    max_vaddr: &mut VirtAddr,
-) {
-    if !((p_header.p_type) == ProgramType::Load) {
-        return;
-    }
-    let flags = get_flags(p_header.p_flags) | PAGE_U;
-    let vaddr = VirtAddr::new(p_header.p_vaddr);
-    let page_num = (align_up(p_header.p_memsz, PAGE_SIZE)) / PAGE_SIZE;
-    let mut file_sz_rem = p_header.p_filesz;
-    for page_idx in 0..page_num {
-        let vaddr_n = vaddr.add(PAGE_SIZE * page_idx);
-        if *max_vaddr < vaddr_n {
-            *max_vaddr = vaddr_n;
-        }
-        let page_addr = bootstage_mbr.alloc_page();
-        let page_cap = create_mapped_page_cap(
-            cnode_cap,
+pub struct RootServerElfMapper<'a> {
+    max_vaddr: VirtAddr,
+    root_rsc_mgr: &'a mut RootServerResourceManager,
+    root_table_cap: &'a mut PageTableCap,
+    cnode_cap: &'a mut CNodeCap
+}
+
+impl<'a> RootServerElfMapper<'a> {
+    pub fn new(root_rsc_mgr: &'a mut RootServerResourceManager, root_table_cap: &'a mut PageTableCap, cnode_cap: &'a mut CNodeCap) -> Self {
+        Self {
+            max_vaddr: 0.into(),
+            root_rsc_mgr,
             root_table_cap,
-            bootstage_mbr,
-            page_addr,
-            vaddr_n,
-            flags,
-        );
-        cnode_cap.write_slot(page_cap, bootstage_mbr.alloc_cnode_idx());
-        if file_sz_rem != 0 {
-            let copy_src = p_start_addr.add(PAGE_SIZE * page_idx);
-            let copy_dst = page_cap.get_address_virtual().addr as *mut u8;
-            let copy_size = min(PAGE_SIZE, file_sz_rem);
-            file_sz_rem = file_sz_rem.saturating_sub(PAGE_SIZE);
-            ptr::copy::<u8>(copy_src, copy_dst, copy_size);
+            cnode_cap
         }
+    }
+
+    pub fn max_vaddr_of_elf(self) -> VirtAddr {
+        self.max_vaddr
+    }
+}
+
+impl ProgramMapper for RootServerElfMapper<'_> {
+    type Flag = usize;
+    type Error = KernelError;
+
+    fn get_flags(flag: u32) -> Self::Flag {
+        get_flags(flag) | PAGE_U
+    }
+
+    fn map_program(
+            &mut self,
+            vaddr: usize,
+            p_start_addr: *const u8,
+            p_mem_size: usize,
+            p_file_size: usize,
+            flags: Self::Flag,
+        ) -> Result<(), Self::Error> {
+        
+        let page_num = (align_up(p_mem_size, PAGE_SIZE)) / PAGE_SIZE;
+        let mut file_sz_rem = p_file_size;
+        let vaddr = VirtAddr::new(vaddr);
+        for page_idx in 0..page_num {
+            let offset = PAGE_SIZE * page_idx;
+            let vaddr_n = vaddr.add(offset);
+            if self.max_vaddr < vaddr_n {
+                self.max_vaddr = vaddr_n;
+            }
+            let page_addr = self.root_rsc_mgr.alloc_page();
+            let page_cap = create_mapped_page_cap(
+                self.cnode_cap, self.root_table_cap, self.root_rsc_mgr, page_addr, vaddr_n, flags);
+            self.cnode_cap.write_slot(page_cap, self.root_rsc_mgr.alloc_cnode_idx());
+            if file_sz_rem != 0 {
+                let copy_dst = page_cap.get_address_virtual().into();
+                let copy_size = min(PAGE_SIZE, file_sz_rem);
+                unsafe {
+                    let copy_src = p_start_addr.add(offset);
+                    ptr::copy::<u8>(copy_src, copy_dst, copy_size);
+                }
+                file_sz_rem = file_sz_rem.saturating_sub(PAGE_SIZE);
+            }
+        }
+        Ok(())
     }
 }
 
 fn create_mapped_page_cap(
     cnode_cap: &mut CNodeCap,
     root_table_cap: &mut PageTableCap,
-    bootstage_mbr: &mut BootStateManager,
+    bootstage_mbr: &mut RootServerResourceManager,
     paddr: KernelVAddress,
     vaddr_n: VirtAddr,
     flags: usize,
@@ -367,7 +379,7 @@ fn create_mapped_page_cap(
 
 fn map_page_tables(
     cnode_cap: &mut CNodeCap,
-    bootstage_mbr: &mut BootStateManager,
+    bootstage_mbr: &mut RootServerResourceManager,
     root_table_cap: &mut PageTableCap,
     vaddr_n: VirtAddr,
 ) {
@@ -401,85 +413,3 @@ fn get_flags(flags: u32) -> usize {
     })
 }
 
-fn create_initial_thread(
-    root_server_mem: &mut RootServerMemory,
-    mut bootstage_mbr: BootStateManager,
-    elf_header: *const Elf64Hdr,
-) {
-    // 8, call return_to_user(after returning user, to clear stack)
-    // 1, create root cnode and insert self cap into self(root cnode)
-    let mut root_cnode_cap = root_server_mem.create_root_cnode();
-    // 2, create vm space for root server,
-    let (mut vspace_cap, max_vaddr) =
-        root_server_mem.create_address_space(&mut root_cnode_cap, elf_header, &mut bootstage_mbr);
-    // 3, create ipc buffer frame
-    let mut ipc_page_cap = root_server_mem.create_ipc_buf_frame(
-        &mut root_cnode_cap,
-        &mut vspace_cap,
-        max_vaddr,
-        &mut bootstage_mbr,
-    );
-
-    let (_, boot_info_addr) = root_server_mem.create_boot_info_frame(
-        &mut root_cnode_cap,
-        &mut vspace_cap,
-        max_vaddr.add(PAGE_SIZE),
-        &mut bootstage_mbr,
-    );
-    // 4, create idle thread
-    create_idle_thread(&raw const __stack_top as usize);
-    // 5, create root server tcb,
-    let boot_info_ptr: *mut BootInfo = boot_info_addr.into();
-    let boot_info = unsafe {
-        *boot_info_ptr = BootInfo::default();
-        boot_info_ptr.as_mut().unwrap()
-    };
-
-    let entry_point = unsafe { (*elf_header).e_entry };
-    let mut root_tcb = root_server_mem.create_root_tcb(
-        &mut root_cnode_cap,
-        &mut vspace_cap,
-        &mut ipc_page_cap,
-        entry_point.into(),
-    );
-
-    // 6, convert rest of memory into untyped objects.
-    let mut num = 0;
-    for (idx, (untyped_cap_idx, untyped_cap)) in bootstage_mbr.finalize().enumerate() {
-        assert!(num < 32);
-        root_cnode_cap.write_slot(untyped_cap.replicate(), untyped_cap_idx);
-        boot_info.untyped_infos[idx] = UntypedInfo {
-            bits: untyped_cap.block_size(),
-            idx: untyped_cap_idx,
-            is_device: false,
-        };
-        num += 1;
-        boot_info.firtst_empty_idx = untyped_cap_idx + 1;
-    }
-    boot_info.untyped_num = num;
-    for (i, ch) in "hello, root_server\n".as_bytes().iter().enumerate() {
-        boot_info.msg[i] = *ch;
-    }
-    boot_info.root_cnode_idx = ROOT_CNODE_IDX;
-    boot_info.root_vspace_idx = ROOT_VSPACE_IDX;
-    boot_info.ipc_buffer_addr = max_vaddr.add(PAGE_SIZE).into();
-    // 7, set initial thread into current thread
-    root_tcb.set_register(&[(Register::A0, max_vaddr.add(PAGE_SIZE * 2).into())]);
-    root_tcb.make_runnable();
-    println!("root process initialization finished");
-}
-
-pub fn init_root_server(mut bump_allocator: BumpAllocator, elf_header: *const Elf64Hdr) {
-    let mut root_server_mem = RootServerMemory::init_with_uninit(&mut bump_allocator);
-    let bootstage_mbr = BootStateManager::new(
-        bump_allocator,
-        ROOT_BOOT_INFO_PAGE + 1,
-        2_usize.pow(ROOT_CNODE_ENTRY_NUM_BITS as u32) - 1,
-    );
-    create_initial_thread(&mut root_server_mem, bootstage_mbr, elf_header);
-
-    require_schedule();
-    unsafe {
-        schedule();
-    }
-}

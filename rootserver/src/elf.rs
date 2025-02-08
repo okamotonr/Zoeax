@@ -2,10 +2,11 @@ use core::ptr;
 use libzoea::{
     shared::{
         align_up,
-        elf::{Elf64Hdr, Elf64Phdr, PHeaders, ProgramFlags, ProgramType},
+        elf::def::{Elf64Hdr, Elf64Phdr, PHeaders, ProgramFlags, ProgramType},
         PAGE_SIZE,
     },
     ErrKind,
+    caps::{UntypedCapability, CNodeCapability, PageCapability, PageTableCapability}
 };
 
 pub struct ElfMapper<'a> {
@@ -15,9 +16,6 @@ pub struct ElfMapper<'a> {
     free_address: usize,
 }
 
-pub struct CNodeManager;
-
-pub struct UntypedManager;
 
 // TODO: DRY in kernel::init::root_server
 // ElfMapper gets FnMut(map_page), Fn(flag analyzer)
@@ -31,9 +29,9 @@ pub struct UntypedManager;
 // Fn (u32) -> F: F is flag ((bool, bool, bool) or usize)
 impl<'a> ElfMapper<'a> {
     pub fn new(
-        cnode_mgr: CNodeManager,
-        ut_mgr: UntypedManager,
-        root_table: &mut PageTableCap,
+        cnode_mgr: CNodeCapability,
+        ut_mgr: UntypedCapability,
+        root_table: &mut PageTableCapability,
         free_address: usize,
     ) -> Self {
         Self {
@@ -65,7 +63,7 @@ impl<'a> ElfMapper<'a> {
         &mut self,
         p_header: &Elf64Phdr,
         p_start_addr: *const u8,
-        target_root_space: &mut PageTableCap,
+        target_root_space: &mut PageTableCapability,
     ) -> Result<(), ()> {
         if !(p_header.p_type == ProgramType::Load) {
             return Ok(());
@@ -117,11 +115,11 @@ impl<'a> ElfMapper<'a> {
 
     fn map_page_with_tables(
         &mut self,
-        target_root_space: &mut PageTableCap,
+        target_root_space: &mut PageTableCapability,
         vaddr: usize,
         flags: (bool, bool, bool),
     ) -> Result<PageCap, ()> {
-        let mut page_cap = self.ut_mgr.retype_single::<PageCap>(&mut self.cnode_mgr)?;
+        let mut page_cap = self.ut_mgr.retype_single::<PageCapability>(&mut self.cnode_mgr)?;
         if let Err(e) = page_cap.map(target_root_space, vaddr, flags) {
             match e {
                 (ErrKind::PageTableNotMappedYet, value) => {
@@ -136,7 +134,7 @@ impl<'a> ElfMapper<'a> {
 
     fn map_page_tables(
         &mut self,
-        target_root_space: &mut PageTableCap,
+        target_root_space: &mut PageTableCapability,
         vaddr: usize,
         value: usize,
     ) -> Result<(), ()> {
