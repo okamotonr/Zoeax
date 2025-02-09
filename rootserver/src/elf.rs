@@ -1,16 +1,18 @@
 use core::{cmp::min, ptr};
 use libzoea::{
-    caps::{CNodeCapability, Page, PageCapability, PageFlags, PageTable, PageTableCapability, TCBCapability, UntypedCapability}, shared::{
+    caps::{CNodeCapability, Page, PageCapability, PageFlags, PageTable, PageTableCapability, UntypedCapability}, shared::{
         align_up,
-        elf::def::{Elf64Hdr, Elf64Phdr, PHeaders, ProgramFlags, ProgramType},
+        elf::{def::ProgramFlags, ProgramMapper},
         PAGE_SIZE,
     }, syscall::SysCallFailed, ErrKind
 };
 
-pub struct ElfMapper<'a> {
-    cnode_mgr: CNodeCapability,
-    ut_mgr: UntypedCapability,
+// TODO: Consider we have to borrow everything.
+pub struct ElfProgramMapper<'a> {
+    cnode: CNodeCapability,
+    ut: UntypedCapability,
     root_table: &'a mut PageTableCapability,
+    target_root_vspace: PageTableCapability,
     free_address: usize,
 }
 
@@ -25,53 +27,28 @@ pub struct ElfMapper<'a> {
 // usize,
 // ) -> Result where C: Capability or some trait to enable
 // Fn (u32) -> F: F is flag ((bool, bool, bool) or usize)
-impl<'a> ElfMapper<'a> {
-    pub fn new(
-        cnode_mgr: CNodeCapability,
-        ut_mgr: UntypedCapability,
-        root_table: &'a mut PageTableCapability,
-        free_address: usize,
-    ) -> Self {
-        Self {
-            cnode_mgr,
-            ut_mgr,
-            root_table,
-            free_address,
-        }
-    }
+//
+impl ProgramMapper for ElfProgramMapper<'_> {
+    type Flag = PageFlags;
+    type Error = SysCallFailed;
 
-    pub fn map_elf(&mut self, elf_image: &Elf64Hdr, tcb_cap: &mut TCBCapability) -> Result<(), SysCallFailed> {
-        /*
-         * 1, create root vspace,
-         * 2, mapping image,
-         * 3, set root vspace into tcb
-         * 4, write eip
-         */
-        let mut vroot_slot = self.cnode_mgr.get_slot()?;
-        let mut vroot = self
-            .ut_mgr
-            .retype_single_with_fixed_size::<PageTable>(&mut vroot_slot)?;
-        for (p_header, p_start_addr) in PHeaders::new(elf_image) {
-            self.map_program(p_header, p_start_addr, &mut vroot)?
-        }
-        let entry = elf_image.e_entry;
-        Ok(())
+    fn get_flags(flag: u32) -> Self::Flag {
+        let is_executable = ProgramFlags::is_executable(flag);
+        let is_writable = ProgramFlags::is_writable(flag);
+        let is_readable = ProgramFlags::is_readable(flag);
+        PageFlags { is_writable, is_readable, is_executable }
     }
 
     fn map_program(
-        &mut self,
-        p_header: &Elf64Phdr,
-        p_start_addr: *const u8,
-        target_root_space: &mut PageTableCapability,
-    ) -> Result<(), SysCallFailed> {
-        if !(p_header.p_type == ProgramType::Load) {
-            return Ok(());
-        }
-        let flags = get_flags(p_header.p_flags);
-        let page_num = (align_up(p_header.p_memsz, PAGE_SIZE)) / PAGE_SIZE;
-        let mut file_sz_rem = p_header.p_filesz;
-        let vaddr = p_header.p_vaddr;
-        let mut file_sz_rem = p_header.p_filesz;
+            &mut self,
+            vaddr: usize,
+            p_start_addr: *const u8,
+            p_mem_size: usize,
+            p_file_size: usize,
+            flags: Self::Flag,
+        ) -> Result<(), Self::Error> {
+        let mut file_sz_rem = p_file_size;
+        let page_num = (align_up(p_mem_size, PAGE_SIZE)) / PAGE_SIZE;
         for page_idx in 0..page_num {
             let offset = PAGE_SIZE * page_idx;
             let vaddr_n = vaddr + offset;
@@ -81,10 +58,57 @@ impl<'a> ElfMapper<'a> {
                 flags,
                 &mut file_sz_rem,
                 offset,
-                target_root_space,
             )?;
         }
         Ok(())
+
+        
+    }
+}
+
+impl<'a> ElfProgramMapper<'a> {
+    pub fn new(
+        cnode: CNodeCapability,
+        ut: UntypedCapability,
+        root_table: &'a mut PageTableCapability,
+        target_root_vspace: PageTableCapability,
+        free_address: usize,
+    ) -> Self {
+        Self {
+            cnode,
+            ut,
+            root_table,
+            target_root_vspace,
+            free_address,
+        }
+    }
+
+    pub fn try_new(
+        mut cnode: CNodeCapability,
+        mut ut: UntypedCapability,
+        root_table: &'a mut PageTableCapability,
+        free_address: usize,
+    ) -> Result<Self, SysCallFailed> {
+
+        let mut table_slot = cnode.get_slot()?;
+        let target_root_vspace = ut
+            .retype_single_with_fixed_size::<PageTable>(&mut table_slot)?;
+        Ok(
+            Self {
+                cnode,
+                ut,
+                root_table,
+                target_root_vspace,
+                free_address
+            }
+        )
+    }
+
+    pub fn finalize(self) -> (CNodeCapability, UntypedCapability, PageTableCapability) {
+        let cnode = self.cnode;
+        let ut = self.ut;
+        let target_root_vspace = self.target_root_vspace;
+        (cnode, ut, target_root_vspace)
     }
 
     fn map_page(
@@ -94,37 +118,35 @@ impl<'a> ElfMapper<'a> {
         flags: PageFlags,
         file_sz_rem: &mut usize,
         offset: usize,
-        target_root_space: &mut PageTableCapability,
     ) -> Result<(), SysCallFailed> {
-        let page_cap = self.map_page_with_tables(target_root_space, vaddr, flags)?;
+        let page_cap = self.map_page_with_tables(vaddr, flags)?;
         if *file_sz_rem != 0 {
-            let copy_src = p_start_addr.add(offset);
-            let tmp_page_cap = self.cnode_mgr.copy(page_cap)?;
+            let mut tmp_page_cap = self.cnode.copy(&page_cap)?;
             let copy_size = min(PAGE_SIZE, *file_sz_rem);
-            tmp_page_cap.map(self.root_table, self.free_address)?;
+            tmp_page_cap.map(self.root_table, self.free_address, flags)?;
             unsafe {
+                let copy_src = p_start_addr.add(offset);
                 ptr::copy::<u8>(copy_src, self.free_address as *mut u8, copy_size);
             }
             *file_sz_rem = (*file_sz_rem).saturating_sub(PAGE_SIZE);
-            tmp_page_cap.ummap(self.root_table)?;
-            self.cnode_mgr.delete(tmp_page_cap)?;
+            tmp_page_cap.unmap(self.root_table)?;
+            self.cnode.delete(tmp_page_cap)?;
         }
         Ok(())
     }
 
     fn map_page_with_tables(
         &mut self,
-        target_root_space: &mut PageTableCapability,
         vaddr: usize,
         flags: PageFlags,
     ) -> Result<PageCapability, SysCallFailed> {
-        let mut slot = self.cnode_mgr.get_slot()?;
-        let mut page_cap = self.ut_mgr.retype_single_with_fixed_size::<Page>(&mut slot)?;
-        if let Err(e) = page_cap.map(target_root_space, vaddr, flags) {
+        let mut slot = self.cnode.get_slot()?;
+        let mut page_cap = self.ut.retype_single_with_fixed_size::<Page>(&mut slot)?;
+        if let Err(e) = page_cap.map(&mut self.target_root_vspace, vaddr, flags) {
             match e {
                 (ErrKind::PageTableNotMappedYet, value) => {
-                    self.map_page_tables(target_root_space, vaddr, value)?;
-                    page_cap.map(vaddr, target_root_space, flags)?;
+                    self.map_page_tables(vaddr, value)?;
+                    page_cap.map(&mut self.target_root_vspace, vaddr, flags)?;
                 }
                 _ => Err((ErrKind::InvalidOperation, 0))?,
             }
@@ -134,16 +156,15 @@ impl<'a> ElfMapper<'a> {
 
     fn map_page_tables(
         &mut self,
-        target_root_space: &mut PageTableCapability,
         vaddr: usize,
-        value: usize,
+        _value: u16,
     ) -> Result<(), SysCallFailed> {
         loop {
-            let mut table_slot = self.cnode_mgr.get_slot()?;
+            let mut table_slot = self.cnode.get_slot()?;
             let mut page_table_cap = self
-                .ut_mgr
+                .ut
                 .retype_single_with_fixed_size::<PageTable>(&mut table_slot)?;
-            if let Ok(level) = page_table_cap.map(target_root_space, vaddr) {
+            if let Ok(level) = page_table_cap.map(&mut self.target_root_vspace, vaddr) {
                 if level == 0 {
                     break;
                 }
@@ -153,9 +174,3 @@ impl<'a> ElfMapper<'a> {
     }
 }
 
-fn get_flags(flags: u32) -> PageFlags {
-    let is_executable = ProgramFlags::is_executable(flags);
-    let is_writable = ProgramFlags::is_writable(flags);
-    let is_readable = ProgramFlags::is_readable(flags);
-    PageFlags { is_writable, is_readable, is_executable }
-}

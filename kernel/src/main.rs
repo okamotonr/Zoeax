@@ -9,6 +9,7 @@ use kernel::init_kernel;
 use kernel::println;
 use kernel::return_to_user;
 use shared::elf::def::Elf64Hdr;
+use shared::aligned_to::AlignedTo;
 
 extern "C" {
     static mut __bss: u8;
@@ -18,11 +19,6 @@ extern "C" {
 
 global_asm!(include_str!("boot.S"));
 
-#[repr(C)] // guarantee 'bytes' comes after '_align'
-pub struct AlignedTo<Align, Bytes: ?Sized> {
-    _align: [Align; 0],
-    pub bytes: Bytes,
-}
 
 static ALIGNED: &AlignedTo<u8, [u8]> = &AlignedTo {
     _align: [],

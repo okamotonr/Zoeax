@@ -7,6 +7,7 @@ pub mod inv_labels;
 pub mod registers;
 pub mod syscall_no;
 pub mod types;
+pub mod aligned_to;
 
 pub const PAGE_SIZE: usize = 4096;
 
