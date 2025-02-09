@@ -68,7 +68,7 @@ impl KObject for Something {}
 pub type CapInSlot = CapabilityData<Something>;
 
 impl CapInSlot {
-    pub fn try_as_ref_mut<NK>(&mut self) -> KernelResult<&mut CapabilityData<NK>>
+    pub fn try_ref_mut_as<NK>(&mut self) -> KernelResult<&mut CapabilityData<NK>>
     where
         NK: KObject,
         CapabilityData<NK>: Capability,
@@ -83,7 +83,7 @@ impl CapInSlot {
         }
     }
 
-    pub fn try_as_ref<NK>(&self) -> KernelResult<&CapabilityData<NK>>
+    pub fn try_ref_as<NK>(&self) -> KernelResult<&CapabilityData<NK>>
     where
         NK: KObject,
         CapabilityData<NK>: Capability,

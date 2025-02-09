@@ -1,89 +1,100 @@
 use crate::{syscall::{untyped_retype, SysCallFailed}, IPCBuffer};
-use shared::cap_type::CapabilityType;
+use shared::{cap_type::CapabilityType, err_kind::ErrKind};
 
-pub struct Zoea {
-    pub ipc_message: &'static IPCBuffer,
-}
-
-pub trait Cap: Default {
+pub trait KernelObject: Default {
     const CAP_TYPE: CapabilityType;
 }
 
-pub struct Capability<T: Cap> {
+pub trait FixedSizeType: KernelObject {
+    const OBJECT_SIZE: usize;
+}
+
+pub struct Capability<K: KernelObject> {
     pub cap_ptr: usize,
     pub cap_depth: u32,
-    pub cap_data: T,
+    pub cap_data: K,
 }
 
 #[derive(Default, Debug)]
-pub struct UntypedData {
+pub struct Untyped {
     pub is_device: bool,
     pub size_bits: usize,
 }
 
-impl Cap for UntypedData {
+impl KernelObject for Untyped {
     const CAP_TYPE: CapabilityType = CapabilityType::Untyped;
 }
 
 
 #[derive(Debug, Default)]
-pub struct CNodeData {
+pub struct CNode {
     pub radix: u32,
     // TODO: We have to track which slots are now in using.
     // Box<[Option<&Cap<Something>; 2_usize.pow(self.radix)]
     // or simple bitmap
     // Box<[bool; 2_usize.pow(self.radix)]
+    pub cursor: usize,
 }
 
-impl Cap for CNodeData {
+
+impl KernelObject for CNode {
     const CAP_TYPE: CapabilityType = CapabilityType::CNode;
 }
 
 #[derive(Debug, Default)]
-pub struct PageTableData {
+pub struct PageTable {
     pub mapped_address: usize,
     pub is_root: bool,
     pub is_mapped: bool
 }
 
-impl Cap for PageTableData {
+impl KernelObject for PageTable {
     const CAP_TYPE: CapabilityType = CapabilityType::PageTable;
 }
 
+impl FixedSizeType for PageTable {
+    const OBJECT_SIZE: usize = 4096;
+}
+
+
 #[derive(Debug, Default)]
-pub struct PageData {
+pub struct Page {
     pub mapped_address: usize,
     pub is_mapped: bool,
     pub rights: u8
 }
 
-impl Cap for PageData {
+impl KernelObject for Page {
     const CAP_TYPE: CapabilityType = CapabilityType::Page;
+}
+
+impl FixedSizeType for Page {
+    const OBJECT_SIZE: usize = 4096;
 }
 
 #[derive(Debug, Default)]
 pub struct EndpointData {
 }
 
-impl Cap for EndpointData {
+impl KernelObject for EndpointData {
     const CAP_TYPE: CapabilityType = CapabilityType::EndPoint;
 }
 
 #[derive(Debug, Default)]
 pub struct NotificaitonData {}
 
-impl Cap for NotificaitonData {
+impl KernelObject for NotificaitonData {
     const CAP_TYPE: CapabilityType = CapabilityType::Notification;
 }
 
 #[derive(Debug, Default)]
 pub struct TCBData {}
 
-impl Cap for TCBData {
+impl KernelObject for TCBData {
     const CAP_TYPE: CapabilityType = CapabilityType::Tcb;
 }
 
-pub type UntypedCapability = Capability<UntypedData>;
+pub type UntypedCapability = Capability<Untyped>;
 
 pub struct CSlots {
     // TODO: Get pptr and depth from parent: &CNode
@@ -108,7 +119,7 @@ impl UntypedCapability {
         num: u32,
     ) -> Result<(), SysCallFailed>
     where
-        T: Cap,
+        T: KernelObject,
     {
         untyped_retype(
             self.cap_ptr,
@@ -131,9 +142,9 @@ impl UntypedCapability {
         Ok(())
     }
 
-    pub fn retype_single<T: Cap>(
+    pub fn retype_single<T: KernelObject>(
         &mut self,
-        slot: &CSlot,
+        slot: &mut CSlot,
         user_size: usize,
     ) -> Result<Capability<T>, SysCallFailed> {
         let num = 1;
@@ -148,21 +159,69 @@ impl UntypedCapability {
             T::CAP_TYPE,
         )?;
         let new_c = T::default();
+        // We have to caluculate new cap postion.
         Ok(Capability {
             cap_ptr: slot.pptr,
             cap_depth: slot.depth,
             cap_data: new_c,
         })
     }
+
+    pub fn retype_single_with_fixed_size<T: KernelObject + FixedSizeType>(
+        &mut self,
+        slot: &mut CSlot
+    ) -> Result<Capability<T>, SysCallFailed> {
+        // NOTE: user_size will be ignored in kernel.
+        let user_size = T::OBJECT_SIZE;
+        self.retype_single::<T>(slot, user_size)
+    }
 }
 
-pub type CNodeCapability = Capability<CNodeData>;
+pub type CNodeCapability = Capability<CNode>;
 
 impl CNodeCapability {
+
+    pub fn get_slot(&mut self) -> Result<CSlot, SysCallFailed> {
+        let size = self.get_size();
+        if self.cap_data.cursor >= size {
+            Err((ErrKind::NoEnoughSlot, 0))
+        } else {
+            let ret = Ok(CSlot {
+                pptr: self.cap_ptr,
+                depth: self.cap_depth,
+                index: self.cap_data.cursor as u32
+            });
+            self.cap_data.cursor += 1;
+            ret
+        }
+    }
+
+    pub fn get_size(&self) -> usize {
+        2_usize.pow(self.cap_data.radix)
+    }
 }
 
-pub type PageTableCapability = Capability<PageTableData>;
+pub type PageTableCapability = Capability<PageTable>;
 
-pub type PageCapability = Capability<PageData>;
+impl PageTableCapability {
+    pub fn map(&mut self, root_table: &mut Self, vaddr: usize) -> Result<usize, SysCallFailed> {
+        todo!("")
+    }
+}
+
+pub type PageCapability = Capability<Page>;
+
+impl PageCapability {
+    pub fn map(&mut self, root_table: &mut PageTableCapability, vaddr: usize, flags: PageFlags) -> Result<(), SysCallFailed> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PageFlags {
+    pub is_writable: bool,
+    pub is_readable: bool,
+    pub is_executable: bool
+}
 
 pub type TCBCapability = Capability<TCBData>;

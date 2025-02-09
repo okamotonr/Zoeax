@@ -96,7 +96,7 @@ fn handle_invocation(
                 .cap_ref_mut();
             let dest_cnode = dest_cnode_cap.get_writable(num, index as u32)?;
             let (src_cap, src_mdb) = slot.cap_and_mdb_ref_mut();
-            src_cap.try_as_ref_mut::<Untyped>()?.invoke_retype(
+            src_cap.try_ref_mut_as::<Untyped>()?.invoke_retype(
                 src_mdb,
                 dest_cnode,
                 user_size,
@@ -110,7 +110,7 @@ fn handle_invocation(
             let dest_depth = reg.a4 as u32;
             let dest_index = reg.a5;
 
-            let dest_root = slot.cap_ref_mut().try_as_ref_mut::<CNode>()?;
+            let dest_root = slot.cap_ref_mut().try_ref_mut_as::<CNode>()?;
             let src_slot = root_cnode.lookup_entry_mut(src_index, src_depth)?;
             let src_entry = src_slot.as_mut().ok_or(kerr!(ErrKind::SlotIsEmpty))?;
             let dest_slot = dest_root.lookup_entry_mut(dest_index, dest_depth)?;
@@ -136,7 +136,7 @@ fn handle_invocation(
             }
         }
         CapabilityType::Tcb => {
-            let tcb_cap = slot.cap_ref_mut().try_as_ref_mut::<ThreadControlBlock>()?;
+            let tcb_cap = slot.cap_ref_mut().try_ref_mut_as::<ThreadControlBlock>()?;
             match inv_label {
                 InvLabel::TcbConfigure => {
                     let cnode_ptr = reg.a3;
@@ -187,7 +187,7 @@ fn handle_invocation(
             // replicate is enough because send or wait operation will never change cap data.
             let mut notify_cap = slot
                 .cap_ref_mut()
-                .try_as_ref_mut::<Notification>()?
+                .try_ref_mut_as::<Notification>()?
                 .replicate();
             match inv_label {
                 InvLabel::NotifySend => {
@@ -205,7 +205,7 @@ fn handle_invocation(
         }
         CapabilityType::EndPoint => {
             // replicate is enough because send or recv operation will never change cap data.
-            let mut ep_cap = slot.cap_ref_mut().try_as_ref_mut::<Endpoint>()?.replicate();
+            let mut ep_cap = slot.cap_ref_mut().try_ref_mut_as::<Endpoint>()?.replicate();
             match inv_label {
                 InvLabel::EpSend => {
                     if ep_cap.send(current_tcb) {
@@ -223,7 +223,7 @@ fn handle_invocation(
             }
         }
         CapabilityType::Page => {
-            let page_cap = slot.cap_ref_mut().try_as_ref_mut::<Page>()?;
+            let page_cap = slot.cap_ref_mut().try_ref_mut_as::<Page>()?;
             match inv_label {
                 InvLabel::PageMap => {
                     let page_table_ptr = reg.a3;
@@ -237,7 +237,7 @@ fn handle_invocation(
                         .as_mut()
                         .ok_or(kerr!(ErrKind::SlotIsEmpty))?
                         .cap_ref_mut()
-                        .try_as_ref_mut::<PageTable>()?;
+                        .try_ref_mut_as::<PageTable>()?;
                     let flags = PAGE_U | reg.a6;
                     page_cap.map(root_page_table, vaddr.into(), flags)
                 }
@@ -249,14 +249,14 @@ fn handle_invocation(
                         .as_mut()
                         .ok_or(kerr!(ErrKind::SlotIsEmpty))?
                         .cap_ref_mut()
-                        .try_as_ref_mut::<PageTable>()?;
+                        .try_ref_mut_as::<PageTable>()?;
                     page_cap.unmap(root_page_table)
                 }
                 _ => Err(kerr!(ErrKind::UnknownInvocation)),
             }
         }
         CapabilityType::PageTable => {
-            let page_table_cap = slot.cap_ref_mut().try_as_ref_mut::<PageTable>()?;
+            let page_table_cap = slot.cap_ref_mut().try_ref_mut_as::<PageTable>()?;
             match inv_label {
                 InvLabel::PageTableMap => {
                     let page_table_ptr = reg.a3;
@@ -270,7 +270,7 @@ fn handle_invocation(
                         .as_mut()
                         .ok_or(kerr!(ErrKind::SlotIsEmpty))?
                         .cap_ref_mut()
-                        .try_as_ref_mut::<PageTable>()?;
+                        .try_ref_mut_as::<PageTable>()?;
                     page_table_cap.map(root_page_table, vaddr.into())?;
                     Ok(())
                 }

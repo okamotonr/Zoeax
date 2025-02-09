@@ -101,7 +101,7 @@ impl CNodeCap {
                         return Ok(val);
                     }
                     let entry = val.as_mut().unwrap();
-                    let cap = entry.cap_ref_mut().try_as_ref_mut().unwrap();
+                    let cap = entry.cap_ref_mut().try_ref_mut_as().unwrap();
                     (cap, rem)
                 }
             };
@@ -152,7 +152,7 @@ impl CNodeCap {
                 print!("|");
                 // TODO: Prity print
                 print!("level is {}, index is {}, {:?}", level, i, entry);
-                if let Ok(cap) = entry.cap_ref().try_as_ref::<CNode>() {
+                if let Ok(cap) = entry.cap_ref().try_ref_as::<CNode>() {
                     if cap.get_address() == self.get_address() {
                         println!("  # same cnode of current");
                     } else {

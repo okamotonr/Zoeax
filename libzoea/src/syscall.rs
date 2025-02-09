@@ -7,7 +7,7 @@ use core::arch::asm;
 pub use shared::cap_type::CapabilityType;
 
 pub type SysCallRes = Result<usize, SysCallFailed>;
-pub type SysCallFailed = (ErrKind, u16)
+pub type SysCallFailed = (ErrKind, u16);
 
 #[allow(clippy::too_many_arguments)]
 unsafe fn syscall(

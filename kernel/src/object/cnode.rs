@@ -92,7 +92,7 @@ impl CNodeEntry<Something> {
         CapabilityData<K>: Capability,
     {
         // whether cast is safe or
-        self.cap.try_as_ref_mut::<K>()?;
+        self.cap.try_ref_mut_as::<K>()?;
         unsafe {
             let ptr = self as *mut Self as *mut CNodeEntry<K>;
             Ok(ptr.as_mut().unwrap())
