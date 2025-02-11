@@ -44,12 +44,8 @@ pub fn main(boot_info: &BootInfo) {
         .retype_single_with_fixed_size::<Notificaiton>(&mut root_cnode.get_slot().unwrap())
         .unwrap();
 
-    let mut lv2_cnode = untyped
+    let lv2_cnode = untyped
         .retype_single::<CNode>(&mut root_cnode.get_slot().unwrap(), 18)
-        .unwrap();
-
-    let mut root_vspace_for_new_proc = untyped
-        .retype_single_with_fixed_size::<PageTable>(&mut lv2_cnode.get_slot().unwrap())
         .unwrap();
 
     let mut page = untyped
@@ -83,7 +79,6 @@ pub fn main(boot_info: &BootInfo) {
     page.map(&mut root_vspace, vaddr, flags).unwrap();
     page.unmap(&mut root_vspace).unwrap();
 
-    root_vspace_for_new_proc.make_as_root().unwrap();
     let mut elf_mapper =
         ElfProgramMapper::try_new(lv2_cnode, untyped, &mut root_vspace, vaddr).unwrap();
 
