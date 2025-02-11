@@ -6,7 +6,8 @@ use crate::SysCallNo;
 use core::arch::asm;
 pub use shared::cap_type::CapabilityType;
 
-pub type SysCallRes = Result<usize, (ErrKind, u16)>;
+pub type SysCallRes = Result<usize, SysCallFailed>;
+pub type SysCallFailed = (ErrKind, u16);
 
 #[allow(clippy::too_many_arguments)]
 unsafe fn syscall(
@@ -322,6 +323,21 @@ pub fn map_page_table(
             dest_ptr,
             dest_depth as usize,
             vaddr,
+            0,
+            SysCallNo::Call,
+        )
+    }
+}
+
+pub fn make_page_table_root(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::PageTableMakeRoot,
+            0,
+            0,
+            0,
             0,
             SysCallNo::Call,
         )

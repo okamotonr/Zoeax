@@ -32,9 +32,12 @@ QEMUFLAGS += -device virtio-blk-device,drive=drive0,bus=virtio-mmio-bus.0
 
 kernel_elf    := $(BUILD_DIR)/kernel
 rootserver_elf      := $(BUILD_DIR)/rootserver
+simple_elf := $(BUILD_DIR)/simple
 
 .PHONY: build
 build:
+	pushd simple && cargo build $(CARGO_FLAGS) && popd
+	cp $(simple_elf) rootserver/simple
 	pushd rootserver && cargo build $(CARGO_FLAGS) && popd
 	cp $(rootserver_elf) kernel/rootserver
 	pushd kernel && cargo build $(CARGO_FLAGS) && popd

@@ -14,8 +14,9 @@ use crate::{
 use super::Something;
 
 /*
+ * PageTable
  * RawCapability[0]
- * | padding 15 | is_mapped 1 | mapped_address 48 |
+ * | padding 14 | is_root 1 | is_mapped 1 | mapped_address 48 |
  * 64                                            0
  */
 
@@ -42,9 +43,10 @@ impl PageTableCap {
     }
 
     pub unsafe fn activate(&mut self) -> KernelResult<()> {
-        self.is_mapped()
+        // TODO: Check
+        self.is_root()
             .then_some(())
-            .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
+            .ok_or(kerr!(ErrKind::NotRootPageTable))?;
         let page_table = self.get_pagetable();
         unsafe {
             page_table.activate();
@@ -57,18 +59,28 @@ impl PageTableCap {
             (0x1 << 48) | (<VirtAddr as Into<usize>>::into(vaddr) & 0xffffffffffff) as u64
     }
 
-    pub fn root_map(&mut self) -> KernelResult<()> {
+    pub fn make_as_root(&mut self) -> KernelResult<()> {
         (!self.is_mapped())
             .then_some(())
             .ok_or(kerr!(ErrKind::PageTableAlreadyMapped))?;
-        let vaddr = self.get_pagetable();
-        let addr = VirtAddr::from(vaddr as *const PageTable);
+        let root_table = self.get_pagetable();
+        root_table.copy_global_mapping();
+        let addr = VirtAddr::from(root_table as *const PageTable);
         self.set_mapped(addr);
+        self.set_root();
         Ok(())
     }
 
     fn is_mapped(&self) -> bool {
         ((self.cap_dep_val >> 48) & 0x1) == 1
+    }
+
+    pub fn is_root(&self) -> bool {
+        ((self.cap_dep_val >> 49) & 0x1) == 1
+    }
+
+    pub fn set_root(&mut self) {
+        self.cap_dep_val |= 0x1 << 49
     }
 }
 
@@ -78,6 +90,7 @@ impl Default for PageTable {
     }
 }
 /*
+ * Page
  * RawCapability[0]
  * | padding 11 | right 3 | is_device 1 | is_mapped 1 | mapped_address 48 |
  * 64                                                                    0
@@ -163,9 +176,9 @@ impl Capability for PageTableCap {
         PAGE_SIZE // page size, bytes
     }
     fn derive(&self, _src_slot: &crate::object::CNodeEntry<Something>) -> KernelResult<Self> {
-        self.is_mapped()
-            .then_some(())
-            .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
+        // self.is_mapped()
+        //     .then_some(())
+        //     .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
         Ok(self.replicate())
     }
 }
@@ -191,6 +204,8 @@ impl Capability for PageCap {
             .then_some(())
             .ok_or(kerr!(ErrKind::PageTableNotMappedYet))?;
 
-        Ok(self.replicate())
+        let mut cap = self.replicate();
+        cap.cap_dep_val = 0;
+        Ok(cap)
     }
 }

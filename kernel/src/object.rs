@@ -7,6 +7,7 @@ mod tcb;
 pub use crate::object::cnode::{CNode, CNodeEntry, CSlot, ManagementDB};
 pub use crate::object::endpoint::Endpoint;
 pub use crate::object::notification::Notification;
+pub use crate::object::page_table::get_user_flags;
 pub use crate::object::page_table::PageTable;
 pub use crate::object::tcb::{resume, Register, Registers, ThreadControlBlock, ThreadInfo};
 

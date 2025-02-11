@@ -36,6 +36,13 @@ use core::{
     ptr,
 };
 
+// From unix style to riscv
+pub fn get_user_flags(flags: usize) -> usize {
+    (if (flags & 0x1) == 0x1 { PAGE_X } else { 0x0 }
+        | if (flags & 0x2) == 0x2 { PAGE_W } else { 0x0 }
+        | if (flags & 0x4) == 0x4 { PAGE_R } else { 0x0 })
+}
+
 pub const SATP_SV48: usize = 9 << 60;
 pub const PAGE_V: usize = 1 << 0;
 pub const PAGE_R: usize = 1 << 1;

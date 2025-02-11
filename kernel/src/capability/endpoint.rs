@@ -25,6 +25,15 @@ impl Capability for EndPointCap {
             *ptr = Self::KernelObject::new();
         }
     }
+
+    fn derive(
+        &self,
+        _src_slot: &crate::object::CNodeEntry<super::Something>,
+    ) -> KernelResult<Self> {
+        let mut ret = self.replicate();
+        ret.cap_dep_val = 0;
+        Ok(ret)
+    }
 }
 
 impl EndPointCap {

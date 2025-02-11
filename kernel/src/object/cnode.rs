@@ -7,7 +7,9 @@ use crate::{
 use core::{fmt::Debug, mem};
 use shared::const_assert;
 
-use super::KObject;
+use super::{
+    page_table::Page, Endpoint, KObject, Notification, PageTable, ThreadControlBlock, Untyped,
+};
 
 /*
  * ManagementDB[0]
@@ -30,17 +32,15 @@ impl ManagementDB {
         self.get_node(true)
     }
 
-    pub fn set_next(&mut self, next: &mut CNodeEntry<Something>) {
+    pub fn set_next<C: KObject>(&mut self, next: &mut CNodeEntry<C>) {
         self.set_node(next, true)
     }
 
-    #[allow(dead_code)]
     pub fn get_prev(&mut self) -> Option<&mut CNodeEntry<Something>> {
         self.get_node(false)
     }
 
-    #[allow(dead_code)]
-    pub fn set_prev(&mut self, prev: &mut CNodeEntry<Something>) {
+    pub fn set_prev<C: KObject>(&mut self, prev: &mut CNodeEntry<C>) {
         self.set_node(prev, false)
     }
 
@@ -63,16 +63,16 @@ impl ManagementDB {
             .cast::<CNodeEntry<Something>>()
     }
 
-    fn set_node(&mut self, node: &mut CNodeEntry<Something>, is_next: bool) {
+    fn set_node<C: KObject>(&mut self, node: &mut CNodeEntry<C>, is_next: bool) {
         self._set_node(is_next, node);
         let parent = unsafe { self.get_entry().as_mut().unwrap() };
         node.mdb._set_node(!is_next, parent);
     }
 
-    fn _set_node(&mut self, is_next: bool, node: &CNodeEntry<Something>) {
+    fn _set_node<C: KObject>(&mut self, is_next: bool, node: &CNodeEntry<C>) {
         let index = if is_next { 1 } else { 0 };
         self.0[index] &= 0xffff;
-        self.0[index] |= (node as *const CNodeEntry<Something> as usize) << 16;
+        self.0[index] |= (node.as_ref() as *const CNodeEntry<Something> as usize) << 16;
     }
 }
 
@@ -82,7 +82,6 @@ pub type CSlot<T = Something> = Option<CNodeEntry<T>>;
 pub struct CNodeEntry<K: KObject>
 where
     K: KObject,
-    CapabilityData<K>: Capability,
 {
     cap: CapabilityData<K>,
     mdb: ManagementDB,
@@ -95,7 +94,7 @@ impl CNodeEntry<Something> {
         CapabilityData<K>: Capability,
     {
         // whether cast is safe or
-        self.cap.as_capability::<K>()?;
+        self.cap.try_ref_mut_as::<K>()?;
         unsafe {
             let ptr = self as *mut Self as *mut CNodeEntry<K>;
             Ok(ptr.as_mut().unwrap())
@@ -104,12 +103,42 @@ impl CNodeEntry<Something> {
     pub fn get_cap_type(&self) -> KernelResult<CapabilityType> {
         self.cap.get_cap_type()
     }
+
+    pub fn derive(&self) -> KernelResult<CapInSlot> {
+        match self.cap.get_cap_type()? {
+            CapabilityType::Tcb => {
+                let tcb = unsafe { self.cap.unchecked_ref_as::<ThreadControlBlock>() };
+                tcb.derive(self).map(Into::into)
+            }
+            CapabilityType::Untyped => {
+                let untyped = unsafe { self.cap.unchecked_ref_as::<Untyped>() };
+                untyped.derive(self).map(Into::into)
+            }
+            CapabilityType::CNode => {
+                let cnode = unsafe { self.cap.unchecked_ref_as::<CNode>() };
+                cnode.derive(self).map(Into::into)
+            }
+            CapabilityType::Notification => {
+                let noti = unsafe { self.cap.unchecked_ref_as::<Notification>() };
+                noti.derive(self).map(Into::into)
+            }
+            CapabilityType::EndPoint => {
+                let ep = unsafe { self.cap.unchecked_ref_as::<Endpoint>() };
+                ep.derive(self).map(Into::into)
+            }
+            CapabilityType::Page => {
+                let page = unsafe { self.cap.unchecked_ref_as::<Page>() };
+                page.derive(self).map(Into::into)
+            }
+            CapabilityType::PageTable => {
+                let page_table = unsafe { self.cap.unchecked_ref_as::<PageTable>() };
+                page_table.derive(self).map(Into::into)
+            }
+        }
+    }
 }
 
-impl<K: KObject> CNodeEntry<K>
-where
-    CapabilityData<K>: Capability,
-{
+impl<K: KObject> CNodeEntry<K> {
     pub fn new_with_rawcap(cap: CapabilityData<K>) -> Self {
         Self {
             cap,
@@ -117,37 +146,37 @@ where
         }
     }
 
-    pub fn cap_and_mdb(&mut self) -> (&mut CapabilityData<K>, &mut ManagementDB) {
+    pub fn cap_and_mdb_ref_mut(&mut self) -> (&mut CapabilityData<K>, &mut ManagementDB) {
         (&mut self.cap, &mut self.mdb)
     }
 
-    pub fn cap(&self) -> &CapabilityData<K> {
+    pub fn cap_ref(&self) -> &CapabilityData<K> {
         &self.cap
     }
 
-    pub fn insert(&mut self, parent: &mut CNodeEntry<Something>) {
+    pub fn insert<C: KObject>(&mut self, parent: &mut CNodeEntry<C>) {
         if let Some(prev_next) = parent.get_next() {
             self.set_next(prev_next);
         };
-        parent.set_next(self.up_cast_ref_mut())
+        parent.set_next(self.as_mut())
     }
 
-    pub fn replace(&mut self, src: &mut CNodeEntry<Something>) {
+    pub fn replace<C: KObject>(&mut self, src: &mut CNodeEntry<C>) {
         if let Some(src_next) = src.get_next() {
-            src_next.set_prev(self.up_cast_ref_mut());
+            src_next.set_prev(self.as_mut());
             self.set_next(src_next);
         };
         if let Some(src_prev) = src.get_prev() {
-            src_prev.set_next(self.up_cast_ref_mut());
+            src_prev.set_next(self.as_mut());
             self.set_prev(src_prev);
         }
     }
 
-    pub fn set_next(&mut self, next: &mut CNodeEntry<Something>) {
+    pub fn set_next<C: KObject>(&mut self, next: &mut CNodeEntry<C>) {
         self.mdb.set_next(next)
     }
 
-    pub fn set_prev(&mut self, prev: &mut CNodeEntry<Something>) {
+    pub fn set_prev<C: KObject>(&mut self, prev: &mut CNodeEntry<C>) {
         self.mdb.set_prev(prev)
     }
 
@@ -162,15 +191,19 @@ where
     pub fn cap_ref_mut(&mut self) -> &mut CapabilityData<K> {
         &mut self.cap
     }
+}
 
-    pub fn up_cast_ref(&self) -> &CNodeEntry<Something> {
+impl<K: KObject> AsRef<CNodeEntry<Something>> for CNodeEntry<K> {
+    fn as_ref(&self) -> &CNodeEntry<Something> {
         unsafe {
             let ptr = self as *const CNodeEntry<K> as *const CNodeEntry<Something>;
             ptr.as_ref().unwrap()
         }
     }
+}
 
-    pub fn up_cast_ref_mut(&mut self) -> &mut CNodeEntry<Something> {
+impl<K: KObject> AsMut<CNodeEntry<Something>> for CNodeEntry<K> {
+    fn as_mut(&mut self) -> &mut CNodeEntry<Something> {
         unsafe {
             let ptr = self as *mut CNodeEntry<K> as *mut CNodeEntry<Something>;
             ptr.as_mut().unwrap()
@@ -186,10 +219,15 @@ impl CNode {
         Self
     }
 
-    pub fn insert_cap(&mut self, parent: &mut ManagementDB, cap: CapInSlot, index: usize) {
+    pub fn insert_cap<C: Into<CapInSlot>>(
+        &mut self,
+        parent: &mut ManagementDB,
+        cap: C,
+        index: usize,
+    ) {
         let root = (self as *mut Self).cast::<CNodeEntry<Something>>();
         let mut entry = CNodeEntry {
-            cap,
+            cap: cap.into(),
             mdb: ManagementDB::default(),
         };
         if let Some(prev_next) = parent.get_next() {
