@@ -33,7 +33,6 @@ pub const ROOT_IPC_BUFFER: usize = 4;
 pub const ROOT_BOOT_INFO_PAGE: usize = 5;
 pub const ROOT_CNODE_ENTRY_NUM_BITS: usize = 18; // 2^18
 
-
 impl CNode {
     // todo: broken
     pub(in crate::init) fn write_slot<C: Into<CapInSlot>>(&mut self, cap: C, index: usize) {
@@ -111,10 +110,9 @@ impl<'a> RootServerMemory<'a> {
     ) -> (PageTableCap, VirtAddr) {
         let root_page_table = self.vspace.write(PageTable::new());
 
-        root_page_table.copy_global_mapping();
         let vaddr = (root_page_table as *const PageTable).into();
         let mut cap = PageTableCap::init(vaddr, 0);
-        cap.root_map().unwrap();
+        cap.make_as_root().unwrap();
         cnode_cap.write_slot(cap.replicate(), ROOT_VSPACE_IDX);
         let mut mapper = RootServerElfMapper::new(root_rsc_mgr, &mut cap, cnode_cap);
         unsafe {
@@ -289,16 +287,20 @@ pub struct RootServerElfMapper<'a> {
     max_vaddr: VirtAddr,
     root_rsc_mgr: &'a mut RootServerResourceManager,
     root_table_cap: &'a mut PageTableCap,
-    cnode_cap: &'a mut CNodeCap
+    cnode_cap: &'a mut CNodeCap,
 }
 
 impl<'a> RootServerElfMapper<'a> {
-    pub fn new(root_rsc_mgr: &'a mut RootServerResourceManager, root_table_cap: &'a mut PageTableCap, cnode_cap: &'a mut CNodeCap) -> Self {
+    pub fn new(
+        root_rsc_mgr: &'a mut RootServerResourceManager,
+        root_table_cap: &'a mut PageTableCap,
+        cnode_cap: &'a mut CNodeCap,
+    ) -> Self {
         Self {
             max_vaddr: 0.into(),
             root_rsc_mgr,
             root_table_cap,
-            cnode_cap
+            cnode_cap,
         }
     }
 
@@ -316,14 +318,13 @@ impl ProgramMapper for RootServerElfMapper<'_> {
     }
 
     fn map_program(
-            &mut self,
-            vaddr: usize,
-            p_start_addr: *const u8,
-            p_mem_size: usize,
-            p_file_size: usize,
-            flags: Self::Flag,
-        ) -> Result<(), Self::Error> {
-        
+        &mut self,
+        vaddr: usize,
+        p_start_addr: *const u8,
+        p_mem_size: usize,
+        p_file_size: usize,
+        flags: Self::Flag,
+    ) -> Result<(), Self::Error> {
         let page_num = (align_up(p_mem_size, PAGE_SIZE)) / PAGE_SIZE;
         let mut file_sz_rem = p_file_size;
         let vaddr = VirtAddr::new(vaddr);
@@ -335,8 +336,15 @@ impl ProgramMapper for RootServerElfMapper<'_> {
             }
             let page_addr = self.root_rsc_mgr.alloc_page();
             let page_cap = create_mapped_page_cap(
-                self.cnode_cap, self.root_table_cap, self.root_rsc_mgr, page_addr, vaddr_n, flags);
-            self.cnode_cap.write_slot(page_cap, self.root_rsc_mgr.alloc_cnode_idx());
+                self.cnode_cap,
+                self.root_table_cap,
+                self.root_rsc_mgr,
+                page_addr,
+                vaddr_n,
+                flags,
+            );
+            self.cnode_cap
+                .write_slot(page_cap, self.root_rsc_mgr.alloc_cnode_idx());
             if file_sz_rem != 0 {
                 let copy_dst = page_cap.get_address_virtual().into();
                 let copy_size = min(PAGE_SIZE, file_sz_rem);
@@ -412,4 +420,3 @@ fn get_flags(flags: u32) -> usize {
         0
     })
 }
-

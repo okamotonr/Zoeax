@@ -7,7 +7,9 @@ use crate::{
 use core::{fmt::Debug, mem};
 use shared::const_assert;
 
-use super::KObject;
+use super::{
+    page_table::Page, Endpoint, KObject, Notification, PageTable, ThreadControlBlock, Untyped,
+};
 
 /*
  * ManagementDB[0]
@@ -100,6 +102,39 @@ impl CNodeEntry<Something> {
     }
     pub fn get_cap_type(&self) -> KernelResult<CapabilityType> {
         self.cap.get_cap_type()
+    }
+
+    pub fn derive(&self) -> KernelResult<CapInSlot> {
+        match self.cap.get_cap_type()? {
+            CapabilityType::Tcb => {
+                let tcb = unsafe { self.cap.unchecked_ref_as::<ThreadControlBlock>() };
+                tcb.derive(self).map(Into::into)
+            }
+            CapabilityType::Untyped => {
+                let untyped = unsafe { self.cap.unchecked_ref_as::<Untyped>() };
+                untyped.derive(self).map(Into::into)
+            }
+            CapabilityType::CNode => {
+                let cnode = unsafe { self.cap.unchecked_ref_as::<CNode>() };
+                cnode.derive(self).map(Into::into)
+            }
+            CapabilityType::Notification => {
+                let noti = unsafe { self.cap.unchecked_ref_as::<Notification>() };
+                noti.derive(self).map(Into::into)
+            }
+            CapabilityType::EndPoint => {
+                let ep = unsafe { self.cap.unchecked_ref_as::<Endpoint>() };
+                ep.derive(self).map(Into::into)
+            }
+            CapabilityType::Page => {
+                let page = unsafe { self.cap.unchecked_ref_as::<Page>() };
+                page.derive(self).map(Into::into)
+            }
+            CapabilityType::PageTable => {
+                let page_table = unsafe { self.cap.unchecked_ref_as::<PageTable>() };
+                page_table.derive(self).map(Into::into)
+            }
+        }
     }
 }
 

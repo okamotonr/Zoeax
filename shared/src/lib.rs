@@ -1,5 +1,6 @@
 #![no_std]
 
+pub mod aligned_to;
 pub mod cap_type;
 pub mod elf;
 pub mod err_kind;
@@ -7,7 +8,6 @@ pub mod inv_labels;
 pub mod registers;
 pub mod syscall_no;
 pub mod types;
-pub mod aligned_to;
 
 pub const PAGE_SIZE: usize = 4096;
 

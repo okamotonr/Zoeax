@@ -17,10 +17,11 @@ pub trait ProgramMapper {
     ) -> Result<(), Self::Error>;
 }
 
-
 impl Elf64Hdr {
-
-    pub fn map_self<Mapper: ProgramMapper>(&self, mapper: &mut Mapper) -> Result<(), Mapper::Error> {
+    pub fn map_self<Mapper: ProgramMapper>(
+        &self,
+        mapper: &mut Mapper,
+    ) -> Result<(), Mapper::Error> {
         for (p_header, p_start_addr) in PHeaders::new(self) {
             self.map_program(p_header, p_start_addr, mapper)?;
         }
@@ -34,14 +35,12 @@ impl Elf64Hdr {
         mapper: &mut Mapper,
     ) -> Result<(), Mapper::Error> {
         if !(p_header.p_type == ProgramType::Load) {
-            return Ok(())
+            return Ok(());
         };
         let flags = Mapper::get_flags(p_header.p_flags);
         let p_memsz = p_header.p_memsz;
         let vaddr = p_header.p_vaddr;
         let p_filesz = p_header.p_filesz;
-        mapper.map_program(
-            vaddr, p_start_addr, p_memsz, p_filesz, flags
-        )
+        mapper.map_program(vaddr, p_start_addr, p_memsz, p_filesz, flags)
     }
 }

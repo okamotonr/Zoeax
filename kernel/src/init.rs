@@ -1,9 +1,11 @@
-use shared::elf::def::Elf64Hdr;
-use shared::registers::Register;
-use crate::scheduler::{schedule, create_idle_thread, require_schedule};
+use self::root_server::{
+    ROOT_BOOT_INFO_PAGE, ROOT_CNODE_ENTRY_NUM_BITS, ROOT_CNODE_IDX, ROOT_VSPACE_IDX,
+};
 use crate::address::PAGE_SIZE;
 use crate::common::{BootInfo, UntypedInfo};
-use self::root_server::{ROOT_CNODE_IDX, ROOT_VSPACE_IDX, ROOT_BOOT_INFO_PAGE, ROOT_CNODE_ENTRY_NUM_BITS};
+use crate::scheduler::{create_idle_thread, require_schedule, schedule};
+use shared::elf::def::Elf64Hdr;
+use shared::registers::Register;
 
 mod pm;
 mod root_server;
@@ -15,9 +17,8 @@ use crate::riscv::{r_sie, w_sie, w_sscratch, w_stvec, SIE_SEIE, SIE_SSIE, SIE_ST
 use crate::scheduler::CPU_VAR;
 use crate::timer::{set_timer, MTIME_PER_1MS};
 use pm::BumpAllocator;
-use root_server::{RootServerResourceManager, RootServerMemory};
+use root_server::{RootServerMemory, RootServerResourceManager};
 use vm::kernel_vm_init;
-
 
 extern "C" {
     static __stack_top: u8;

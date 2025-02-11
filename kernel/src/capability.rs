@@ -77,10 +77,7 @@ impl CapInSlot {
         (CapabilityData::<NK>::CAP_TYPE == cap_type)
             .then_some(())
             .ok_or(kerr!(ErrKind::UnexpectedCapType))?;
-        unsafe {
-            let ptr = self as *mut CapabilityData<Something> as *mut CapabilityData<NK>;
-            Ok(ptr.as_mut().unwrap())
-        }
+        unsafe { Ok(self.unchecked_ref_mut_as()) }
     }
 
     pub fn try_ref_as<NK>(&self) -> KernelResult<&CapabilityData<NK>>
@@ -92,10 +89,25 @@ impl CapInSlot {
         (CapabilityData::<NK>::CAP_TYPE == cap_type)
             .then_some(())
             .ok_or(kerr!(ErrKind::UnexpectedCapType))?;
-        unsafe {
-            let ptr = self as *const CapabilityData<Something> as *const CapabilityData<NK>;
-            Ok(ptr.as_ref().unwrap())
-        }
+        unsafe { Ok(self.unchecked_ref_as()) }
+    }
+
+    pub unsafe fn unchecked_ref_as<NK>(&self) -> &CapabilityData<NK>
+    where
+        NK: KObject,
+        CapabilityData<NK>: Capability,
+    {
+        let ptr = self as *const Self as *const CapabilityData<NK>;
+        ptr.as_ref().unwrap()
+    }
+
+    unsafe fn unchecked_ref_mut_as<NK>(&mut self) -> &mut CapabilityData<NK>
+    where
+        NK: KObject,
+        CapabilityData<NK>: Capability,
+    {
+        let ptr = self as *mut Self as *mut CapabilityData<NK>;
+        ptr.as_mut().unwrap()
     }
 }
 

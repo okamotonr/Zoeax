@@ -329,6 +329,21 @@ pub fn map_page_table(
     }
 }
 
+pub fn make_page_table_root(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
+    unsafe {
+        syscall(
+            cap_ptr,
+            cap_depth,
+            InvLabel::PageTableMakeRoot,
+            0,
+            0,
+            0,
+            0,
+            SysCallNo::Call,
+        )
+    }
+}
+
 pub fn send_ipc(cap_ptr: usize, cap_depth: u32) -> SysCallRes {
     unsafe {
         syscall(

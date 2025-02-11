@@ -22,6 +22,7 @@ pub enum ErrKind {
     CapNotFound,
     NotAligned,
     UnknownSysCall,
+    NotRootPageTable,
 }
 
 impl TryFrom<usize> for ErrKind {

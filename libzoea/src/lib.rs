@@ -12,8 +12,8 @@ pub use crate::shared::syscall_no::SysCallNo;
 pub use crate::shared::types::BootInfo;
 pub use crate::shared::types::IPCBuffer;
 pub use crate::shared::types::UntypedInfo;
-pub mod syscall;
 pub mod caps;
+pub mod syscall;
 
 #[macro_export]
 macro_rules! print {

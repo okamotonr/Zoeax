@@ -6,9 +6,9 @@ use core::{arch::naked_asm, panic::PanicInfo};
 
 use libzoea::println;
 
+mod boot_info;
 mod elf;
 mod rootserver;
-mod boot_info;
 
 extern "C" {
     static __stack_top: u8;

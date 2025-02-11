@@ -19,6 +19,7 @@ pub enum InvLabel {
     PageUnMap,
     PageTableMap,
     PageTableUnMap,
+    PageTableMakeRoot,
     EpSend,
     EpRecv,
 }
@@ -43,6 +44,7 @@ impl TryFrom<usize> for InvLabel {
             inv if inv == Self::PageUnMap as usize => Ok(Self::PageUnMap),
             inv if inv == Self::PageTableMap as usize => Ok(Self::PageTableMap),
             inv if inv == Self::PageTableUnMap as usize => Ok(Self::PageTableUnMap),
+            inv if inv == Self::PageTableMakeRoot as usize => Ok(Self::PageTableMakeRoot),
             inv if inv == Self::EpSend as usize => Ok(Self::EpSend),
             inv if inv == Self::EpRecv as usize => Ok(Self::EpRecv),
             _ => Err(ErrKind::UnknownInvocation),

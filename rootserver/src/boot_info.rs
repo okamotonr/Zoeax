@@ -1,10 +1,9 @@
 use libzoea::caps::CNode;
+use libzoea::caps::CNodeCapability;
 use libzoea::caps::PageTable;
 use libzoea::caps::PageTableCapability;
-use libzoea::shared::types::BootInfo;
 use libzoea::caps::UntypedCapability;
-use libzoea::caps::CNodeCapability;
-
+use libzoea::shared::types::BootInfo;
 
 pub const ROOT_CNODE_RADIX: u32 = 18;
 
@@ -19,7 +18,7 @@ pub fn get_root_cnode(boot_info: &BootInfo) -> CNodeCapability {
         cap_data: CNode {
             radix: ROOT_CNODE_RADIX,
             cursor: boot_info.firtst_empty_idx,
-        }
+        },
     }
 }
 
@@ -30,7 +29,7 @@ pub fn get_root_vspace(boot_info: &BootInfo) -> PageTableCapability {
         cap_data: PageTable {
             mapped_address: 0, // nonsense
             is_root: true,
-            is_mapped: true
-        }
+            is_mapped: true,
+        },
     }
 }
