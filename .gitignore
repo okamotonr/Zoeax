@@ -2,5 +2,6 @@
 shell.bin*
 qemu.log
 .gdb_history
+./*/*.map
 
 
