@@ -1,24 +1,18 @@
 use libzoea::caps::CNode;
 use libzoea::caps::Endpoint;
+use libzoea::caps::EndpointCapability;
 use libzoea::caps::Notificaiton;
+use libzoea::caps::NotificaitonCapability;
 use libzoea::caps::Page;
 use libzoea::caps::PageFlags;
 use libzoea::caps::ThreadControlBlock;
 use libzoea::caps::PageTable;
 use libzoea::println;
-use libzoea::syscall::map_page;
-use libzoea::syscall::recv_ipc;
-use libzoea::syscall::send_ipc;
-use libzoea::syscall::send_signal;
 use libzoea::syscall::traverse;
-use libzoea::syscall::unmap_page;
-use libzoea::syscall::CapabilityType;
-use libzoea::syscall::untyped_retype;
 use libzoea::BootInfo;
 use libzoea::Registers;
 use libzoea::shared::aligned_to::AlignedTo;
 
-use crate::boot_info::ROOT_CNODE_RADIX;
 use crate::elf::ElfProgramMapper;
 use crate::boot_info::{get_untyped, get_root_cnode, get_root_vspace};
 
@@ -41,9 +35,7 @@ pub fn main(boot_info: &BootInfo) {
     let mut root_cnode = get_root_cnode(boot_info);
     let mut untyped = get_untyped(boot_info);
     let mut root_vspace = get_root_vspace(boot_info);
-    let untyped_cnode_idx = boot_info.untyped_infos[0].idx;
     println!("boot info: {:x?}", boot_info);
-    println!("parent: hello, world, {untyped_cnode_idx:x}");
     let mut child_tcb = untyped.retype_single_with_fixed_size::<ThreadControlBlock>(&mut root_cnode.get_slot().unwrap()).unwrap();
     let notify = untyped.retype_single_with_fixed_size::<Notificaiton>(
         &mut root_cnode.get_slot().unwrap(),
@@ -76,8 +68,17 @@ pub fn main(boot_info: &BootInfo) {
     }
     child_tcb.set_ipc_buffer(&page).unwrap();
 
+
+    let vaddr = 0x0000000001000000 - 0x2000;
+    let mut page = untyped.retype_single_with_fixed_size::<Page>(
+        &mut root_cnode.get_slot().unwrap()
+    ).unwrap();
+
+    let flags = PageFlags::readonly();
+    page.map(&mut root_vspace, vaddr, flags).unwrap();
     // test copy into lv2
-    let copied_notiry = lv2_cnode.copy::<Notificaiton>(
+    page.unmap(&mut root_vspace).unwrap();
+    let _copied_notiry = lv2_cnode.copy::<Notificaiton>(
         &notify,
     )
     .unwrap();
@@ -111,14 +112,14 @@ pub fn main(boot_info: &BootInfo) {
             sp: sp_val,
             sepc: children as usize,
             a0: minted_not_1.cap_ptr,
-            a1: minted_ep.cap_ptr,
-            a2: untyped_cnode_idx,
+            a1: minted_not_1.cap_depth as usize,
+            a2: minted_ep.cap_ptr,
+            a3: minted_ep.cap_depth as usize,
             ..Default::default()
         },
         boot_info.ipc_buffer(),
     )
     .unwrap();
-
 
     traverse().unwrap();
     child_tcb.resume().unwrap();
@@ -133,61 +134,35 @@ pub fn main(boot_info: &BootInfo) {
     endpoint.recive().unwrap();
     println!("parnet: recv done");
     println!("parent: call recv");
-    endpoint.recive();
+    endpoint.recive().unwrap();
     println!("parnet: recv done");
     panic!("iam parent");
 }
 
 #[allow(clippy::empty_loop)]
-fn children(a0: usize, a1: usize, a2: usize) {
-    let root_cnode_idx: usize = 2;
-    let root_vspace_idx: usize = 3;
-    println!("children: hello from children");
-    println!("children: a0 is {a0}");
-    println!("children: a1 is {a1}");
-    println!("children: a2 is {a2}");
-    send_signal(a0, ROOT_CNODE_RADIX).unwrap();
+fn children(not_cptr: usize, not_depth: u32, ep_ptr: usize, ep_depth: u32) {
+    let not = NotificaitonCapability {
+        cap_ptr: not_cptr,
+        cap_depth: not_depth,
+        cap_data: Notificaiton {  }
+    };
+    let ep = EndpointCapability {
+        cap_ptr: ep_ptr,
+        cap_depth: ep_depth,
+        cap_data: Endpoint {}
+    };
+    println!("children: notification is {not:?}");
+    println!("children: ep is {ep:?}");
+    not.send().unwrap();
     println!("children: send signal");
-    let vaddr = 0x0000000001000000 - 0x2000;
-    let page_idx = a1 + 1;
-    let page_r = 2;
-    let page_w = 4;
-    let flags = page_r | page_w;
-    untyped_retype(
-        a2,
-        ROOT_CNODE_RADIX,
-        root_cnode_idx,
-        ROOT_CNODE_RADIX,
-        page_idx as u32,
-        1,
-        1,
-        CapabilityType::Page,
-    )
-    .unwrap();
-    map_page(
-        page_idx,
-        ROOT_CNODE_RADIX,
-        root_vspace_idx,
-        ROOT_CNODE_RADIX,
-        vaddr,
-        flags,
-    )
-    .unwrap();
-    unmap_page(
-        page_idx,
-        ROOT_CNODE_RADIX,
-        root_vspace_idx,
-        ROOT_CNODE_RADIX,
-    )
-    .unwrap();
     println!("child: call recv");
-    recv_ipc(a1, ROOT_CNODE_RADIX).unwrap();
+    ep.recive().unwrap();
     println!("child: recv done");
     println!("child: call send");
-    send_ipc(a1, ROOT_CNODE_RADIX).unwrap();
+    ep.send().unwrap();
     println!("child: send done");
     println!("child: call send");
-    send_ipc(a1, ROOT_CNODE_RADIX).unwrap();
+    ep.send().unwrap();
     println!("child: send done");
     panic!("iam child");
 }

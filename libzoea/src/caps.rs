@@ -9,7 +9,7 @@ pub trait KernelObject {
     fn from_retype(user_size: usize, is_device: bool) -> Self;
 }
 
-pub trait FixedSizeType: KernelObject {
+pub trait FixedSizeObject: KernelObject {
     const OBJECT_SIZE: usize;
 }
 
@@ -21,6 +21,7 @@ pub trait Mintable: KernelObject {
     fn mint_data(&self, value: usize) -> Self;
 }
 
+#[derive(Debug)]
 pub struct Capability<K: KernelObject> {
     // Or pub cnode: *mut CNode (or MutableCNodePtr, which gauarantee only one mutable ref is
     // existing)
@@ -82,7 +83,7 @@ impl KernelObject for PageTable {
     }
 }
 
-impl FixedSizeType for PageTable {
+impl FixedSizeObject for PageTable {
     const OBJECT_SIZE: usize = 4096;
 }
 
@@ -101,7 +102,7 @@ impl KernelObject for Page {
     }
 }
 
-impl FixedSizeType for Page {
+impl FixedSizeObject for Page {
     const OBJECT_SIZE: usize = 4096;
 }
 
@@ -122,7 +123,7 @@ impl KernelObject for Endpoint {
     }
 }
 
-impl FixedSizeType for Endpoint {
+impl FixedSizeObject for Endpoint {
     const OBJECT_SIZE: usize = 0;
 }
 
@@ -142,7 +143,7 @@ impl KernelObject for Notificaiton {
     }
 }
 
-impl FixedSizeType for Notificaiton {
+impl FixedSizeObject for Notificaiton {
     const OBJECT_SIZE: usize = 0;
 }
 
@@ -168,7 +169,7 @@ impl KernelObject for ThreadControlBlock {
     }
 }
 
-impl FixedSizeType for ThreadControlBlock {
+impl FixedSizeObject for ThreadControlBlock {
     // Dummy
     const OBJECT_SIZE: usize = 0;
 }
@@ -187,37 +188,7 @@ impl UntypedCapability {
             }
         }
     }
-    pub fn retype_mul<T>(
-        &mut self,
-        slots: &CSlots,
-        user_size: u32,
-        buffer: &mut [Capability<T>],
-        num: u32,
-    ) -> Result<(), SysCallFailed>
-    where
-        T: KernelObject,
-    {
-        untyped_retype(
-            self.cap_ptr,
-            self.cap_depth,
-            slots.pptr,
-            slots.depth,
-            slots.index,
-            user_size,
-            slots.num,
-            T::CAP_TYPE,
-        )?;
-        for i in 0..num {
-            let new_c = T::from_retype(user_size as usize, self.cap_data.is_device);
-            buffer[i as usize] = Capability {
-                cap_ptr: slots.pptr,
-                cap_depth: slots.depth,
-                cap_data: new_c,
-            }
-        }
-        Ok(())
-    }
-
+    
     pub fn retype_single<T: KernelObject>(
         &mut self,
         slot: &mut CSlot,
@@ -244,7 +215,7 @@ impl UntypedCapability {
         })
     }
 
-    pub fn retype_single_with_fixed_size<T: KernelObject + FixedSizeType>(
+    pub fn retype_single_with_fixed_size<T: FixedSizeObject>(
         &mut self,
         slot: &mut CSlot
     ) -> Result<Capability<T>, SysCallFailed> {
@@ -252,13 +223,6 @@ impl UntypedCapability {
         let user_size = T::OBJECT_SIZE;
         self.retype_single::<T>(slot, user_size)
     }
-}
-pub struct CSlots {
-    // TODO: Get pptr and depth from parent: &CNode
-    pptr: usize,
-    depth: u32,
-    index: u32,
-    num: u32,
 }
 
 #[derive(Debug)]
@@ -274,11 +238,9 @@ pub struct CSlot {
 impl CSlot {
     pub fn get_cap_ptr(&self) -> (usize, u32) {
         // TODO: check overflow
-        println!("{:?}", self);
+        // TODO: If this is from root cnode, we don't have to add
         let new_depth = self.depth + self.radix;
         let new_pptr = (self.pptr << self.radix) + self.index as usize;
-        println!("{:#b}", new_pptr);
-        println!("{}", new_depth);
         (new_pptr, new_depth)
         
     }
