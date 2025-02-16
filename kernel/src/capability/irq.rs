@@ -32,5 +32,10 @@ impl IrqHandlerCap {
     pub fn get_irq_number(&self) -> u64 {
         self.cap_dep_val & 0xfff
     }
-}
 
+    pub fn create(irq_number: u64) -> Self {
+        let mut ret = Self::init(0.into(), 0);
+        ret.cap_dep_val &= irq_number & 0xfff;
+        ret
+    }
+}

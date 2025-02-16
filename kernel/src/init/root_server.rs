@@ -1,11 +1,13 @@
 use super::pm::BumpAllocator;
 use shared::elf::def::{Elf64Hdr, ProgramFlags};
 use shared::elf::ProgramMapper;
+use shared::types::{BootInfo, UntypedInfo};
 
-use crate::address::KernelVAddress;
+use crate::address::{KernelVAddress, PhysAddr};
 use crate::address::VirtAddr;
 use crate::address::PAGE_SIZE;
 use crate::capability::cnode::CNodeCap;
+use crate::capability::irq::IrqControlCap;
 use crate::capability::page_table::PageCap;
 use crate::capability::page_table::PageTableCap;
 use crate::capability::tcb::TCBCap;
@@ -13,6 +15,8 @@ use crate::capability::untyped::UntypedCap;
 use crate::capability::CapInSlot;
 use crate::capability::Capability;
 use crate::common::{align_up, ErrKind};
+use crate::irq::init_irq_nodes;
+use crate::memlayout::VIRTIO0;
 use crate::object::page_table::{Page, PAGE_R, PAGE_U, PAGE_W, PAGE_X};
 use crate::object::CNodeEntry;
 use crate::object::PageTable;
@@ -29,8 +33,9 @@ use core::ptr;
 pub const ROOT_TCB_IDX: usize = 1;
 pub const ROOT_CNODE_IDX: usize = 2;
 pub const ROOT_VSPACE_IDX: usize = 3;
-pub const ROOT_IPC_BUFFER: usize = 4;
-pub const ROOT_BOOT_INFO_PAGE: usize = 5;
+pub const ROOT_IRQ_CONTROL: usize = 4;
+pub const ROOT_IPC_BUFFER: usize = 5;
+pub const ROOT_BOOT_INFO_PAGE: usize = 6;
 pub const ROOT_CNODE_ENTRY_NUM_BITS: usize = 18; // 2^18
 
 impl CNode {
@@ -51,6 +56,14 @@ impl CNodeCap {
         cnode[index] = Some(entry);
     }
 }
+
+impl IrqControlCap {
+    pub(in crate::init) fn create() -> Self {
+        // Address has no meanings because IrqControl is not in physical memory
+        Self::init(0.into(), 0)
+    }
+}
+
 
 pub(in crate::init) struct RootServerMemory<'a> {
     cnode: &'a mut MaybeUninit<CNode>,
@@ -120,6 +133,17 @@ impl<'a> RootServerMemory<'a> {
         }
         let max_vaddr = mapper.max_vaddr_of_elf();
         (cap, max_vaddr)
+    }
+
+    pub fn create_irqs(
+        &mut self,
+        cnode_cap: &mut CNodeCap
+    ) {
+        let irq_cap = IrqControlCap::create();
+        unsafe {
+            init_irq_nodes();
+        }
+        cnode_cap.write_slot(irq_cap, ROOT_IRQ_CONTROL);
     }
 
     /// create ipc buffer frame
@@ -402,6 +426,21 @@ fn map_page_tables(
             panic!("error occur")
         }
     }
+}
+
+pub fn set_device_memory(cnode_cap: &mut CNodeCap, boot_info: &mut BootInfo, idx: usize) {
+    // virtio mmio
+    let virtio_phys: PhysAddr = VIRTIO0.into();
+    let mut virtio_untyped = UntypedCap::init(virtio_phys.into(), PAGE_SIZE);
+    virtio_untyped.mark_is_device();
+    boot_info.untyped_infos[idx] = UntypedInfo {
+        bits: virtio_untyped.block_size(),
+        idx: boot_info.firtst_empty_idx,
+        is_device: true,
+        phys_addr: virtio_untyped.get_address().into()
+    };
+    cnode_cap.write_slot(virtio_untyped, boot_info.firtst_empty_idx);
+    boot_info.firtst_empty_idx += 1;
 }
 
 #[inline]
