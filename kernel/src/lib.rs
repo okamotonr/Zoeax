@@ -7,7 +7,7 @@
 mod address;
 mod capability;
 pub mod common;
-mod handler;
+mod trap;
 mod init;
 pub mod list;
 mod memlayout;
@@ -17,11 +17,12 @@ mod sbi;
 mod scheduler;
 mod syscall;
 mod timer;
+mod irq;
 pub mod uart;
 
 pub use capability::CapabilityType;
 pub use common::{ErrKind, KernelError, KernelResult};
-pub use handler::return_to_user;
+pub use trap::return_to_user;
 pub use init::init_kernel;
 pub use object::Registers;
 pub use syscall::InvLabel;
